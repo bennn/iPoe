@@ -1,0 +1,17 @@
+{% load staticfiles %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html lang="en">
+    <head>
+        <title>{% block title %}iPoe{% endblock %}</title>
+        <link rel="stylesheet" type="text/css" href="{% static 'ipoe.css' %}"/>
+        <link rel="shortcut icon" type="image/x-icon" href="{% static 'favi.ico' %}"/>
+    </head>
+    <body>
+        {% block header %}
+        {% endblock %}
+        {% block content %}
+        {% endblock %}
+        {% block footer %}
+        {% endblock %}
+    </body>
+</html>
