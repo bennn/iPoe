@@ -3,6 +3,12 @@
 *~
 \#*
 
+# compiled files
+*.pyc
+
+# database
+*.db
+
 # a very pretty online editor, may eventually want to integrate
 ckeditor-dev
 
