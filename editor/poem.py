@@ -12,7 +12,7 @@ class Poem:
             'num_rows' : (self.NUM_LINES or 35) + (self.NUM_STANZAS or 0),
             'num_cols' : 80,
         }
-        return """<textarea class='poemcontent' rows='{num_rows}' cols='{num_cols}'></textarea>""".format(**fmt)
+        return """<textarea id='poem_content' rows='{num_rows}' cols='{num_cols}'></textarea>""".format(**fmt)
 
     def get_name(self):
         return self.NAME
