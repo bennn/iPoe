@@ -16,8 +16,12 @@ poetry editor
     {{ poem.as_text_area|safe }}
 </div>
 
-{% if error_message %}
-    <p class="error">{{ error_message }}</p>
+{% if compiled %}
+    {% if error_message %}
+        <p class="error">{{ error_message }}</p>
+    {% else %}
+        <p class="success">Lookin' Good!</p>
+    {% endif %}
 {% endif %}
 
     <div class="control">

@@ -5,3 +5,7 @@ body a {
 .error {
     color: red;
 }
+
+.success {
+    color: green;
+}
