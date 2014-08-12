@@ -1,3 +1,7 @@
 body a {
     color: green;
 }
+
+.error {
+    color: red;
+}

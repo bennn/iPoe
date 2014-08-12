@@ -9,12 +9,21 @@ poetry editor
 {% endblock %}
 
 {% block content %}
-<div class="textarea">
-    {{ poem.as_text_area|safe }}
-</div>
-<div class="control">
-    <button onclick="saveTextAsFile()">Download Poem</button>
-</div>
+<form action="/editor/{{ slug }}/" method="post">{% csrf_token %}
+    <div class="textarea">
+        {{ poem.as_text_area|safe }}
+    </div>
+
+{% if error_message %}
+    <p class="error">{{ error_message }}</p>
+{% endif %}
+
+    <div class="control">
+        <button onclick="saveTextAsFile()">Download Poem</button>
+        <input type="submit" value="Check Poem" />
+    </div>
+</form>
+
 {% endblock %}
 
 {% block footer %}
