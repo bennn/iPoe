@@ -6,13 +6,22 @@ class Poem:
     LINES_PER_STANZA   = []
     SYLLABLES_PER_LINE = []
 
+    def __init__(self, content=""):
+        self.content = content
+
     def as_text_area(self):
         # render the widget to html
         fmt = {
+            'content'  : self.content,
             'num_rows' : (self.NUM_LINES or 35) + (self.NUM_STANZAS or 0),
             'num_cols' : 80,
         }
-        return """<textarea id='poem_content' rows='{num_rows}' cols='{num_cols}'></textarea>""".format(**fmt)
+        return """<textarea id='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
+
+    def compile(self):
+        # Compare 'self.content' to an expected poem of this format. Default is 'PASS!'
+        # TODO break into methods?
+        return None
 
     def get_name(self):
         return self.NAME
@@ -44,6 +53,9 @@ class Haiku(Poem):
     NUM_STANZA         = 1
     LINES_PER_STANZA   = [3]
     SYLLABLES_PER_LINE = [5,7,5]
+
+    def compile(self):
+        return "Errors everywhere"
 
 def of_string(poem_type):
     if poem_type == "free":
