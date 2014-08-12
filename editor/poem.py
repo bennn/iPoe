@@ -16,7 +16,7 @@ class Poem:
             'num_rows' : (self.NUM_LINES or 35) + (self.NUM_STANZAS or 0),
             'num_cols' : 80,
         }
-        return """<textarea id='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
+        return """<textarea id='poem_content' name='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
 
     def compile(self):
         # Compare 'self.content' to an expected poem of this format. Default is 'PASS!'

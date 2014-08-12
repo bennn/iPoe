@@ -9,10 +9,12 @@ poetry editor
 {% endblock %}
 
 {% block content %}
-<form action="/editor/{{ slug }}/" method="post">{% csrf_token %}
-    <div class="textarea">
-        {{ poem.as_text_area|safe }}
-    </div>
+<form action="/editor/{{ slug }}/" method="post">
+{% csrf_token %}
+
+<div class="textarea">
+    {{ poem.as_text_area|safe }}
+</div>
 
 {% if error_message %}
     <p class="error">{{ error_message }}</p>
