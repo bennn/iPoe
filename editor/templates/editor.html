@@ -9,8 +9,11 @@ poetry editor
 {% endblock %}
 
 {% block content %}
-<p>Insert text box here.</p>
+<div class="textarea">
+{{ poem.as_text_area|safe }}
+</div>
 {% endblock %}
 
 {% block footer %}
+<p>TODO add button to save poem</p>
 {% endblock %}
