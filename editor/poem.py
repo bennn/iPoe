@@ -6,6 +6,14 @@ class Poem:
     LINES_PER_STANZA   = []
     SYLLABLES_PER_LINE = []
 
+    def as_text_area(self):
+        # render the widget to html
+        fmt = {
+            'num_rows' : (self.NUM_LINES or 35) + (self.NUM_STANZAS or 0),
+            'num_cols' : 80,
+        }
+        return """<textarea class='poemcontent' rows='{num_rows}' cols='{num_cols}'></textarea>""".format(**fmt)
+
     def get_name(self):
         return self.NAME
 
