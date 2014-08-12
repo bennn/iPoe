@@ -4,5 +4,5 @@ urlpatterns = patterns('',
     # Examples:
     url(r'^$', 'views.home'),
     url(r'^editor$', 'views.editor'),
-    url(r'^editor/(?P<poemtype>[a-z\-]+)/$', 'views.editor'),
+    url(r'^editor/(?P<poem_type>[a-z\-]+)/$', 'views.editor'),
 )
