@@ -51,6 +51,7 @@ class Poem:
 
 class FreeVerse(Poem):
     NAME = "Free Verse"
+    # descr = free verse has no rules. write whatever you like #poetic_license
 
 class Haiku(Poem):
     NAME               = "Haiku"
@@ -58,6 +59,8 @@ class Haiku(Poem):
     NUM_STANZAS        = 1
     LINES_PER_STANZA   = [3]
     SYLLABLES_PER_LINE = [5,7,5]
+    # descr = traditional haikus consist of 3 lines with 5 syllables on the first line, 7 syllables on the second, and 5 syllables on the third.
+    #         the secret of the best haikus is juxtaposition: they combine two very different ideas or feelings.
 
     def compile(self):
         return "Errors everywhere"
@@ -112,7 +115,13 @@ class Villanelle(Poem):
                     a,  b, r1,
                     a,  b, r2,
                     a,  b, r1, r2]
-                        
+    # correct = right lines, right stanzas, right syllables, right rhyme scheme
+    # descr = A villanelle is a 19-line, iambic pentameter poem broken into 6 stanzas.
+    #         The first stanza sets the refrain.
+    #         Its first line must be the last line of stanzas 2 and 4, and the second-to-last line of the final stanza.
+    #         Its last line must be the last line of stanzas 3, 5, and 6.
+    #         These first and last lines must rhyme both with each other and with the first line of every proceeding stanza.
+    #         Additionally, the second line of every stanza must rhyme.
 
 
 def of_string(poem_type):
