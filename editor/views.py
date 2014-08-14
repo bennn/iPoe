@@ -16,7 +16,8 @@ def editor(request, poem_slug=None):
         # Compile poem
         cookie['poem'] = poem_class(request.POST.get('poem_content', ''))
         cookie['compiled'] = True
-        cookie['error_message'] = cookie['poem'].compile()
+        cookie['unknown_words'] = cookie['poem'].check_words()
+        cookie['error_message'] = None # cookie['poem'].compile()
         return render_to_response('editor.html', cookie)
     else:
         # Prepare to create poem

@@ -17,10 +17,22 @@ poetry editor
 </div>
 
 {% if compiled %}
+    {% if unknown_words %}
+        <div class="warn">
+            <h3>Unknown Words</h3>
+            <ul>
+            {% for word in unknown_words %}
+                <li>{{ word }}</li>
+            {% endfor %}
+            </ul>
+            <p>Please add these words to <a href="/create/">the dictionary</a>.</p>
+        </div>
+    {% endif %}
+
     {% if error_message %}
-        <p class="error">{{ error_message }}</p>
+        <h3 class="error">{{ error_message }}</h3>
     {% else %}
-        <p class="success">Lookin' Good!</p>
+        <h3 class="success">Lookin' Good!</h3>
     {% endif %}
 {% endif %}
 

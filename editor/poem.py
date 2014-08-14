@@ -1,3 +1,5 @@
+from dictionary.models import Word
+
 class Rhyme:
     SOUND = None
     def __init__(self, word=None):
@@ -26,7 +28,7 @@ class Refrain:
         return self.WORDS == words
 
     def set(self, words):
-        last_word = Word(words.rsplit(" ", 1)[-1])
+        last_word = words.rsplit(" ", 1)[-1]
         if self.RHYME == Rhyme(last_word):
             self.WORDS = words
             return True
@@ -54,16 +56,37 @@ class Poem:
         return """<textarea id='poem_content' name='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
 
     def check_words(self):
-        return
+        # filter puncutation
+        # get all words from all lines
+        # lookup each in db
+        not_found = set([])
+        for word in self.filtered_words():
+            try:
+                Word.objects.get(name=word)
+            except Word.DoesNotExist:
+                not_found.add(word)
+        return list(not_found)
 
     def compile(self):
         # Compare 'self.content' to an expected poem of this format. Default is 'PASS!'
-        self.check_stanzas()
-        self.check_lines()
-        self.check_syllables()
-        self.check_rhyme_scheme()
-        self.check_other()
+        # try:
+        #     self.check_stanzas()
+        #     self.check_lines()
+        #     self.check_syllables()
+        #     self.check_rhyme_scheme()
+        #     self.check_other()
+        #     return "" # We are OK
+        # except (PoemError msg):
+        #     return msg
         return
+
+    def filtered_words(self):
+        # Return a generator of each word of the content, punctuation removed.
+        for line in self.content.split("\n"):
+            for word in line.split(" "):
+                clean_word = "".join((c for c in word.lower() if 'a' <= c <= 'z'))
+                if clean_word:
+                    yield clean_word
 
     def get_description(self):
         return "There's no description."
@@ -161,7 +184,7 @@ class ItalianSonnet(Poem):
     LINES_PER_STANZA   = [NUM_LINES]
     SYLLABLES_PER_LINE = [10] * NUM_LINES
 
-    (a,b,c,d)  = (Rhyme(), Rhyme(), Rhyme(), Rhyme())
+    (a,b,c,d, e)  = (Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme())
     RHYME_SCHEME = [a, b, b, a,
                     a, b, b, a,
                     c, d, e, c, d, e]
