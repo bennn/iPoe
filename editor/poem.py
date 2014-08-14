@@ -1,5 +1,7 @@
 from dictionary.models import Word
 
+ENGLISH_VOWELS = ['a', 'e', 'i', 'o', 'u', 'y']
+
 class Rhyme:
     SOUND = None
     def __init__(self, word=""):
@@ -50,6 +52,7 @@ class Poem:
     NUM_STANZAS        = None
     LINES_PER_STANZA   = []
     SYLLABLES_PER_LINE = []
+    RHYME_SCHEME       = []
 
     def __init__(self, content=""):
         self.content = content
@@ -70,14 +73,23 @@ class Poem:
             raise PoemError("A %s should have one stanza." % self.NAME)
 
     def check_lines(self):
-        total_lines = sum((len(stanza) for stanza in self.get_stanzas()))
-        if total_lines == self.NUM_LINES:
+        if len(self.get_lines()) == self.NUM_LINES:
             return
         else:
             raise PoemError("A %s should have %s lines." % (self.NAME, self.NUM_LINES))
 
     def check_syllables(self):
-        return
+        all_lines = self.get_lines()
+        errors    = []
+        for i in xrange(0, self.NUM_LINES):
+            expected_syllables = self.syllables_of_int(i)
+            actual_syllables   = self.syllables_of_line(all_lines[i])
+            if (expected_syllables is not None) and (actual_syllables != expected_syllables):
+                errors.append("Line %s should have %s syllables, got %s syllables." % (i+1, expected_syllables, actual_syllables))
+        if errors:
+            raise PoemError("\n".join(errors))
+        else:
+            return
 
     def check_rhyme_scheme(self):
         return
@@ -90,7 +102,7 @@ class Poem:
         # get all words from all lines
         # lookup each in db
         not_found = set([])
-        for word in self.filtered_words():
+        for word in self.get_filtered_words(self.content):
             try:
                 Word.objects.get(name=word)
             except Word.DoesNotExist:
@@ -109,16 +121,23 @@ class Poem:
         except PoemError as err:
             return err.msg
 
-    def filtered_words(self):
-        # Return a generator of each word of the content, punctuation removed.
-        for line in self.content.split("\n"):
-            for word in line.split(" "):
-                clean_word = "".join((c for c in word.lower() if 'a' <= c <= 'z'))
-                if clean_word:
-                    yield clean_word
+    def normalize_word(self, word):
+        # Remove punctuation from the string [word].
+        return "".join((c for c in word.lower() if 'a' <= c <= 'z'))
 
     def get_description(self):
         return "There's no description."
+
+    def get_filtered_words(self, text):
+        # Return a generator of each word of the content, punctuation removed.
+        for line in text.split("\n"):
+            for word in line.split(" "):
+                clean_word = self.normalize_word(word)
+                if clean_word:
+                    yield clean_word
+
+    def get_lines(self):
+        return [line for stanza in self.get_stanzas() for line in stanza]
 
     def get_name(self):
         return self.NAME
@@ -149,11 +168,21 @@ class Poem:
         else:
             return None
 
-    def syllables_of_line(self, line_index):
+    def syllables_of_int(self, line_index):
         if line_index < len(self.SYLLABLES_PER_LINE):
             return self.SYLLABLES_PER_LINE[line_index]
         else:
             return None
+
+    def syllables_of_line(self, line):
+        num_syllables = 0
+        for word in self.get_filtered_words(line):
+            try:
+                word_obj = Word.objects.get(name=word)
+                num_syllables += word_obj.num_syllables
+            except Word.DoesNotExist:
+                num_syllables += sum((1 for c in word if c in ENGLISH_VOWELS))
+        return num_syllables
 
 class FreeVerse(Poem):
     NAME = "Free Verse"
@@ -167,9 +196,6 @@ class Haiku(Poem):
     NUM_STANZAS        = 1
     LINES_PER_STANZA   = [3]
     SYLLABLES_PER_LINE = [5,7,5]
-
-    def check_syllables(self):
-        return
 
     def get_description(self):
         return " ".join(("Traditional haikus consist of 3 lines with 5 syllables on the first line, 7 syllables on the second, and 5 syllables on the third.",
