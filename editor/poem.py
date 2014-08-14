@@ -2,11 +2,12 @@ from dictionary.models import Word
 
 class Rhyme:
     SOUND = None
-    def __init__(self, word=None):
-        # TODO get the ending sound from the word
-        if word is not None:
-            pass
-        self.SOUND = None
+    def __init__(self, word=""):
+        try:
+            w = Word.objects.get(name=word)
+            self.SOUND = None # w.phonic_set.related.
+        except Word.DoesNotExist:
+            self.SOUND = None
         
     def match(self, sound):
         # Check if argument sound matches this rhyme
@@ -35,6 +36,13 @@ class Refrain:
         else:
             return False
 
+class PoemError(Exception):
+    def __init__(self, msg):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
 class Poem:
 
     NAME               = "???"
@@ -55,6 +63,21 @@ class Poem:
         }
         return """<textarea id='poem_content' name='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
 
+    def check_stanzas(self):
+        return
+
+    def check_lines(self):
+        return
+
+    def check_syllables(self):
+        return
+
+    def check_rhyme_scheme(self):
+        return
+
+    def check_other(self):
+        return
+
     def check_words(self):
         # filter puncutation
         # get all words from all lines
@@ -69,16 +92,15 @@ class Poem:
 
     def compile(self):
         # Compare 'self.content' to an expected poem of this format. Default is 'PASS!'
-        # try:
-        #     self.check_stanzas()
-        #     self.check_lines()
-        #     self.check_syllables()
-        #     self.check_rhyme_scheme()
-        #     self.check_other()
-        #     return "" # We are OK
-        # except (PoemError msg):
-        #     return msg
-        return
+        try:
+            self.check_stanzas()
+            self.check_lines()
+            self.check_syllables()
+            self.check_rhyme_scheme()
+            self.check_other()
+            return "" # We are OK
+        except PoemError as err:
+            return err.value
 
     def filtered_words(self):
         # Return a generator of each word of the content, punctuation removed.
