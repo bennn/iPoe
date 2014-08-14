@@ -38,10 +38,10 @@ class Refrain:
 
 class PoemError(Exception):
     def __init__(self, msg):
-        self.value = value
+        self.msg = msg
 
     def __str__(self):
-        return repr(self.value)
+        return repr(self.msg)
 
 class Poem:
 
@@ -64,10 +64,17 @@ class Poem:
         return """<textarea id='poem_content' name='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
 
     def check_stanzas(self):
-        return
+        if len(self.get_stanzas()) == self.NUM_STANZAS:
+            return
+        else:
+            raise PoemError("A %s should have one stanza." % self.NAME)
 
     def check_lines(self):
-        return
+        total_lines = sum((len(stanza) for stanza in self.get_stanzas()))
+        if total_lines == self.NUM_LINES:
+            return
+        else:
+            raise PoemError("A %s should have %s lines." % (self.NAME, self.NUM_LINES))
 
     def check_syllables(self):
         return
@@ -100,7 +107,7 @@ class Poem:
             self.check_other()
             return "" # We are OK
         except PoemError as err:
-            return err.value
+            return err.msg
 
     def filtered_words(self):
         # Return a generator of each word of the content, punctuation removed.
@@ -120,7 +127,21 @@ class Poem:
         return self.NUM_LINES
 
     def get_numstanzas(self):
+        # Return the expected number of stanzas
         return self.NUM_STANZAS
+
+    def get_stanzas(self):
+        content_by_stanza = []
+        curr_stanza = []
+        for line in (x.strip() for x in self.content.split("\n")):
+            if line:
+                curr_stanza.append(line)
+            elif curr_stanza:
+                content_by_stanza.append(curr_stanza)
+                curr_stanza = []
+        if curr_stanza:
+            content_by_stanza.append(curr_stanza)
+        return content_by_stanza
 
     def lines_of_stanza(self, stanza_index):
         if stanza_index < len(self.LINES_PER_STANZA):
@@ -147,8 +168,8 @@ class Haiku(Poem):
     LINES_PER_STANZA   = [3]
     SYLLABLES_PER_LINE = [5,7,5]
 
-    def compile(self):
-        return "Errors everywhere"
+    def check_syllables(self):
+        return
 
     def get_description(self):
         return " ".join(("Traditional haikus consist of 3 lines with 5 syllables on the first line, 7 syllables on the second, and 5 syllables on the third.",
