@@ -53,16 +53,17 @@ class Poem:
         }
         return """<textarea id='poem_content' name='poem_content' rows='{num_rows}' cols='{num_cols}'>{content}</textarea>""".format(**fmt)
 
+    def check_words(self):
+        return
+
     def compile(self):
         # Compare 'self.content' to an expected poem of this format. Default is 'PASS!'
-        # TODO break into methods. What does it mean for a poem to be correct?
-        # right number of lines
-        # right number of stanzas
-        # right number of lines per stanza
-        # right number of syllables per line
-        # right rhyme scheme (can I do schemes as lists? [a, b, a, b, c, c])
-        # other stuff (limerick should have fewer syllables in lines 3,4
-        return None
+        self.check_stanzas()
+        self.check_lines()
+        self.check_syllables()
+        self.check_rhyme_scheme()
+        self.check_other()
+        return
 
     def get_description(self):
         return "There's no description."
