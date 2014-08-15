@@ -215,7 +215,13 @@ class Limerick(Poem):
 
     def check_other(self):
         # Coreectness = right rhyme. It should taste like a song, but not sure how to check that
-        return True
+        all_lines = self.get_lines()
+        shortest_long_line = min([self.syllables_of_line(l) for l in [all_lines[0], all_lines[1], all_lines[4]]])
+        longest_short_line = max([self.syllables_of_line(l) for l in [all_lines[2], all_lines[3]]])
+        if shortest_long_line < longest_short_line:
+            raise PoemError("Lines 3 and 4 should probably have fewer syllables than lines 1,2, and 5.")
+        else:
+            return
     
     def get_description(self):
         return "Limericks are fun."
