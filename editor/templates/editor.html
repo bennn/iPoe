@@ -30,7 +30,7 @@ poetry editor
     {% endif %}
 
     {% if error_message %}
-        <h3 class="error">{{ error_message }}</h3>
+        <h3 class="error">{{ error_message|linebreaksbr }}</h3>
     {% else %}
         <h3 class="success">Lookin' Good!</h3>
     {% endif %}
