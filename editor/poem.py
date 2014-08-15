@@ -2,22 +2,37 @@ from dictionary.models import Word
 
 ENGLISH_VOWELS = ['a', 'e', 'i', 'o', 'u', 'y']
 
+def normalize_word(word):
+    # Remove punctuation from the string [word].
+    return "".join((c for c in word.lower() if 'a' <= c <= 'z'))
+
 class Rhyme:
     SOUND = None
     def __init__(self, word=""):
         try:
             w = Word.objects.get(name=word)
-            self.SOUND = None # w.phonic_set.related.
+            self.SOUND = None # w.phonic_set.related. TODO
         except Word.DoesNotExist:
             self.SOUND = None
         
-    def match(self, sound):
+    def match(self, words):
         # Check if argument sound matches this rhyme
+        sound = self.sound_of_words(words)
         if self.SOUND is None:
             # Set sound
             self.SOUND = sound
         # Check sound
         return self.SOUND == sound
+
+    def sound_of_words(self, words):
+        last_word = [x for x in (normalize_word(w) for w in words.split(" ")) if x][-1]
+        try:
+            word_obj = Word.objects.get(name=last_word)
+            sound = word_obj.phonic_set.related.first().name
+        except:
+            sound = last_word[-3:]
+        return sound
+        
 
 class Refrain:
     WORDS = None
@@ -27,12 +42,15 @@ class Refrain:
         self.RHYME = rhyme
 
     def match(self, words):
-        # Check if that line matches this line. Same words.
-        return self.WORDS == words
+        # Check if that line matches this line. Set if not already.
+        if self.WORDS is None:
+            return self.set(words)
+        else:
+            # Need exact match
+            return self.WORDS == words
 
     def set(self, words):
-        last_word = words.rsplit(" ", 1)[-1]
-        if self.RHYME == Rhyme(last_word):
+        if self.RHYME.match(words):
             self.WORDS = words
             return True
         else:
@@ -92,9 +110,19 @@ class Poem:
             return
 
     def check_rhyme_scheme(self):
-        return
+        all_lines = self.get_lines()
+        errors = []
+        for i in xrange(0, self.NUM_LINES):
+            expected_rhyme = self.rhyme_of_int(i)
+            if (expected_rhyme is not None) and (not expected_rhyme.match(all_lines[i])):
+                errors.append("Line %s does not match rhyme scheme." % (i+1))
+        if errors:
+            raise PoemError("\n".join(errors))
+        else:
+            return
 
     def check_other(self):
+        # Miscellaneous check. Nothing here by default.
         return
 
     def check_words(self):
@@ -121,10 +149,6 @@ class Poem:
         except PoemError as err:
             return err.msg
 
-    def normalize_word(self, word):
-        # Remove punctuation from the string [word].
-        return "".join((c for c in word.lower() if 'a' <= c <= 'z'))
-
     def get_description(self):
         return "There's no description."
 
@@ -132,7 +156,7 @@ class Poem:
         # Return a generator of each word of the content, punctuation removed.
         for line in text.split("\n"):
             for word in line.split(" "):
-                clean_word = self.normalize_word(word)
+                clean_word = normalize_word(word)
                 if clean_word:
                     yield clean_word
 
@@ -165,6 +189,12 @@ class Poem:
     def lines_of_stanza(self, stanza_index):
         if stanza_index < len(self.LINES_PER_STANZA):
             return self.LINES_PER_STANZA[stanza_index]
+        else:
+            return None
+
+    def rhyme_of_int(self, line_index):
+        if line_index < len(self.RHYME_SCHEME):
+            return self.RHYME_SCHEME[line_index]
         else:
             return None
 
