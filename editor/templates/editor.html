@@ -6,6 +6,7 @@ poetry editor
 
 {% block header %}
 <h1><a href="http://en.wikipedia.org/wiki/{{ poem.get_name|lower }}">{{ poem.get_name }}</a> editor</h1>
+<p>{{ poem.get_description }}</p>
 {% endblock %}
 
 {% block content %}
