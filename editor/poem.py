@@ -394,3 +394,5 @@ class EnglishSonnet(Poem):
         return " ".join(("English sonnets are 14 lines in iambic pentameter.",
             "The rhyme scheme is 'abab cdcd efef gg'.",
             "Notice that couplet at the end."))
+
+# See 'http://en.wikipedia.org/wiki/Rhyme_scheme' for more
