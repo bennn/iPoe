@@ -262,6 +262,22 @@ class Cinquian(Poem):
     def get_description(self):
         return "The American cinquain is a 5-line poem with rhyme scheme 'ababb' and 2, 4, 6, 8, and 2 syllables on each line."
     
+class Clerihew(Poem):
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Clerihew"
+        self.NUM_LINES          = 4
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = []
+        (a,b) = Rhyme(), Rhyme()
+        self.RHYME_SCHEME       = [a, a, b, b]
+
+    def get_description(self):
+        return " ".join(("The first line of a clerihew should be a famous person's name and the rest of the poem should put that person in an amusing or uncommon situation.",
+                         "Rhyme scheme is 'aabb', but length and meter are free and should be varied for effect."))
+    
 class Limerick(Poem):
 
     def __init__(self, *args, **kwargs):
@@ -366,6 +382,8 @@ def of_string(poem_type):
         return Haiku
     elif poem_type == "cinquain":
         return Cinquian
+    elif poem_type == "clerihew":
+        return Clerihew
     elif poem_type == "villanelle":
         return Villanelle
     elif poem_type == "limerick":
