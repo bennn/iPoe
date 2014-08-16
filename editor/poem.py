@@ -67,9 +67,9 @@ class PoemError(Exception):
         return repr(self.msg)
 
 class Poem:
+    NAME = "???"
 
-    def __init__(self, content=""):
-        self.NAME               = "???"
+    def __init__(self, content=""):        
         self.NUM_LINES          = None
         self.NUM_STANZAS        = None
         self.LINES_PER_STANZA   = []
@@ -224,19 +224,18 @@ class Poem:
         return num_syllables
 
 class FreeVerse(Poem):
-
-    def __init__(self, *args, **kwargs):
-        Poem.__init__(self, *args, **kwargs)
-        self.NAME = "Free Verse"
+    NAME = "Free Verse"
+    SLUG = "free"
 
     def get_description(self):
         return "Free verse has no rules. Go ham."
 
 class Haiku(Poem):
-
+    NAME = "Haiku"
+    SLUG = "haiku"
+    
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Haiku"
         self.NUM_LINES          = 3
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [3]
@@ -248,10 +247,11 @@ class Haiku(Poem):
             "Combine two very different ideas or feelings with a key 'cutting' word."))
 
 class Cinquian(Poem):
+    NAME = "Cinquain"
+    SLUG = "cinquain"
 
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Cinquain"
         self.NUM_LINES          = 5
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [self.NUM_LINES]
@@ -263,10 +263,11 @@ class Cinquian(Poem):
         return "The American cinquain is a 5-line poem with rhyme scheme 'ababb' and 2, 4, 6, 8, and 2 syllables on each line."
     
 class Clerihew(Poem):
+    NAME = "Clerihew"
+    SLUG = "clerihew"
 
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Clerihew"
         self.NUM_LINES          = 4
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [self.NUM_LINES]
@@ -279,10 +280,11 @@ class Clerihew(Poem):
                          "Rhyme scheme is 'aabb', but length and meter are free and should be varied for effect."))
     
 class Couplet(Poem):
-
+    NAME = "Couplet"
+    SLUG = "couplet"
+    
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Couplet"
         self.NUM_LINES          = 2
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [self.NUM_LINES]
@@ -294,10 +296,11 @@ class Couplet(Poem):
         return "Two rhyming lines of 10 syllables."
     
 class Limerick(Poem):
-
+    NAME = "Limerick"
+    SLUG = "limerick"
+    
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Limerick"
         self.NUM_LINES          = 5
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [5]
@@ -320,10 +323,11 @@ class Limerick(Poem):
         return "Limericks are fun."
 
 class Villanelle(Poem):
-
+    NAME = "Villanelle"
+    SLUG = "villanelle"
+    
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Villanelle"
         self.NUM_LINES          = 19
         self.NUM_STANZAS        = 6
         self.LINES_PER_STANZA   = [3, 3, 3, 3, 3, 4]
@@ -349,10 +353,11 @@ class Villanelle(Poem):
             # "See Dylan Thomas or Sylvia Plath."
 
 class ItalianSonnet(Poem):
-
+    NAME = "Italian Sonnet"
+    SLUG = "italian-sonnet"
+    
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "Italian (Petrarchan) Sonnet"
         self.NUM_LINES          = 14
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [self.NUM_LINES]
@@ -369,10 +374,11 @@ class ItalianSonnet(Poem):
             "Rhyme scheme is 'abba abba cde cde'."))
 
 class EnglishSonnet(Poem):
-
+    NAME = "English Sonnet"
+    SLUG = "english-sonnet"
+    
     def __init__(self, *args, **kwargs):
         Poem.__init__(self, *args, **kwargs)
-        self.NAME               = "English (Shakespearian) Sonnet"
         self.NUM_LINES          = 14
         self.NUM_STANZAS        = 1
         self.LINES_PER_STANZA   = [self.NUM_LINES]
@@ -388,26 +394,3 @@ class EnglishSonnet(Poem):
         return " ".join(("English sonnets are 14 lines in iambic pentameter.",
             "The rhyme scheme is 'abab cdcd efef gg'.",
             "Notice that couplet at the end."))
-
-
-def of_string(poem_type):
-    if poem_type == "free":
-        return FreeVerse
-    elif poem_type == "haiku":
-        return Haiku
-    elif poem_type == "cinquain":
-        return Cinquian
-    elif poem_type == "clerihew":
-        return Clerihew
-    elif poem_type == "couplet":
-        return Couplet
-    elif poem_type == "villanelle":
-        return Villanelle
-    elif poem_type == "limerick":
-        return Limerick
-    elif poem_type == "italian-sonnet":
-        return ItalianSonnet
-    elif poem_type == "english-sonnet":
-        return EnglishSonnet
-    else: # default / not-implemented
-        return Poem
