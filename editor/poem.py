@@ -145,7 +145,6 @@ class Poem:
             self.check_syllables()
             self.check_rhyme_scheme()
             self.check_other()
-            return "" # We are OK
         except PoemError as err:
             return err.msg
 
