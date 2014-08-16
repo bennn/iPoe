@@ -14,6 +14,9 @@ class Rhyme:
             self.SOUND = None # w.phonic_set.related. TODO
         except Word.DoesNotExist:
             self.SOUND = None
+
+    def __str__(self):
+        return self.SOUND
         
     def match(self, words):
         # Check if argument sound matches this rhyme
@@ -65,14 +68,13 @@ class PoemError(Exception):
 
 class Poem:
 
-    NAME               = "???"
-    NUM_LINES          = None
-    NUM_STANZAS        = None
-    LINES_PER_STANZA   = []
-    SYLLABLES_PER_LINE = []
-    RHYME_SCHEME       = []
-
     def __init__(self, content=""):
+        self.NAME               = "???"
+        self.NUM_LINES          = None
+        self.NUM_STANZAS        = None
+        self.LINES_PER_STANZA   = []
+        self.SYLLABLES_PER_LINE = []
+        self.RHYME_SCHEME       = []
         self.content = content
 
     def as_text_area(self):
@@ -115,7 +117,7 @@ class Poem:
         for i in xrange(0, self.NUM_LINES):
             expected_rhyme = self.rhyme_of_int(i)
             if (expected_rhyme is not None) and (not expected_rhyme.match(all_lines[i])):
-                errors.append("Line %s does not match rhyme scheme." % (i+1))
+                errors.append("Line %s does not match rhyme scheme '%s'." % (i+1, expected_rhyme))
         if errors:
             raise PoemError("\n".join(errors))
         else:
@@ -222,17 +224,23 @@ class Poem:
         return num_syllables
 
 class FreeVerse(Poem):
-    NAME = "Free Verse"
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME = "Free Verse"
 
     def get_description(self):
         return "Free verse has no rules. Go ham."
 
 class Haiku(Poem):
-    NAME               = "Haiku"
-    NUM_LINES          = 3
-    NUM_STANZAS        = 1
-    LINES_PER_STANZA   = [3]
-    SYLLABLES_PER_LINE = [5,7,5]
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Haiku"
+        self.NUM_LINES          = 3
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [3]
+        self.SYLLABLES_PER_LINE = [5,7,5]
 
     def get_description(self):
         return " ".join(("Traditional haikus consist of 3 lines with 5 syllables on the first line, 7 syllables on the second, and 5 syllables on the third.",
@@ -240,16 +248,18 @@ class Haiku(Poem):
             "Combine two very different ideas or feelings with a key 'cutting' word."))
     
 class Limerick(Poem):
-    NAME               = "Limerick"
-    NUM_LINES          = 5
-    NUM_STANZAS        = 1
-    LINES_PER_STANZA   = [5]
-    SYLLABLES_PER_LINE = [] # roughly 8, 8, 6, 6, 8, but too rough to call
 
-    a  = Rhyme()
-    b  = Rhyme()
-    RHYME_SCHEME = [a, a, b, b, a]
-
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Limerick"
+        self.NUM_LINES          = 5
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [5]
+        self.SYLLABLES_PER_LINE = [] # roughly 8, 8, 6, 6, 8, but too rough to call
+        a  = Rhyme()
+        b  = Rhyme()
+        self.RHYME_SCHEME = [a, a, b, b, a]
+        
     def check_other(self):
         # Coreectness = right rhyme. It should taste like a song, but not sure how to check that
         all_lines = self.get_lines()
@@ -264,21 +274,24 @@ class Limerick(Poem):
         return "Limericks are fun."
 
 class Villanelle(Poem):
-    NAME               = "Villanelle"
-    NUM_LINES          = 19
-    NUM_STANZAS        = 6
-    LINES_PER_STANZA   = [3, 3, 3, 3, 3, 4]
-    SYLLABLES_PER_LINE = [10] * NUM_LINES
 
-    (a,b)  = Rhyme(), Rhyme()
-    r1 = Refrain(a)
-    r2 = Refrain(a)
-    RHYME_SCHEME = [r1, b, r2,
-                    a,  b, r1,
-                    a,  b, r2,
-                    a,  b, r1,
-                    a,  b, r2,
-                    a,  b, r1, r2]
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Villanelle"
+        self.NUM_LINES          = 19
+        self.NUM_STANZAS        = 6
+        self.LINES_PER_STANZA   = [3, 3, 3, 3, 3, 4]
+        self.SYLLABLES_PER_LINE = [10] * self.NUM_LINES
+        (a,b)  = Rhyme(), Rhyme()
+        r1 = Refrain(a)
+        r2 = Refrain(a)
+        self.RHYME_SCHEME = [r1, b, r2,
+                             a,  b, r1,
+                             a,  b, r2,
+                             a,  b, r1,
+                             a,  b, r2,
+                             a,  b, r1, r2]
+            
     def get_description(self):
         return " ".join(("A villanelle is a 19-line, iambic pentameter poem broken into 6 stanzas.",
             "The first stanza sets the refrain.",
@@ -290,16 +303,19 @@ class Villanelle(Poem):
             # "See Dylan Thomas or Sylvia Plath."
 
 class ItalianSonnet(Poem):
-    NAME               = "Italian (Petrarchan) Sonnet"
-    NUM_LINES          = 14
-    NUM_STANZAS        = 1
-    LINES_PER_STANZA   = [NUM_LINES]
-    SYLLABLES_PER_LINE = [10] * NUM_LINES
 
-    (a,b,c,d, e)  = (Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme())
-    RHYME_SCHEME = [a, b, b, a,
-                    a, b, b, a,
-                    c, d, e, c, d, e]
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Italian (Petrarchan) Sonnet"
+        self.NUM_LINES          = 14
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = [10] * self.NUM_LINES
+
+        (a,b,c,d,e)  = (Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme())
+        self.RHYME_SCHEME = [a, b, b, a,
+                             a, b, b, a,
+                             c, d, e, c, d, e]
 
     def get_description(self):
         return " ".join(("The Italian sonnet, invented by Giacomo de Lentini in the 1200s, consists of 14-lines of iambic pentameter.",
@@ -307,17 +323,20 @@ class ItalianSonnet(Poem):
             "Rhyme scheme is 'abba abba cde cde'."))
 
 class EnglishSonnet(Poem):
-    NAME               = "English (Shakespearian) Sonnet"
-    NUM_LINES          = 14
-    NUM_STANZAS        = 1
-    LINES_PER_STANZA   = [14]
-    SYLLABLES_PER_LINE = [10] * NUM_LINES
 
-    (a,b,c,d,e,f,g)  = (Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme())
-    RHYME_SCHEME = [a, b, a, b,
-                    c, d, c, d,
-                    e, f, e, f,
-                    g, g]
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "English (Shakespearian) Sonnet"
+        self.NUM_LINES          = 14
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = [10] * self.NUM_LINES
+
+        (a,b,c,d,e,f,g)  = (Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme(), Rhyme())
+        self.RHYME_SCHEME = [a, b, a, b,
+                             c, d, c, d,
+                             e, f, e, f,
+                             g, g]
 
     def get_description(self):
         return " ".join(("English sonnets are 14 lines in iambic pentameter.",
