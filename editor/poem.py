@@ -125,6 +125,16 @@ class Poem:
         # Miscellaneous check. Nothing here by default.
         return
 
+    def check_style(self):
+        errors = []
+        for check in [self.check_syllables, self.check_rhyme_scheme, self.check_other]:
+            try:
+                check()
+            except PoemError as err:
+                errors.append(err.msg)
+        if errors:
+            raise PoemError("\n".join(errors))
+
     def check_words(self):
         # filter puncutation
         # get all words from all lines
@@ -142,9 +152,7 @@ class Poem:
         try:
             self.check_stanzas()
             self.check_lines()
-            self.check_syllables()
-            self.check_rhyme_scheme()
-            self.check_other()
+            self.check_style()
         except PoemError as err:
             return err.msg
 
