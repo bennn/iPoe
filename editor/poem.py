@@ -320,7 +320,7 @@ class Limerick(Poem):
             return
     
     def get_description(self):
-        return "Limericks are fun."
+        return "Limericks are fun. Write 5 musical lines with rhyme scheme 'aabba'."
 
 class Villanelle(Poem):
     NAME = "Villanelle"
