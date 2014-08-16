@@ -246,6 +246,21 @@ class Haiku(Poem):
         return " ".join(("Traditional haikus consist of 3 lines with 5 syllables on the first line, 7 syllables on the second, and 5 syllables on the third.",
             "Juxtaposition is nice for haikus.",
             "Combine two very different ideas or feelings with a key 'cutting' word."))
+
+class Cinquian(Poem):
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Cinquain"
+        self.NUM_LINES          = 5
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = [2, 4, 6, 8, 2]
+        (a,b) = Rhyme(), Rhyme()
+        self.RHYME_SCHEME       = [a, b, a, b, b]
+
+    def get_description(self):
+        return "The American cinquain is a 5-line poem with rhyme scheme 'ababb' and 2, 4, 6, 8, and 2 syllables on each line."
     
 class Limerick(Poem):
 
@@ -349,6 +364,8 @@ def of_string(poem_type):
         return FreeVerse
     elif poem_type == "haiku":
         return Haiku
+    elif poem_type == "cinquain":
+        return Cinquian
     elif poem_type == "villanelle":
         return Villanelle
     elif poem_type == "limerick":
