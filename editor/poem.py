@@ -278,6 +278,21 @@ class Clerihew(Poem):
         return " ".join(("The first line of a clerihew should be a famous person's name and the rest of the poem should put that person in an amusing or uncommon situation.",
                          "Rhyme scheme is 'aabb', but length and meter are free and should be varied for effect."))
     
+class Couplet(Poem):
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NAME               = "Couplet"
+        self.NUM_LINES          = 2
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = [10] * self.NUM_LINES
+        a = Rhyme()
+        self.RHYME_SCHEME       = [a, a]
+
+    def get_description(self):
+        return "Two rhyming lines of 10 syllables."
+    
 class Limerick(Poem):
 
     def __init__(self, *args, **kwargs):
@@ -384,6 +399,8 @@ def of_string(poem_type):
         return Cinquian
     elif poem_type == "clerihew":
         return Clerihew
+    elif poem_type == "couplet":
+        return Couplet
     elif poem_type == "villanelle":
         return Villanelle
     elif poem_type == "limerick":
