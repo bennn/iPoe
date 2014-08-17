@@ -2,6 +2,8 @@ import inspect
 import sys
 import poem
 
+from dictionary.scrape import util
+
 from django.core.context_processors import csrf
 from django.shortcuts import render_to_response
 
@@ -11,6 +13,17 @@ POEM_STYLES= dict(((c.SLUG, c)
 def create(request):
     cookie = {}
     cookie.update(csrf(request))
+    if request.method == "POST":
+        name = util.normalize_word(request.POST['word_name'])
+        word, is_new = dictionary.models.Word.objects.get_or_create(
+            name          = name,
+            num_syllables = request.POST['num_syllables'],
+        )
+        if is_new:
+            # Get rhymes
+            rhymes, almost_rhymes = util.scrape_rhymebrain(name)
+            # TODO add rhymes
+        cookie['success'] = is_new
     return render_to_response('create.html', cookie)
 
 def home(request):

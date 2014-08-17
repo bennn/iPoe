@@ -1,10 +1,7 @@
 from dictionary.models import Word
+from dictionary.scrape.util import normalize_word
 
 ENGLISH_VOWELS = ['a', 'e', 'i', 'o', 'u', 'y']
-
-def normalize_word(word):
-    # Remove punctuation from the string [word].
-    return "".join((c for c in word.lower() if 'a' <= c <= 'z'))
 
 class Rhyme:
     SOUND = None
