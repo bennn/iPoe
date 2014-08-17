@@ -3,9 +3,20 @@
 {% block title %}add word{% endblock %}
 
 {% block header %}
-<h1>Future Home of the Word Submission Page</h1>
+<h1>Create Word</h1>
+<p>Use this form to add words to the iPoe database.</p>
 {% endblock %}
 
 {% block content %}
-<p>Nothing to see here. Yet.</p>
+<form action="/create/" method="post">
+{% csrf_token %}
+    <p>Word:
+        <input type="text" name="word_name" value="" required>
+    </p>
+    <p>Number of Syllables:
+        <input type="number" name="num_syllables" value="" required>
+    </p>
+    
+    <input name="submit" type="submit" value="Submit" />
+</form>
 {% endblock %}
