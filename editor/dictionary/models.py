@@ -6,10 +6,3 @@ class Word(models.Model):
 
     def __unicode__(self):
         return self.name
-
-class Phonic(models.Model):
-    name = models.CharField(max_length=10)
-    word = models.ForeignKey(Word)
-
-    def __unicode__(self):
-        return self.name
