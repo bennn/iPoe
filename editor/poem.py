@@ -292,6 +292,22 @@ class Couplet(Poem):
     def get_description(self):
         return "Two rhyming lines of 10 syllables."
 
+class Tercet(Poem):
+    NAME = "Tercet"
+    SLUG = "tercet"
+    
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NUM_LINES          = 3
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = [10] * self.NUM_LINES
+        a = Rhyme()
+        self.RHYME_SCHEME       = [a, a, a]
+
+    def get_description(self):
+        return "Three rhyming lines of 10 syllables."
+
 class Tanaga(Poem):
     NAME = "Tanaga"
     SLUG = "tanaga"
