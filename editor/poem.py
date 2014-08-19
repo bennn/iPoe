@@ -381,6 +381,24 @@ class Villanelle(Poem):
             # "There seems to be a connection between villanelles and obsession."
             # "See Dylan Thomas or Sylvia Plath."
 
+class Rondelet(Poem):
+    NAME = "Rondelet"
+    SLUG = "rondelet"
+    
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NUM_LINES          = 7
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = self.NUM_LINES
+        self.SYLLABLES_PER_LINE = [4, 8, 4, 8, 8, 8, 4]
+        (a,b)  = Rhyme(), Rhyme()
+        r1 = Refrain(a)
+        self.RHYME_SCHEME = [r1, b, r1, a, b, b, r1]
+            
+    def get_description(self):
+        return " ".join(("A rondelet is a 7-line French form with rhyme scheme 'AbAabbA'.",
+                         "The refrain 'A' has 4 syllables and the rest have 8 syllables."))
+
 class ItalianSonnet(Poem):
     NAME = "Italian Sonnet"
     SLUG = "italian-sonnet"
