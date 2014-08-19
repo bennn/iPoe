@@ -291,6 +291,22 @@ class Couplet(Poem):
 
     def get_description(self):
         return "Two rhyming lines of 10 syllables."
+
+class Tanaga(Poem):
+    NAME = "Tanaga"
+    SLUG = "tanaga"
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NUM_LINES          = 4
+        self.NUM_STANZAS        = 4
+        self.LINES_PER_STANZA   = self.NUM_LINES
+        self.SYLLABLES_PER_LINE = [7] * self.NUM_LINES
+        (a,b) = Rhyme(), Rhyme()
+        self.RHYME_SCHEME       = [a, a, b, b]
+
+    def get_description(self):
+        return "The Tanaga is a Filipino style. It has 4 lines of 7 syllables and rhyme scheme 'aabb'."
     
 class Limerick(Poem):
     NAME = "Limerick"
