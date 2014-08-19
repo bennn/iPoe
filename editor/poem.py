@@ -308,6 +308,25 @@ class Tercet(Poem):
     def get_description(self):
         return "Three rhyming lines of 10 syllables."
 
+class Quaternion(Poem):
+    # make sure this works, with the no rhyme scheme and all
+    NAME = "Quaternion"
+    SLUG = "quaternion"
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NUM_LINES          = 12
+        self.NUM_STANZAS        = 3
+        self.LINES_PER_STANZA   = [4, 4, 4]
+        self.SYLLABLES_PER_LINE = [] # anything goes!
+        a, b, c, d = Rhyme(), Rhyme(), Rhyme(), Rhyme()
+        self.RHYME_SCHEME       = [a, a, b, b,
+                                   c, c, d, d,
+                                   a, b, c, d]
+
+    def get_description(self):
+        return "Three quatrains, each should handle part of the theme. Rhyme scheme is fixed at 'aabb ccdd abcd', but syllables are free."
+
 class Tanaga(Poem):
     NAME = "Tanaga"
     SLUG = "tanaga"
@@ -442,4 +461,5 @@ class EnglishSonnet(Poem):
             "The rhyme scheme is 'abab cdcd efef gg'.",
             "Notice that couplet at the end."))
 
-# See 'http://en.wikipedia.org/wiki/Rhyme_scheme' for more
+# See  'http://en.wikipedia.org/wiki/Rhyme_scheme' for more
+# Also 'http://poetscollective.org/poetryforms/'
