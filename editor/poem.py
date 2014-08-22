@@ -327,6 +327,22 @@ class Quaternion(Poem):
     def get_description(self):
         return "Three quatrains, each should handle part of the theme. Rhyme scheme is fixed at 'aabb ccdd abcd', but syllables are free."
 
+class Sextilla(Poem):
+    NAME = "Sextilla"
+    SLUG = "sextilla"
+
+    def __init__(self, *args, **kwargs):
+        Poem.__init__(self, *args, **kwargs)
+        self.NUM_LINES          = 6
+        self.NUM_STANZAS        = 1
+        self.LINES_PER_STANZA   = [self.NUM_LINES]
+        self.SYLLABLES_PER_LINE = [8] * self.NUM_LINES
+        a, b, c = Rhyme(), Rhyme(), Rhyme()
+        self.RHYME_SCHEME       = [a, b, a, b, c, c]
+
+    def get_description(self):
+        return "Spanish six-line poem. We use 1 stanza, 8 syllables per line, and rhyme scheme 'ababcc' here, but more stanzas, fewer syllables, and rhyme scheme 'aabccb' are also common."
+
 class Tanaga(Poem):
     NAME = "Tanaga"
     SLUG = "tanaga"
