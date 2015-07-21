@@ -8,12 +8,7 @@
 
 # database
 *.db
-
-# a very pretty online editor, may eventually want to integrate
-ckeditor-dev
+scrape
 
 # personal notes
 ipoe.org
-
-# moby syllables database
-mhyph.txt

@@ -29,9 +29,9 @@
     (unless (spellcheck word) (printf "Warning: misspelled word '~a'\n" word)))
   (with-syntax ([str (string-join line* "\n")])
     (strip-context
-      #'(module anything racket
+      (syntax/loc src (module anything racket
           (provide data)
-          (define data 'str)))))
+          (define data 'str))))))
 
 (define (make-info key default use-default)
   ;; Can dispatch on symbol `key` to do things like loading Dr.Racket extensions.
