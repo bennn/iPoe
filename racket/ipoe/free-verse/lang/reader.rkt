@@ -21,7 +21,7 @@
 (define (read/free-verse in)
   (syntax->datum (read-syntax/free-verse #f in)))
 
-(define (read-syntax/free-verse src in)
+(define (read-syntax/free-verse src-path in)
   (define line* (port->lines in))
   ;; spellcheck lines
   (for* ([line (in-list line*)]
@@ -29,9 +29,9 @@
     (unless (spellcheck word) (printf "Warning: misspelled word '~a'\n" word)))
   (with-syntax ([str (string-join line* "\n")])
     (strip-context
-      (syntax/loc src (module anything racket
+       #'(module anything racket
           (provide data)
-          (define data 'str))))))
+          (define data 'str)))))
 
 (define (make-info key default use-default)
   ;; Can dispatch on symbol `key` to do things like loading Dr.Racket extensions.
