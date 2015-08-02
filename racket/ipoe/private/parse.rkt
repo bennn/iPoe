@@ -1,5 +1,7 @@
 #lang racket/base
 
+;; Generic parsing tools
+
 (provide
   to-lines
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
