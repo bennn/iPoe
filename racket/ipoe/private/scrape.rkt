@@ -2,8 +2,12 @@
 
 (provide
   resolve-rhyme*
-  resolve-almost-rhyme*
   resolve-syllables
+  ;; --
+  rhyme-result
+  rhyme-result?
+  rhyme-result-rhyme*
+  rhyme-result-almost-rhyme*
 )
 
 (require

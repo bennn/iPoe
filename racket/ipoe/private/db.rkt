@@ -40,7 +40,8 @@
   (only-in ipoe/private/scrape
     resolve-syllables
     resolve-rhyme*
-    resolve-almost-rhyme*)
+    rhyme-result-rhyme*
+    rhyme-result-almost-rhyme*)
 )
 
 ;; =============================================================================
@@ -64,8 +65,10 @@
     (error 'db:add-word (format "Cannot add word '~a', already in database" word))]
    [else
     (define syllables (resolve-syllables word syllables-param))
-    (define rhyme*    (resolve-rhyme* word rhyme-param))
-    (define almost-rhyme* (resolve-almost-rhyme* word almost-rhyme-param))
+    (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param))
+    ;; TODO some rhymes may not be in database
+    (define rhyme* (rhyme-result-rhyme* rr))
+    (define almost-rhyme* (rhyme-result-almost-rhyme* rr))
     (add-word/unsafe pgc word syllables rhyme* almost-rhyme*)]))
 
 (define (add-word/unsafe pgc word syllables rhyme* almost-rhyme*)
