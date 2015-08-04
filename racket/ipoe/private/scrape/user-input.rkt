@@ -3,6 +3,10 @@
 ;; Tools for interacting with users
 
 (provide
+  alert
+  ;; (-> String Void)
+  ;; Display a message to the user
+
   get-user-input
   ;;
 
@@ -12,12 +16,19 @@
   ;; (-> String (U Natural #f))
   ;; Try reading natural number from input, return #f on failure.
 
+  read-yes-or-no
+  ;; (-> String (U 'Y 'N #f))
+  ;; Read a yes-or-no input
+
 )
 
 (require
 )
 
 ;; =============================================================================
+
+;; For external clients
+(define alert displayln)
 
 ;; Prompt the user until he/she/it returns someting `valid?`
 (define (get-user-input valid?
@@ -48,14 +59,21 @@
   (define n (string->number str))
   (and n (exact-nonnegative-integer? n) n))
 
+(define (read-yes-or-no str)
+  (case (string-downcase str)
+   [("y" "yes" "yolo") 'Y]
+   [("n" "no") 'N]
+   [else #f]))
+
 ;; =============================================================================
 
 (module+ test
   (require rackunit)
 
-  (define-syntax-rule (check-read-natural [str expect] ...)
-    (begin (check-equal? (read-natural str) expect) ...))
-  (check-read-natural
+  (define-syntax-rule (check-fun f [str expect] ...)
+    (begin (check-equal? (f str) expect) ...))
+
+  (check-fun read-natural
     ["hello"    #f]
     ["o"        #f]
     ["(-> a b)" #f]
@@ -68,6 +86,25 @@
     ["0"              0]
     ["1"              1]
     ["83423113513513" 83423113513513]
+  )
+
+  (check-fun read-yes-or-no
+    ["hello"    #f]
+    ["" #f]
+    ["word" #f]
+    ["yes please" #f]
+    ["never" #f]
+    ["no no no" #f]
+    ;; --
+    ["y" 'Y]
+    ["Y" 'Y]
+    ["yes" 'Y]
+    ["yEs" 'Y]
+    ["yolo" 'Y]
+    ;; --
+    ["n" 'N]
+    ["no" 'N]
+    ["NO" 'N]
   )
 )
 
