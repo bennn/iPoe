@@ -50,8 +50,7 @@
   (define url-str (word->rhyme-url word))
   (define sxml (url->sxml url-str))
   (define all-results ((sxpath `(// div ,(id? "results") *)) sxml))
-  (define-values (r* a*) (split-rhymes all-results))
-  (make-rhyme-result r* a*))
+  (split-rhymes all-results))
 
 ;; Input is a list of <span> results, split these where the html changes to
 ;;  "almost rhymes" and return only the text for each word.
@@ -61,11 +60,11 @@
     (cond
       [(eq? '() elem*)
        ;; Should never happen
-       (values r* '())]
+       (make-rhyme-result r* '())]
       [(h4? (car elem*))
        ;; Reached end of rhymes, extract text from the almost-rhymes
        (define a* (map (if-car-sxpath `(,(class? "wordpanel") *text*)) (cdr elem*)))
-       (values r* (for/list ([a (in-list a*)] #:when a) (string-trim a)))]
+       (make-rhyme-result r* (for/list ([a (in-list a*)] #:when a) (string-trim a)))]
       [else
        ;; Extract text from one rhyme
        (define r ((if-car-sxpath `(,(class? "wordpanel") *text*)) (car elem*)))
