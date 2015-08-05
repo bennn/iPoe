@@ -36,7 +36,7 @@
   (cond
    [(not syllables)
     ref-syllables]
-   [(= syllables ref-syllables)
+   [(or (not ref-syllables) (= syllables ref-syllables))
     ;; Good, validated user input against trusted source
     syllables]
    [interactive?
