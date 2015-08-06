@@ -28,9 +28,10 @@
 ;;  maybe this'll be easier to figure out after I know all the things to provide
 (define (free-verse arg)
   (define line* (to-lines arg))
-  (for* ([line (in-list line*)]
-         [word (in-list (string-split line))])
-    (unless (spellcheck word) (printf "Warning: misspelled word '~a'\n" word)))
+  ;; Could also collect words in a set
+  (for ([line (in-list line*)] [line-num (in-naturals)])
+    (for ([word (in-list (string-split line))] [word-num (in-naturals)])
+      (unless (spellcheck word) (alert (format "Warning: misspelled word '~a' on line ~a" word line-num)))))
   (string-join line* "\n"))
 
 (define (read/free-verse in)
@@ -45,5 +46,5 @@
           (define data 'str)))))
 
 (define (make-info key default use-default)
-  ;; Can dispatch on symbol `key` to do things like loading Dr.Racket extensions.
+  ;; Can dispatch on symbol `key` to do things like loading Dr.Racket extensions
   (use-default key default))
