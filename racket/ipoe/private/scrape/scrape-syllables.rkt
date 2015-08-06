@@ -18,7 +18,7 @@
 
 (require
   "scrape-util.rkt"
-  (only-in "user-input.rkt" get-user-input read-natural)
+  ipoe/private/ui
   (only-in sxml if-car-sxpath)
 )
 

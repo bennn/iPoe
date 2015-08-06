@@ -19,7 +19,7 @@
 (define (spellchecker)
   (define pgc (db-init))
   (lambda (word)
-    (word-exists? pgc word)))
+    (word-exists? pgc (normalize word))))
 
 ;; Convert a string to an "equivalent" string that might be in the database.
 ;; i.e., remove things like '?' and '!'.
@@ -34,10 +34,10 @@
 (module+ test
   (require rackunit)
 
+  ;; -- spellcheck
   (define spellcheck (spellchecker))
   (define-syntax-rule (check-spellcheck [in out] ...)
     (begin (check-equal? (spellcheck in) out) ...))
-
   (check-spellcheck
     ["yes" #t]
     ["volcano" #t]
@@ -45,9 +45,9 @@
     ["" #f]
   )
 
+  ;; -- normalize
   (define-syntax-rule (check-normalize [in out] ...)
     (begin (check-equal? (normalize in) out) ...))
-
   (check-normalize
     ["asdf" "asdf"]
     ["" ""]
