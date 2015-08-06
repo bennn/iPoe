@@ -158,21 +158,13 @@
 
 ;; (: find-word (->* [PGC (U String Integer)] [#:column (U 'id 'word 'num_syllables #f)] (U #f (Vector Integer String Integer))))
 (define (find-word pgc word-property #:column [col-param #f])
-  (case (or col-param (infer-word-column word-property))
+  (case (or (validate-word-column col-param) (infer-word-column word-property))
     [(id)
      (query-maybe-row pgc "SELECT * FROM word WHERE word.id=$1" word-property)]
     [(num_syllables)
      (query-maybe-row pgc "SELECT * FROM word WHERE word.num_syllables=$1" word-property)]
     [(word)
      (query-maybe-row pgc "SELECT * FROM word WHERE word.word=$1" word-property)]))
-
-(define (rhyme-table? sym)
-  (or (eq? sym 'rhyme)
-      (eq? sym 'almost_rhyme)))
-
-(define (assert-rhyme-table? sym #:src loc)
-  (unless (rhyme-table? sym)
-    (table-error loc sym)))
 
 ;; A finder for rhymes and almost-rhymes.
 ;; Both `wid` and `rid` are nullable, but not at the same time.
@@ -201,20 +193,6 @@
   (match (find-word pgc wid #:column 'id)
     [#f #f]
     [(vector id word syllables) word]))
-
-(define (infer-word-column param)
-  (cond
-   [(string? param)
-    ;; 'word' is the only string column
-    'word]
-   [(and (integer? param) (< 0 param 50))
-    ;; Small integers are probably syllables
-    'num_syllables]
-   [(integer? param)
-    ;; Other integers are hopefully word ids
-    'id]
-   [else
-    (db-error 'infer-word-column "Cannot infer column in word database from parameter '~a'" param)]))
 
 (define (syllables->word* pgc num-syllables)
   (in-query pgc "SELECT word FROM word WHERE word.num_syllables=$1" num-syllables))
@@ -260,6 +238,38 @@
   (define rid (word->id pgc r))
   (unless wid (db-error 'r-with "Cannot check ~a-with? for rhyme '~a'" loc r))
   (if (find-r pgc wid rid #:table loc) #t #f))
+
+;; -----------------------------------------------------------------------------
+;; --- misc validation
+
+(define (rhyme-table? sym)
+  (or (eq? sym 'rhyme)
+      (eq? sym 'almost_rhyme)))
+
+(define (assert-rhyme-table? sym #:src loc)
+  (unless (rhyme-table? sym)
+    (table-error loc sym)))
+
+(define (infer-word-column param)
+  (cond
+   [(string? param)
+    ;; 'word' is the only string column
+    'word]
+   [(and (integer? param) (< 0 param 50))
+    ;; Small integers are probably syllables
+    'num_syllables]
+   [(integer? param)
+    ;; Other integers are hopefully word ids
+    'id]
+   [else
+    (db-error 'infer-word-column "Cannot infer column in word database from parameter '~a'" param)]))
+
+(define (validate-word-column col)
+  (cond
+   [(or (eq? col 'id) (eq? col 'word) (eq? col 'num_syllables))
+    col]
+   [else
+    #f]))
 
 ;; =============================================================================
 
@@ -319,6 +329,23 @@
    [-51    'id]
    [55     'id]
    [8675309 'id])
+
+  ;; -- validate-word-column
+  (define-syntax-rule (check-validate-word-column? [in out] ...)
+    (begin (check-equal? (validate-word-column in) out) ...))
+  (check-validate-word-column?
+   ['id 'id]
+   ['word 'word]
+   ['num_syllables 'num_syllables]
+   ;; --
+   ['part_of_speech #f]
+   ['nothing #f]
+   ['genre #f]
+   ["id" #f]
+   ["word" #f]
+   ['() #f]
+   [5 #f]
+  )
 
   ;; -- word->id
   ;; Should return #f for unknown words
