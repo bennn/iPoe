@@ -35,7 +35,7 @@
                         #:prompt prompt-str
                         #:description [desc-str #f])
   ;; TODO use something more general/gui-friendly than printf
-  (when desc-str (displayln desc-str))
+  (when desc-str (alert desc-str))
   (define (show-prompt)
     (displayln prompt-str)
     (display "> "))
@@ -50,7 +50,7 @@
        ;; Optimistically send a help message
        (when (and desc-str (or (regexp-match "help" response)
                                (regexp-match "\\?"    response)))
-         (displayln desc-str))
+         (alert desc-str))
        ;; Re-show the prompt and loop
        (show-prompt)
        (loop (read-line))])))
