@@ -8,7 +8,7 @@
 
 # database
 *.db
-scrape
+__dump
 
 # personal notes
 ipoe.org

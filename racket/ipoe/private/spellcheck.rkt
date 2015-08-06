@@ -19,7 +19,7 @@
 (define (spellchecker)
   (define pgc (db-init))
   (lambda (word)
-    (not (eq? '() (find-word pgc word)))))
+    (word-exists? pgc word)))
 
 ;; Convert a string to an "equivalent" string that might be in the database.
 ;; i.e., remove things like '?' and '!'.
