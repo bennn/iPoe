@@ -14,12 +14,10 @@
 (require
   ipoe/private
   syntax/strip-context
-  (only-in racket/string string-split string-join)
+  (only-in racket/string string-join)
 )
 
 ;; =============================================================================
-
-(define spellcheck (spellchecker))
 
 ;; Good name convention?
 ;; I like the idea of calling `(free-verse "text")` after importing the same
@@ -27,11 +25,9 @@
 ;; Maybe `free-verse?` would be better;
 ;;  maybe this'll be easier to figure out after I know all the things to provide
 (define (free-verse arg)
-  (define line* (to-lines arg))
+  (define line* (to-line* arg))
   ;; Could also collect words in a set
-  (for ([line (in-list line*)] [line-num (in-naturals)])
-    (for ([word (in-list (string-split line))] [word-num (in-naturals)])
-      (unless (spellcheck word) (alert (format "Warning: misspelled word '~a' on line ~a" word line-num)))))
+  (check-spelling line*)
   (string-join line* "\n"))
 
 (define (read/free-verse in)
