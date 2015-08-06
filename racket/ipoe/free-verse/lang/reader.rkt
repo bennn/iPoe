@@ -12,7 +12,7 @@
 ;; =============================================================================
 
 (require
-  ipoe ;;bg TODO prefer to say 'ipoe/private'
+  ipoe/private
   syntax/strip-context
   (only-in racket/string string-split string-join)
 )
