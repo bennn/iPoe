@@ -10,7 +10,8 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  "db.rkt"
+  ipoe/private/db
+  ipoe/private/parse
   (only-in racket/file file->value))
 
 ;; =============================================================================
@@ -19,15 +20,7 @@
 (define (spellchecker)
   (define pgc (db-init))
   (lambda (word)
-    (word-exists? pgc (normalize word))))
-
-;; Convert a string to an "equivalent" string that might be in the database.
-;; i.e., remove things like '?' and '!'.
-(define (normalize word)
-  (apply string
-         (for/list ([c (in-string word)]
-                    #:when (char-alphabetic? c))
-           (char-downcase c))))
+    (word-exists? pgc (parse-word word))))
 
 ;; =============================================================================
 
@@ -45,16 +38,4 @@
     ["" #f]
   )
 
-  ;; -- normalize
-  (define-syntax-rule (check-normalize [in out] ...)
-    (begin (check-equal? (normalize in) out) ...))
-  (check-normalize
-    ["asdf" "asdf"]
-    ["" ""]
-    ["cat61" "cat"]
-    ["ARGH" "argh"]
-    ["waiT?" "wait"]
-    ["don't" "dont"]
-    ["hel,p" "help"]
-  )
 )

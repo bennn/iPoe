@@ -1,8 +1,12 @@
 #lang racket/base
 
-;; Generic parsing tools
+;; Generic word/line parsing tools
 
 (provide
+  last-word
+  ;; (-> String (U #f String))
+  ;; Get the last parseable word from a string of text
+
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
   ;; Convert an input source to a list of newline-separated strings
@@ -10,6 +14,11 @@
   to-stanza*
   ;; (-> (Sequenceof String) (Sequenceof (Sequenceof String)))
   ;; Convert a sequence of lines to a sequence of stanzas
+
+  parse-word
+  ;; (-> String String)
+  ;; Filter unimportant things from some text.
+  ;; i.e. Remove punctuation, convert to lowercase.
 )
 
 ;; -----------------------------------------------------------------------------
@@ -22,6 +31,17 @@
 
 ;; =============================================================================
 ;; TODO library should be lazy enough to handle Dickens
+
+(define (last-word str)
+  ;; Collect a reverse-order list of parsed words
+  ;; (Basically, rev-map)
+  (define word*
+    (for/fold ([w* '()])
+              ([s (in-list (string-split str))])
+      (cons (parse-word s) w*)))
+  (for/first ([w (in-list word*)]
+              #:when (not (string-empty? w)))
+    w))
 
 (define (to-line* arg)
   (cond
@@ -37,7 +57,6 @@
 (define-syntax-rule (maybe-yield-stanza st)
   (when (not (null? st)) (yield (reverse st))))
 
-;; TODO test
 (define (to-stanza* line*)
   (in-generator (let loop ([line* line*] [curr-stanza '()])
     (cond
@@ -52,7 +71,7 @@
       ;; Advance `line*` and add to `curr-stanza`
       (loop (cdr line*) (cons (car line*) curr-stanza))]))))
 
-;; TODO test
+;; (: string-empty? (-> String Boolean))
 (define (string-empty? str)
   (zero? (string-length (string-trim str))))
 
@@ -64,6 +83,15 @@
   (apply append
          (for/list ([x (in-list arg)])
            (string->lines x))))
+
+;; Convert a string to an "equivalent" string that might be in the database.
+;; i.e., remove things like '?' and '!'.
+;; (: parse-word (-> String String))
+(define (parse-word word)
+  (apply string
+         (for/list ([c (in-string word)]
+                    #:when (char-alphabetic? c))
+           (char-downcase c))))
 
 ;; =============================================================================
 
@@ -121,4 +149,33 @@
      " hello "
      "why\nnot\n"
      "\ta\tb"])
+
+  ;; -- parse-word
+  (define-syntax-rule (check-parse-word [in out] ...)
+    (begin (check-equal? (parse-word in) out) ...))
+  (check-parse-word
+    ["asdf" "asdf"]
+    ["" ""]
+    ["cat61" "cat"]
+    ["ARGH" "argh"]
+    ["waiT?" "wait"]
+    ["don't" "dont"]
+    ["hel,p" "help"]
+  )
+
+  ;; -- last-word
+  (define-syntax-rule (check-last-word [sentence lw] ...)
+    (begin (check-equal? (last-word sentence) lw) ...))
+  (check-last-word
+    ["a red fox" "fox"]
+    ["" #f]
+    ["a" "a"]
+    ;; --
+    ["A" "a"]
+    ["word." "word"]
+    ["a few words and some ..." "some"]
+    ["don't do it!" "it"]
+    ["\tdiffn't\nspaces\n" "spaces"]
+    ;; --
+    ["521351" #f])
 )
