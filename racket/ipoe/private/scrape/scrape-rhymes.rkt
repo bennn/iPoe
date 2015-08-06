@@ -14,7 +14,7 @@
 )
 
 (require
-  "user-input.rkt"
+  ipoe/private/ui
   "scrape-util.rkt"
   (only-in sxml sxpath if-car-sxpath)
   (only-in racket/string string-trim string-join)
