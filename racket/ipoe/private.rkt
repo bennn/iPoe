@@ -1,6 +1,10 @@
 #lang racket/base
 
 (provide
+  alert
+  ;; (-> String Void)
+  ;; Send an alert to the user
+
   spellchecker
   ;; (-> (-> String Boolean))
   ;; Thunk yielding a spellcheck function.
@@ -17,6 +21,7 @@
 ;; -----------------------------------------------------------------------------
 
 (require
+  "private/ui.rkt"
   "private/parse.rkt"
   "private/spellcheck.rkt"
 )
