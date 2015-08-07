@@ -70,7 +70,8 @@
 (define (rhyme=? w1 w2)
   (unless (*pgc*)
     (*pgc* (db-init)))
-  (or (rhymes-with? (*pgc*) w1 w2)
+  (or (string=? w1 w2) ;; TODO maybe rhymes-with? should be enforced equivalence
+      (rhymes-with? (*pgc*) w1 w2)
       (almost-rhymes-with? (*pgc*) w1 w2)))
 
 ;; Unify a stanza of poetry with a rhyme scheme
@@ -88,7 +89,7 @@
       ;; Match current line with existing word
       ;; Do not update varmap
       (unless (rhyme=? rhyme l)
-        (raise-user-error src (format "Line ~a of stanza ~a does not match rhyme scheme. Expected a word to rhyme with '~a' but got '~a'" line-num n rhyme l)))
+        (raise-user-error src (format "Line ~a of stanza ~a does not match rhyme scheme. Expected a word to rhyme with '~a' but got '~a'" (add1 line-num) (add1 n) rhyme l)))
       sym+word*)]
      [else
       ;; Bind the current word to the variable
@@ -115,15 +116,37 @@
   (check-rhyme-scheme/pass
     ['() '()]
     ['(("the quick brown fox" "Jumped over the lazy dog")) '((A B))]
-    ;; TODO more tests
+    ['(("anything")) '((A))]
+    ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
+    ['(("willful and raisin" "under the weather" "jet set go")
+       ("domino effect" "very motivation")
+       ("beside our goal" "the free bird" "gory category"))
+     '((A B C) (D E) (F G H))]
+    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
+       ("in" "a" "land" "full" "of" "snow")
+       ("the" "end"))
+     '((A B C D C E D F)
+       (G C I J K F)
+       (L M))]
   )
 
   (define-syntax-rule (check-rhyme-scheme/fail [st* rs*] ...)
     (begin (check-exn exn:fail? (lambda () (assert-rhyme-scheme st* #:rhyme-scheme rs* #:src 'test))) ...))
   (check-rhyme-scheme/fail
     ['() '((A))]
+    ['(("never" "land")) '()]
+    ['(("never" "land")) '(())]
+    ['(("never" "land")) '((X))]
     ['(("never" "land")) '((A A))]
-    ;; TODO more tests
+    ['(("never" "land")) '((F U N))]
+    ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
+     '((A B C D C E D F))]
+    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
+       ("in" "a" "land" "full" "of" "snow")
+       ("the" "end"))
+     '((A B C D C E D F)
+       (G C I J K F)
+       (L L))]
   )
 
   ;; -- rhyme-scheme?
