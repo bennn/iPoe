@@ -24,10 +24,6 @@
   ;; Calling `(almost-rhymes-with? pgc w r)` returns true if `w` almost rhymes with `r`.
   ;; Results should be symmetric, but this is not guaranteed.
 
-  db-init
-  ;; (-> connection?)
-  ;; Connect to the ipoe database, return the psql connection
-
   id->word
   ;; (-> connection? natural/c string?)
   ;; Convert a primary key to its matching word string.
@@ -40,6 +36,11 @@
   syllables->word*
   ;; (-> connection? natural? (sequence/c string?))
   ;; Return a sequence of words with the supplied number of syllables
+
+  with-ipoe-db
+  ;; (-> (-> Any) Any)
+  ;; Execute the thunk in the context of a fresh database connection
+  ;; TODO Ensures the connection is closed, even when the thunk raises an exception
 
   word->almost-rhyme*
   ;; (-> connection? string? (sequence/c string?)
@@ -75,6 +76,55 @@
 )
 
 ;; =============================================================================
+
+;; TODO these constants should be in an external config file
+(define DB-USER "ben")
+(define DB-NAME "ipoe")
+(define DB-LOG  "./ipoe.log")
+
+(define current-ipoe-db  (make-parameter #f))
+(define current-ipoe-log (make-parameter #f))
+
+;; -----------------------------------------------------------------------------
+
+;; Open a database connection & set parameters
+(define (db-init)
+  (current-ipoe-log (open-output-file DB-LOG #:exists? 'error))
+  (current-ipoe-db  (postgresql-connect #:user DB-USER #:database DB-NAME))
+  (start-transaction (current-ipoe-db))
+  (current-ipoe-db))
+
+;; Close a database connection & unset parameters
+(define (db-close [pgc (current-ipoe-db)]
+                  #:commit? [commit? #t])
+  (close-output-port (current-ipoe-log))
+  (if commit?
+    (begin (commit-transaction pgc)
+           (logfile->sql DB-LOG))
+    (begin (rollback-transaction pgc)
+           (delete-file DB-LOG)))
+  (disconnect pgc)
+  (current-ipoe-db  #f)
+  (current-ipoe-log #f)
+  (void))
+
+(define (with-ipoe-db thunk #:commit? [commit? #t])
+  ;; Open a database connection
+  (let* ([pgc (db-init)])
+    (call-with-exception-handler
+      ;; On error, close the DB connection
+      (lambda (exn)
+        (begin (db-close pgc #:commit? commit?) exn))
+      ;; Execute thunk with parameter set, close DB when finished
+      (lambda ()
+        (let ([result (thunk)])
+          (begin (db-close pgc #:commit? commit?) result))))))
+
+;; Compile a logfile to a new SQL migration
+(define (logfile->sql filename)
+  TODO)
+
+;; -----------------------------------------------------------------------------
 
 (define-syntax-rule (db-error loc msg arg* ...)
   (error (string->symbol (string-append "ipoe:db:" (symbol->string loc)))
@@ -152,9 +202,6 @@
       => (lambda (rid) (query-exec pgc query-str wid rid))]
      [else
       (db-warning loc "Could not find ID for word '~a'" r)])))
-
-(define (db-init)
-  (postgresql-connect #:user "ben" #:database "ipoe"))
 
 ;; (: find-word (->* [PGC (U String Integer)] [#:column (U 'id 'word 'num_syllables #f)] (U #f (Vector Integer String Integer))))
 (define (find-word pgc word-property #:column [col-param #f])
@@ -277,7 +324,6 @@
   (require rackunit racket/sequence)
 
   (define pgc (db-init))
-
   ;; ---- Start a transaction, so nothing in the tests gets committed
   (start-transaction pgc)
 
@@ -538,4 +584,6 @@
 
   ;; ---- End the transaction, do not commit
   (rollback-transaction pgc)
+  (db-close pgc)
+  (purge-log)
 )
