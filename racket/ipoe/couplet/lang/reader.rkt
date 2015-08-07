@@ -15,13 +15,14 @@
   ipoe/private
   syntax/strip-context
   (only-in racket/string string-join)
+  (only-in racket/sequence sequence->list)
 )
 
 ;; =============================================================================
 
 (define (couplet arg)
   (define line* (to-line* arg))
-  (define stanza* (to-stanza* line*))
+  (define stanza* (sequence->list (to-stanza* line*)))
   ;; -- Expecting 1 stanza of two rhyming lines
   (assert-rhyme-scheme stanza* #:rhyme-scheme '((A A)) #:src 'couplet)
   ;; -- Spellcheck the original lines

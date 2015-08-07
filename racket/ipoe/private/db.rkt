@@ -236,7 +236,7 @@
   (define wid (word->id pgc w))
   (unless wid (db-error 'r-with "Cannot check ~a-with? for word '~a'" loc w))
   (define rid (word->id pgc r))
-  (unless wid (db-error 'r-with "Cannot check ~a-with? for rhyme '~a'" loc r))
+  (unless rid (db-error 'r-with "Cannot check ~a-with? for rhyme '~a'" loc r))
   (if (find-r pgc wid rid #:table loc) #t #f))
 
 ;; -----------------------------------------------------------------------------
