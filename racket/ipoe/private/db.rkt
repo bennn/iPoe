@@ -160,7 +160,7 @@
                   #:offline? [offline? #f])
   (cond
    [(word-exists? word #:db pgc)
-    (error 'db:add-word (format "Cannot add word '~a', already in database" word))]
+    (duplicate-word-error (format "Cannot add word '~a', already in database" word))]
    [else
     (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:offline? offline?))
     (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with explicit #:syllables argument." word))
