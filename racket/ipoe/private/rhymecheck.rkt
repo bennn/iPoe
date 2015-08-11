@@ -16,11 +16,6 @@
 )
 
 ;; =============================================================================
-;; --- Types and Parameters
-;; (Parameters should probably be in a new file)
-
-;; Current database connection
-(define *pgc* (make-parameter #f))
 
 ;; (define-type VarMap (Listof (Pairof Symbol String)))
 ;; (define-type RhymeScheme (Listof (Listof Symbol)))
@@ -68,11 +63,11 @@
 ;; For now, allowing both rhyme and almost-rhyme
 ;; (: rhyme=? (-> String String Boolean))
 (define (rhyme=? w1 w2)
-  (unless (*pgc*)
-    (*pgc* (db-init)))
-  (or (string=? w1 w2) ;; TODO maybe rhymes-with? should be enforced equivalence
-      (rhymes-with? (*pgc*) w1 w2)
-      (almost-rhymes-with? (*pgc*) w1 w2)))
+  (or (string=? w1 w2) ;; TODO rhymes-with? is not necessarily an equivalence
+      (with-ipoe-db  (lambda ()
+        (or
+          (rhymes-with? w1 w2)
+          (almost-rhymes-with? w1 w2))))))
 
 ;; Unify a stanza of poetry with a rhyme scheme
 ;; (: unify-rhyme-scheme (-> VarMap (Listof String) (Listof Symbol) #:src Symbol #:stanza-number Natural VarMap))
@@ -122,7 +117,7 @@
        ("domino effect" "very motivation")
        ("beside our goal" "the free bird" "gory category"))
      '((A B C) (D E) (F G H))]
-    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
+    ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
        ("in" "a" "land" "full" "of" "snow")
        ("the" "end"))
      '((A B C D C E D F)
