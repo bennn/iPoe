@@ -27,20 +27,23 @@
 (define-syntax (check-true* stx)
   (syntax-parse stx
     [(_ f [arg* ...] ...)
-     #'(begin (check-true (f arg* ...)) ...)]
+     (syntax/loc stx (begin (check-true (f arg* ...)) ...))]
     [_ (error 'check-true* "Expected (check-true* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
 (define-syntax (check-false* stx)
   (syntax-parse stx
     [(_ f [arg* ...] ...)
-     #'(begin (check-false (f arg* ...)) ...)]
+     (syntax/loc stx (begin (check-false (f arg* ...)) ...))]
     [_ (error 'check-false* "Expected (check-false* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
+;; TODO fails when mixing == and !=, should really pick the right check- variant
 (define-syntax (check-apply* stx)
-  (syntax-parse stx #:datum-literals (==)
+  (syntax-parse stx #:datum-literals (== !=)
     [(_ f [arg* ... == res] ...)
-     #'(begin (check-equal? (f arg* ...) res) ...)]
-    [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...). In other words, a function and parentheses-delimited lists of arguments & an == sign & a result value to compare with.")]))
+     (syntax/loc stx (begin (check-equal? (f arg* ...) res) ...))]
+    [(_ f [arg* ... != res] ...)
+     (syntax/loc stx (begin (check-not-equal? (f arg* ...) res) ...))]
+    [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
 
 ;; =============================================================================
 
@@ -109,5 +112,18 @@
     [1 #:b 2 == 2]
     [1 #:b 2 #:c 3 == 3]
   )
+
+  (check-apply* (lambda (x) x)
+    [1 != 2]
+    [1 != 3]
+    [1 != -1]
+  )
+
+  ;; TODO
+  ;(check-apply* (lambda (x) x)
+  ;  [1 == 1]
+  ;  [1 != 2]
+  ;  [2 == 2]
+  ;  [3 != 0])
 
 )
