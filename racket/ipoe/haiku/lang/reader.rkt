@@ -25,11 +25,11 @@
   (check-spelling line*)
   (string-join line* "\n"))
 
-(define (read/couplet in)
+(define (read/haiku in)
   (syntax->datum (read-syntax/haiku #f in)))
 
 (define (read-syntax/haiku src-path in)
-  (with-syntax ([str (couplet in)])
+  (with-syntax ([str (haiku in)])
     (strip-context
       #`(module anything racket
           (provide data)
