@@ -33,7 +33,6 @@
   (syntax->datum (read-syntax/couplet #f in)))
 
 (define (read-syntax/couplet src-path in)
-  ;; spellcheck lines
   (with-syntax ([str (couplet in)])
     (strip-context
        #`(module anything racket
