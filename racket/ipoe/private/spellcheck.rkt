@@ -28,13 +28,11 @@
   (with-ipoe-db (lambda ()
     (for ([line line*]
           [line-num (in-naturals)])
-      (for ([word (in-list (string-split line))]
+      (for ([w (in-list (string->word* line))]
             [word-num (in-naturals)])
-        (define normalized (parse-word word))
         ;; Do nothing for non-words (punctuation)
-        (when normalized
-          (unless (word-exists? normalized)
-            (alert (format "Warning: mispelled word '~a' on line '~a'" word line-num)))))))))
+        (unless (word-exists? w)
+          (alert (format "Warning: mispelled word '~a' on line '~a'" w line-num))))))))
 
 ;; =============================================================================
 
