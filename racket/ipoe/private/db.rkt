@@ -329,21 +329,19 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit racket/sequence)
+  (require rackunit racket/sequence "rackunit-abbrevs.rkt")
 
   (define-syntax-rule (with-db-test e)
     (with-ipoe-db (lambda () e) #:commit? #f))
 
   ;; -- find-word
-  (define-syntax-rule (check-find-word [word result] ...)
-    (with-db-test
-      (begin (check-equal? (find-word word) result) ...)))
-  (check-find-word
-    ["yoga" '#(679928 "yoga" 2)]
-    ["pal"  '#(614060 "pal" 1)]
-    ["sweet" '#(653512 "sweet" 1)]
-    ["blimp" '#(526807 "blimp" 1)]
-    ["anonymous" '#(517406 "anonymous" 4)])
+  (with-db-test
+    (check-apply* find-word
+      ["yoga" == '#(679928 "yoga" 2)]
+      ["pal"  == '#(614060 "pal" 1)]
+      ["sweet" == '#(653512 "sweet" 1)]
+      ["blimp" == '#(526807 "blimp" 1)]
+      ["anonymous" == '#(517406 "anonymous" 4)]))
 
   ;; -- syllables->word*
   (define-syntax-rule (check-syllables->word* [syllables word-expected*] ...)
@@ -368,87 +366,75 @@
    ["yes" "under" "africa" "polymorphism" "a" "heating"])
 
   ;; -- infer-word-column
-  (define-syntax-rule (check-infer-word-column [in out] ...)
-    (begin (check-equal? (infer-word-column in) out) ...))
-  (check-infer-word-column
-   ["yolo" 'word]
-   ["a13t" 'word]
-   [""     'word]
-   ["word" 'word]
+  (check-apply* infer-word-column
+   ["yolo" == 'word]
+   ["a13t" == 'word]
+   [""     == 'word]
+   ["word" == 'word]
    ;; --
-   [1      'num_syllables]
-   [3      'num_syllables]
-   [7      'num_syllables]
-   [40     'num_syllables]
+   [1      == 'num_syllables]
+   [3      == 'num_syllables]
+   [7      == 'num_syllables]
+   [40     == 'num_syllables]
    ;; --
-   [0      'id]
-   [-51    'id]
-   [55     'id]
-   [8675309 'id])
+   [0       == 'id]
+   [-51     == 'id]
+   [55      == 'id]
+   [8675309 == 'id])
 
   ;; -- validate-word-column
-  (define-syntax-rule (check-validate-word-column? [in out] ...)
-    (begin (check-equal? (validate-word-column in) out) ...))
-  (check-validate-word-column?
-   ['id 'id]
-   ['word 'word]
-   ['num_syllables 'num_syllables]
+  (check-apply* validate-word-column
+   ['id == 'id]
+   ['word == 'word]
+   ['num_syllables == 'num_syllables]
    ;; --
-   ['part_of_speech #f]
-   ['nothing #f]
-   ['genre #f]
-   ["id" #f]
-   ["word" #f]
-   ['() #f]
-   [5 #f]
+   ['part_of_speech == #f]
+   ['nothing == #f]
+   ['genre == #f]
+   ["id" == #f]
+   ["word" == #f]
+   ['() == #f]
+   [5 == #f]
   )
 
   ;; -- word->id
   ;; Should return #f for unknown words
   (with-db-test
     (begin
-     (check-false (word->id ""))
-     (check-false (word->id "afsv2qpewudvnjszd"))
-
-     (define-syntax-rule (check-word->id/pass [word id] ...)
-       (begin (check-equal? (word->id word) id) ...))
-     (check-word->id/pass
-       ["cat" 532756]
-       ["aardvark" 511396]
-       ["holy" 573983]
-       ["chalk" 534003]
-       ["soldier" 645783])
-     (define-syntax-rule (check-word->id/fail [word id] ...)
-       (begin (check-not-equal? (word->id word) id) ...))
-     (check-word->id/fail
-       ["baseball" 420]
-       ["yolo" 1]
-       ["demon" 12])))
+     (check-false* word->id
+       [""]
+       ["aasdfqehudv"]
+     )
+     (check-apply* word->id
+       ["cat" == 532756]
+       ["aardvark" == 511396]
+       ["holy" == 573983]
+       ["chalk" == 534003]
+       ["soldier" == 645783])
+     (check-apply* word->id
+       ["baseball" != 420]
+       ["yolo" != 1]
+       ["demon" != 12])))
 
   ;; -- word->syllables
   (with-db-test
     (begin
-      (define-syntax-rule (check-word->syllables/pass [word syll] ...)
-        (begin (check-equal? (word->syllables word) syll) ...))
-      (check-word->syllables/pass
-        ["" #f]
-        ["once" 1]
-        ["never" 2]
-        ["adamant" 3]
-        ["stallion" 2]
-        ["chrysanthemum" 4]
-        ["metallurgy" 4]
-        ["antihistamine" 5]
-        ["academically" 6])
-
-      (define-syntax-rule (check-word->syllables/fail [word syll] ...)
-        (begin (check-not-equal? (word->syllables word) syll) ...))
-      (check-word->syllables/fail
-        ["" 11]
-        ["mary" 4]
-        ["element" 1]
-        ["balloon" 3]
-        ["hour" 2])))
+      (check-apply* word->syllables
+        ["" == #f]
+        ["once" == 1]
+        ["never" == 2]
+        ["adamant" == 3]
+        ["stallion" == 2]
+        ["chrysanthemum" == 4]
+        ["metallurgy" == 4]
+        ["antihistamine" == 5]
+        ["academically" == 6])
+      (check-apply* word->syllables
+        ["" != 11]
+        ["mary" != 4]
+        ["element" != 1]
+        ["balloon" != 3]
+        ["hour" != 2])))
 
   ;; -- add-word/unsafe
   (with-db-test
@@ -545,11 +531,15 @@
       (check-true (and (almost-rhymes-with? w r) #t))))
 
   ;; -- (assert-)rhyme-table?
-  (check-true (rhyme-table? 'rhyme))
-  (check-true (rhyme-table? 'almost_rhyme))
+  (check-true* rhyme-table?
+    ['rhyme]
+    ['almost_rhyme]
+  )
 
-  (check-false (rhyme-table? 'r))
-  (check-false (rhyme-table? 'am))
+  (check-false* rhyme-table?
+    ['r]
+    ['am]
+  )
 
   (check-true (and (assert-rhyme-table? 'rhyme #:src 'test) #t))
   (check-true (and (assert-rhyme-table? 'almost_rhyme #:src 'test) #t))
@@ -560,44 +550,38 @@
   ;; -- word-exists?
   (with-db-test
     (begin
-      (define-syntax-rule (check-word-exists?/true [word ...])
-        (begin (check-true (word-exists? word)) ...))
-      (check-word-exists?/true
-       ["cat" "dog" "volcano" "element" "wood"])
+      (check-true* word-exists?
+        ["cat"]
+        ["dog"]
+        ["volcano"]
+        ["element"]
+        ["wood"])
 
-      (define-syntax-rule (check-word-exists?/false [word ...])
-        (begin (check-false (word-exists? word)) ...))
-      (check-word-exists?/false
-       ["tagyscv7" "4axz" ""])))
+      (check-false* word-exists?
+       ["tagyscv7"]
+       ["4axz"]
+       [""])))
 
   ;; -- (almost-)rhymes-with?
   (with-db-test
     (begin
-      (define-syntax-rule (check-rhymes-with?/true [w r] ...)
-        (begin (check-true (rhymes-with? w r)) ...))
-      (check-rhymes-with?/true
+      (check-true* rhymes-with?
        ["plate" "mate"]
        ["inherit" "parrot"]
        ["car" "far"]
        ["criticism" "dualism"])
-      (define-syntax-rule (check-rhymes-with?/false [w r] ...)
-        (begin (check-false (rhymes-with? w r)) ...))
-      (check-rhymes-with?/false
+      (check-false* rhymes-with?
        ["out" "book"]
        ["waiter" "chase"]
        ["chalkboard" "goat"]
       )
 
-      (define-syntax-rule (check-almost-rhymes-with?/true [w r] ...)
-        (begin (check-true (almost-rhymes-with? w r)) ...))
-      (check-almost-rhymes-with?/true
+      (check-true* almost-rhymes-with?
        ["criticism" "proposition"]
        ["lyric" "lithic"]
        ["bulimic" "pinprick"]
        ["pinprick" "lipstick"])
-      (define-syntax-rule (check-almost-rhymes-with?/false [w r] ...)
-        (begin (check-false (almost-rhymes-with? w r)) ...))
-      (check-almost-rhymes-with?/false
+      (check-false* almost-rhymes-with?
        ["watermelon" "orange"]
        ["cat" "cat"]
        ["yoyo" "wolf"]
