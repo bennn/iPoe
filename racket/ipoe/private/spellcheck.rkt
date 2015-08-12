@@ -3,58 +3,44 @@
 ;; A very simple spellchecker
 
 (provide
-  ;; (-> (-> String Boolean))
-  spellchecker
+  check-spelling
+  ;; (-> (Sequenceof String) Void)
+  ;; Check all words in a sequence of lines for spelling errors
 )
 
 ;; -----------------------------------------------------------------------------
 
 (require
-  "db.rkt"
+  ipoe/private/db
+  ipoe/private/parse
+  ipoe/private/ui
+  (only-in racket/string string-split)
   (only-in racket/file file->value))
 
 ;; =============================================================================
 
-;; Create a spellchecking function that references the ipoe database
-(define (spellchecker)
-  (define pgc (db-init))
-  (lambda (word)
-    (word-exists? pgc (normalize word))))
-
-;; Convert a string to an "equivalent" string that might be in the database.
-;; i.e., remove things like '?' and '!'.
-(define (normalize word)
-  (apply string
-         (for/list ([c (in-string word)]
-                    #:when (char-alphabetic? c))
-           (char-downcase c))))
+;; Always succeeds.
+;; As of 2015-08-06, just makes an alert if words are mispelled
+;; - doesn't raise an error
+;; - doesn't offer suggestions
+;; (: check-spelling (-> (Sequenceof String) Void))
+(define (check-spelling line*)
+  (with-ipoe-db (lambda ()
+    (for ([line line*]
+          [line-num (in-naturals)])
+      (for ([word (in-list (string-split line))]
+            [word-num (in-naturals)])
+        (define normalized (parse-word word))
+        ;; Do nothing for non-words (punctuation)
+        (when normalized
+          (unless (word-exists? normalized)
+            (alert (format "Warning: mispelled word '~a' on line '~a'" word line-num)))))))))
 
 ;; =============================================================================
 
 (module+ test
   (require rackunit)
 
-  ;; -- spellcheck
-  (define spellcheck (spellchecker))
-  (define-syntax-rule (check-spellcheck [in out] ...)
-    (begin (check-equal? (spellcheck in) out) ...))
-  (check-spellcheck
-    ["yes" #t]
-    ["volcano" #t]
-    ["awsgvdcx" #f]
-    ["" #f]
-  )
-
-  ;; -- normalize
-  (define-syntax-rule (check-normalize [in out] ...)
-    (begin (check-equal? (normalize in) out) ...))
-  (check-normalize
-    ["asdf" "asdf"]
-    ["" ""]
-    ["cat61" "cat"]
-    ["ARGH" "argh"]
-    ["waiT?" "wait"]
-    ["don't" "dont"]
-    ["hel,p" "help"]
-  )
+  ;; -- check-spelling
+  (check-spelling (list "yes"))
 )
