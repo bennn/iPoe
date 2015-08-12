@@ -24,7 +24,7 @@
   (define line* (to-line* arg))
   (define stanza* (sequence->list (to-stanza* line*)))
   ;; -- Expecting 1 stanza of two rhyming lines
-  (assert-rhyme-scheme stanza* #:rhyme-scheme '((A A)) #:src 'couplet)
+  (assert-rhyme-scheme stanza* #:rhyme-scheme '(((A . *) (A . *))) #:src 'couplet)
   ;; -- Spellcheck the original lines
   (check-spelling line*)
   (string-join line* "\n"))
