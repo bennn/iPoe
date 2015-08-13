@@ -10,6 +10,10 @@
   get-user-input
   ;;
 
+  user-error
+  ;; (-> String Any)
+  ;; Raise an error message
+
   ;; -- built-in readers
 
   read-natural
@@ -54,6 +58,12 @@
        ;; Re-show the prompt and loop
        (show-prompt)
        (loop (read-line))])))
+
+(define (user-error src str)
+  ;; Will probably change after Dr.Racket
+  (raise-user-error src str))
+
+;; -----------------------------------------------------------------------------
 
 (define (read-natural str)
   (define n (string->number str))
