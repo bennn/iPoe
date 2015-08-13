@@ -10,9 +10,13 @@
   get-user-input
   ;;
 
+  internal-error
+  ;; (-> Symbol String Any)
+  ;; Raise a developer-centric error message
+
   user-error
-  ;; (-> String Any)
-  ;; Raise an error message
+  ;; (-> Symbol String Any)
+  ;; Raise a user-level error message
 
   ;; -- built-in readers
 
@@ -58,6 +62,10 @@
        ;; Re-show the prompt and loop
        (show-prompt)
        (loop (read-line))])))
+
+(define (internal-error src str)
+  (define err-loc (string->symbol (format "ipoe:~a:internal-error" src)))
+  (error err-loc str))
 
 (define (user-error src str)
   ;; Will probably change after Dr.Racket
