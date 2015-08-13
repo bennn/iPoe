@@ -5,38 +5,37 @@
 ;; -----------------------------------------------------------------------------
 
 (provide
-  assert-rhyme-scheme
-  ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Void)
-  ;; Assert that the input text matches the rhyme scheme
+  check-rhyme-scheme
+  ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either)
+  ;; Check that the input text matches the rhyme scheme
 )
 
 ;; -----------------------------------------------------------------------------
 
 (require
   ipoe/private/db
+  ipoe/private/either
   ipoe/private/parse
   ipoe/private/ui
+  ;; --
+  racket/match
 )
 
 ;; =============================================================================
 ;; == API functions
 
 ;; 2015-08-06: May want to return the VarMap some day
-;; (: assert-rhyme-scheme (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Void))
-(define (assert-rhyme-scheme stanza* #:rhyme-scheme rs* #:src src)
+;; (: check-rhyme-scheme (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either))
+(define (check-rhyme-scheme stanza* #:rhyme-scheme rs* #:src src)
   (define err-loc (string->symbol (format "~a:rhyme-scheme" src)))
   ;; -- preconditions
-  (unless (rhyme-scheme? rs*) (raise-argument-error err-loc "Expected (Listof (Listof Symbol)) for #:rhyme-scheme" rs*))
-  (assert-num-stanzas stanza* rs* #:src err-loc)
-  ;; -- assert rhyme
-  (with-ipoe-db (lambda ()
-    (for/fold ([sym+word '()])
-              ([stanza stanza*] [s+r* (in-list rs*)] [n (in-naturals)])
-      (define s* (map line-scheme->syllable s+r*))
-      (define r* (map line-scheme->rhyme s+r*))
-      (assert-num-lines stanza s+r* #:src err-loc #:stanza-number n)
-      (assert-syllables stanza s* #:src err-loc #:stanza-number n)
-      (unify-rhyme-scheme sym+word stanza r* #:src err-loc #:stanza-number n)))))
+  (either-monad
+    (unless (rhyme-scheme? rs*)
+      (failure err-loc (format "Expected a RhymeScheme, got ~a" rs*)))
+    (check-num-stanzas stanza* rs* #:src err-loc)
+    ;; -- check rhyme
+    (with-ipoe-db (lambda ()
+      (check-stanza* '() stanza* rs* #:src err-loc #:stanza-number 0)))))
 
 ;; -----------------------------------------------------------------------------
 ;; -- dynamic typechecking predicates
@@ -86,6 +85,10 @@
 (define (line-scheme->syllable ls)
   (cdr ls))
 
+(define (split-stanza-scheme* ls)
+  (values (map line-scheme->rhyme ls)
+          (map line-scheme->syllable ls)))
+
 ;; -----------------------------------------------------------------------------
 ;; -- varmap functions
 
@@ -103,32 +106,73 @@
 
 ;; -----------------------------------------------------------------------------
 
-;; (: assert-num-stanzas (-> (Sequenceof (Listof String)) RhymeScheme #:src Symbol Void))
-(define (assert-num-stanzas stanza* rs* #:src src)
-  (assert-length stanza* rs* "stanzas" #:src src))
+;; (: check-num-stanzas (-> (Sequenceof (Listof String)) RhymeScheme #:src Symbol Void))
+(define (check-num-stanzas stanza* rs* #:src src)
+  (check-length stanza* rs* "stanzas" #:src src))
 
-;; (: assert-num-lines (-> (Sequenceof Any) (Sequenceof Any) #:stanza-number Natural #:src Symbol Void))
-(define (assert-num-lines stanza rs #:stanza-number n #:src src)
-  (assert-length stanza rs (format "lines in stanza ~a" n) #:src src))
+;; (: check-num-lines (-> (Sequenceof Any) (Sequenceof Any) #:stanza-number Natural #:src Symbol Void))
+(define (check-num-lines stanza rs #:stanza-number n #:src src)
+  (check-length stanza rs (format "lines in stanza ~a" n) #:src src))
 
-;; (: assert-length (-> (Sequenceof Any) (Sequenceof Any) String #:src Symbol Void))
-(define (assert-length seq-test seq-ref descr-str #:src src)
+;; (: check-length (-> (Sequenceof Any) (Sequenceof Any) String #:src Symbol Void))
+(define (check-length seq-test seq-ref descr-str #:src src)
   (define len-test (for/sum ([s seq-test]) 1))
   (define len-ref  (for/sum ([r seq-ref]) 1))
-  (unless (= len-test len-ref)
-    (raise-user-error src
-      (format "Expected ~a ~a, got ~a" len-ref descr-str len-test))))
+  (if (= len-test len-ref)
+    (success src)
+    (failure src (format "Expected ~a ~a, got ~a" len-ref descr-str len-test))))
 
-(define (assert-syllables stanza syll* #:src src #:stanza-number n)
-  ;; Precondition: len(stanza) == len(syll*)
-  ;; Precondition: must be called with an active database connection
-  (for ([line stanza]
-        [line-no (in-naturals)]
-        [s    (in-list syll*)]
-        #:when (not (wildcard? s)))
-    (define a (line->syllables line))
-    (unless (= s a)
-      (raise-user-error src (format "Expected ~a syllables in line ~a of stanza ~a, got ~a syllables" s line-no n a)))))
+;; Check the number of lines, rhyme scheme, and syllables of each line in
+;;  all stanzas.
+;; Preconditions:
+;; - rs* is a rhyme scheme
+;; - stanza* has the same number of stanzas as rs*
+;; - there is an open connection to the ipoe database
+(define (check-stanza* varmap stanza* rhyme-scheme #:src src #:stanza-number n)
+  (match (cons stanza* rhyme-scheme*)
+    [(cons (cons stanza st*) (cons s+r* rs*))
+     ;; Match `stanza` with syllables & rhymes for lines.
+     ;; Either continue the recursion or return a failure result
+     (define-values (s* r*) (split-stanza-scheme s+r*))
+     (define result (either-monad
+       (check-num-lines stanza s+r* #:src src #:stanza-number n)
+       (check-syllables stanza s*   #:src src #:stanza-number n)
+       (unify-rhyme-scheme varmap stanza r* #:src src #:stanza-number n)))
+     (if (success? result)
+         ;; Continue, with the new varmap
+         (check-stanza* (success-value result) st* rs* #:src src #:stanza-number (add1 n))
+         ;; Stop iteration, return the failure
+         result)]
+    ['(() ())
+     ;; End of recursion (could return the varmap, I guess)
+     (success 'rhyme-scheme (void))]
+    [_
+     (internal-error 'check-stanza* (format "invariant broken: arguments stanza* and rhyme-scheme have different lengths.\n  stanza* = ~a\n  rhyme-scheme = ~a" stanza* rhyme-scheme))]))
+
+;; Preconditions:
+;; - len(stanza) == len(syll*)
+;; - must be called with an active database connection
+(define (check-syllables stanza syll*
+                         #:src src
+                         #:stanza-number sn
+                         #:line-number [ln 0])
+  (match (cons stanza syll*)
+    [(cons (cons line st) (cons s s*))
+     (cond
+       [(wildcard? s)
+        ;; Ignore wildcards
+        (check-syllables st s*
+                         #:src src #:stanza-number sn #:line-number (add1 ln))]
+       [(= s (line->syllables line))
+        ;; If actual syllables match expected, we pass! Continue
+        (check-syllables st s*
+                         #:src src #:stanza-number sn #:line-number (add1 ln))]
+       [else
+        (failure src (format "Expected ~a syllables in line ~a of stanza ~a, got ~a syllables" s line-no n a))])]
+    ['(()())
+     (success src (void))]
+    [_
+     (internal-error src (format "Invariant error: expected arguments `stanza` and `syll*` to be the same length."))]))
 
 (define (line->syllables line)
   ;; Precondition: must be called with an active database connection
@@ -173,6 +217,48 @@
 (module+ test
   (require rackunit "rackunit-abbrevs.rkt")
 
+  ;; -- check-rhyme-scheme
+  (define-syntax-rule (check-rhyme-scheme/pass [st* rs*] ...)
+    (begin (check-not-exn (lambda () (check-rhyme-scheme st* #:rhyme-scheme rs* #:src 'test))) ...))
+  (check-rhyme-scheme/pass
+    ['() '()]
+    ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
+    ['(("anything")) '(((A . *)))]
+    ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
+    ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+    ['(("willful and raisin" "under the weather" "jet set go")
+       ("domino effect" "very motivation")
+       ("beside our goal" "the free bird" "gory category"))
+     '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
+    ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
+       ("in" "a" "land" "full" "of" "snow")
+       ("the" "end"))
+     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
+       ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
+       ((L . *) (M . *)))]
+  )
+
+  (define-syntax-rule (check-rhyme-scheme/fail [st* rs*] ...)
+    (begin (check-exn exn:fail? (lambda () (check-rhyme-scheme st* #:rhyme-scheme rs* #:src 'test))) ...))
+  (check-rhyme-scheme/fail
+    ['() '((A))]
+    ['(("never" "land")) '()]
+    ['(("never" "land")) '(())]
+    ['(("never" "land")) '(((X . *)))]
+    ['(("never" "land")) '(((A . *) (A . *)))]
+    ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
+    ['(("never" "land")) '(((A . *) (B . 2)))]
+    ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
+     '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
+    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
+       ("in" "a" "land" "full" "of" "snow")
+       ("the" "end"))
+     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
+       ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
+       ((L . *) (M . *)))]
+  )
+
+  ;; ---------------------------------------------------------------------------
   ;; -- rhyme-scheme?
   (check-true* rhyme-scheme?
     ['()]
@@ -286,47 +372,12 @@
     ['(D . *) == '*]
   )
 
-  ;; -- assert-rhyme-scheme
-  (define-syntax-rule (check-rhyme-scheme/pass [st* rs*] ...)
-    (begin (check-not-exn (lambda () (assert-rhyme-scheme st* #:rhyme-scheme rs* #:src 'test))) ...))
-  (check-rhyme-scheme/pass
-    ['() '()]
-    ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
-    ['(("anything")) '(((A . *)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
-    ['(("willful and raisin" "under the weather" "jet set go")
-       ("domino effect" "very motivation")
-       ("beside our goal" "the free bird" "gory category"))
-     '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
-    ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
-       ("in" "a" "land" "full" "of" "snow")
-       ("the" "end"))
-     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-       ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
-       ((L . *) (M . *)))]
-  )
+  ;; -- split-stanza-scheme
+  (let-values ([(r* s*) (split-stanza-scheme '((A . 1) (B . 2) (* . 0)))])
+    (check-equal? r* '(A B *))
+    (check-equal? s* '(1 2 0)))
 
-  (define-syntax-rule (check-rhyme-scheme/fail [st* rs*] ...)
-    (begin (check-exn exn:fail? (lambda () (assert-rhyme-scheme st* #:rhyme-scheme rs* #:src 'test))) ...))
-  (check-rhyme-scheme/fail
-    ['() '((A))]
-    ['(("never" "land")) '()]
-    ['(("never" "land")) '(())]
-    ['(("never" "land")) '(((X . *)))]
-    ['(("never" "land")) '(((A . *) (A . *)))]
-    ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
-    ['(("never" "land")) '(((A . *) (B . 2)))]
-    ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
-     '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
-    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
-       ("in" "a" "land" "full" "of" "snow")
-       ("the" "end"))
-     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-       ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
-       ((L . *) (M . *)))]
-  )
-
+  ;; ---------------------------------------------------------------------------
   ;; -- varmap-lookup
   (check-apply* varmap-lookup
     ['() 'a == #f]
@@ -349,24 +400,10 @@
     ['((A1 "B1")) 'A2 "B2"]
   )
 
-  ;; -- assert-num-lines
-  (define-syntax-rule (check-num-lines/fail [st rs] ...)
-    (begin (check-exn exn:fail? (lambda () (assert-num-lines st rs #:stanza-number -1 #:src 'test))) ...))
-  (check-num-lines/fail
-    ['() '(a)]
-    ['("a") '()]
-    ['("asdf asdf" "bbb") '(q w e r)])
-
-  (define-syntax-rule (check-num-lines/pass [st rs] ...)
-    (begin (check-not-exn (lambda () (assert-num-lines st rs #:stanza-number -1 #:src 'test))) ...))
-  (check-num-lines/pass
-    ['() '()]
-    ['("a") '(b)]
-    ['("yes I say" "yes" "Yes") '(one two three)])
-
-  ;; -- assert-num-stanzas
+  ;; ---------------------------------------------------------------------------
+  ;; -- check-num-stanzas
   (define-syntax-rule (check-num-stanzas/fail [st rs] ...)
-    (begin (check-exn exn:fail? (lambda () (assert-num-stanzas st rs #:src 'test))) ...))
+    (begin (check-exn exn:fail? (lambda () (check-num-stanzas st rs #:src 'test))) ...))
   (check-num-stanzas/fail
     ['() '((a))]
     ['(("word")) '()]
@@ -374,30 +411,53 @@
     ['(("a") ("b")) '((a) (b) (c) (d))])
 
   (define-syntax-rule (check-num-stanzas/pass [st rs] ...)
-    (begin (check-not-exn (lambda () (assert-num-stanzas st rs #:src 'test))) ...))
+    (begin (check-not-exn (lambda () (check-num-stanzas st rs #:src 'test))) ...))
   (check-num-stanzas/pass
     ['() '()]
     ['(("a")) '((X))]
     ['(() () () ()) '(() () () ())]
     ['(("yo" "lo") ("wepa")) '((X X X) (Y Z A))])
 
-  ;; -- assert-length
+  ;; -- check-num-lines
+  (define-syntax-rule (check-num-lines/fail [st rs] ...)
+    (begin (check-exn exn:fail? (lambda () (check-num-lines st rs #:stanza-number -1 #:src 'test))) ...))
+  (check-num-lines/fail
+    ['() '(a)]
+    ['("a") '()]
+    ['("asdf asdf" "bbb") '(q w e r)])
+
+  (define-syntax-rule (check-num-lines/pass [st rs] ...)
+    (begin (check-not-exn (lambda () (check-num-lines st rs #:stanza-number -1 #:src 'test))) ...))
+  (check-num-lines/pass
+    ['() '()]
+    ['("a") '(b)]
+    ['("yes I say" "yes" "Yes") '(one two three)])
+
+  ;; -- check-length
   (define-syntax-rule (check-length/fail [x* y*] ...)
-    (begin (check-exn exn:fail? (lambda () (assert-length x* y* "test" #:src 'test))) ...))
+    (begin (check-exn exn:fail? (lambda () (check-length x* y* "test" #:src 'test))) ...))
   (check-length/fail
     ['(a b c) '()]
     ['() '(a b c)]
     ["blah" "b"])
 
   (define-syntax-rule (check-length/pass [x* y*] ...)
-    (begin (check-not-exn (lambda () (assert-length x* y* "test" #:src 'test))) ...))
+    (begin (check-not-exn (lambda () (check-length x* y* "test" #:src 'test))) ...))
   (check-length/pass
     ['() '()]
     ['(1 2 3) '(1 2 3)]
     ["blah" "blah"]
     ['(() () 3) '(() 513423123 ("yes" "Yes"))])
 
-  ;; -- unify
+  ;; -- check-stanza* TODO
+
+  ;; -- check-syllables TODO
+
+  ;; -- line->syllables TODO
+
+  ;; -- rhyme=? TODO
+
+  ;; -- unify-rhyme-scheme
   (define-syntax-rule (check-unify/pass [vm st rs == vm2] ...)
     (begin (check-equal? (unify-rhyme-scheme vm st rs #:src 'test #:stanza-number 0) vm2) ...))
   (check-unify/pass
@@ -418,8 +478,5 @@
     ['() '("harpoon" "moon" "will") '(A B A)]
     ;; TODO
   )
-
-;; -- assert-syllables
-;; -- line->syllables
 
 )
