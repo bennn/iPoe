@@ -4,7 +4,7 @@
 
 (provide
   check-spelling
-  ;; (-> (Sequenceof String) Void)
+  ;; (-> (Sequenceof String) Either)
   ;; Check all words in a sequence of lines for spelling errors
 )
 
@@ -12,6 +12,7 @@
 
 (require
   ipoe/private/db
+  ipoe/private/either
   ipoe/private/parse
   ipoe/private/ui
   (only-in racket/string string-split)
@@ -25,20 +26,38 @@
 ;; - doesn't offer suggestions
 ;; (: check-spelling (-> (Sequenceof String) Void))
 (define (check-spelling line*)
-  (with-ipoe-db (lambda ()
-    (for ([line line*]
-          [line-num (in-naturals)])
-      (for ([w (in-list (string->word* line))]
-            [word-num (in-naturals)])
-        ;; Do nothing for non-words (punctuation)
-        (unless (word-exists? w)
-          (alert (format "Warning: mispelled word '~a' on line '~a'" w line-num))))))))
+  (define misspelled*
+    (with-ipoe-db (lambda ()
+      (for/list
+                ([line line*]
+                 [line-num (in-naturals)])
+        (for/list
+                  ([w (in-list (string->word* line))]
+                   [word-num (in-naturals)]
+                   #:when (not (word-exists? w)))
+          (alert (format "Warning: mispelled word '~a' on line '~a'" w line-num))
+          w)))))
+  (if (null? (car misspelled*))
+      (success 'check-spelling #t)
+      (failure 'check-spelling (apply append misspelled*))))
 
 ;; =============================================================================
 
 (module+ test
-  (require rackunit)
+  (require rackunit "rackunit-abbrevs.rkt")
 
   ;; -- check-spelling
-  (check-spelling (list "yes"))
+  (check-true* (lambda line* (success? (check-spelling line*)))
+    ["yes" "why"]
+    ["all" "these words are" "spelled correctly! I promise"]
+  )
+
+  (let ([bad1 "asdvhuhewdv"]
+        [bad2 "uhnojfyondvwhbonvwf"]
+        [bad3 "hjvndkwcxs"])
+    (check-apply* check-spelling
+      [(list bad1) == (failure 'check-spelling (list bad1))]
+      [(list bad1 bad2 bad3) == (failure 'check-spelling (list bad1 bad2 bad3))]
+    ))
+
 )
