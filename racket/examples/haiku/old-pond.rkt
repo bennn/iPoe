@@ -1,0 +1,5 @@
+#lang ipoe/haiku
+
+old pond
+a frog leaps in
+water's sound
