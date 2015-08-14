@@ -22,6 +22,7 @@
 
 (struct success (
   src ;; Symbol
+  value ;; Any (this is a little reckless, but we expect the caller knows what to expect)
 ))
 
 (struct failure (
@@ -52,12 +53,14 @@
 (define-syntax (either-monad stx)
   (syntax-parse stx
     [(_ e)
-     #'(cond [(either? e) => (lambda (x) x)]
-             [else        => (lambda (x) (either-error 'either-monad x))])]
-    [(_ e f f* ...)
-     #'(cond [(failure? e) => (lambda (x) x)]
-             [(success? e) => (lambda (x) (either-monad (f x) f* ...))]
-             [else         => (lambda (x) (either-error 'either-monad x))])]))
+     #'(let ([tmp e])
+         (cond [(either? tmp) tmp]
+               [else (either-error 'either-monad tmp)]))]
+    [(_ e e* ...)
+     #'(let ([tmp e])
+         (cond [(failure? tmp) tmp]
+               [(success? tmp) (either-monad e* ...)]
+               [else (either-error 'either-monad tmp)]))]))
 
 (define (on-failure expr f-thunk)
   (cond
@@ -75,7 +78,7 @@
 
   ;; -- either?
   (check-true* either?
-    [(success 'yes)]
+    [(success 'yes #t)]
     [(failure 'yes "because")])
   (check-false* either?
     [42]
@@ -83,7 +86,7 @@
     ['yolo])
 
   ;; -- assert-success
-  (let ([s (success 'yes)])
+  (let ([s (success 'yes #t)])
     (check-equal? (assert-success s #:src 'either-test) s))
   (check-exn (regexp "either-test.*myval")
              (lambda () (assert-success (failure 'myval "") #:src 'either-test)))
@@ -94,8 +97,28 @@
 
 
   ;; -- either-monad
+  (define-syntax-rule (test-either-monad [expr ...] result)
+    (check-equal? (either-monad expr ...) result))
+  (let ([fail (failure 'test-either "test either")]
+        [suc1 (success 'test-either 1)]
+        [suc2 (success 'test-either 2)])
+    (test-either-monad [fail] fail)
+    (test-either-monad [suc1] suc1)
+    (test-either-monad [suc1 suc2] suc2)
+    (test-either-monad [suc2 suc1] suc1)
+    (test-either-monad [fail suc1 suc2] fail)
+    (test-either-monad [suc2 fail suc1] fail)
+    (test-either-monad [suc1 suc2 fail] fail)
+    ;; The integer 1 in a "type error", but doesn't appear at runtime.
+    (test-either-monad [fail 1] fail))
+
+  (check-exn (regexp "^ipoe:either:either-monad")
+             (lambda () (either-monad 1)))
+  (check-exn (regexp "^ipoe:either:either-monad")
+             (lambda () (either-monad (success 'a 1) (success 'b 2) 1 (success 'c 3))))
+
   ;; -- on-failure
-  (let ([s (success 'gotcha)])
+  (let ([s (success 'gotcha #t)])
     (check-equal? (on-failure s (lambda (x) 1)) s))
   (check-equal? (on-failure (failure 'omf "oh my failure") (lambda (x) 1)) 1)
   (check-exn exn:fail? (lambda () (on-failure "ohno" (lambda (x) 1))))
