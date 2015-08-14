@@ -19,7 +19,7 @@
   ;; Use the source for error reporting.
 
   check-spelling
-  ;; (-> (Sequenceof String) Void)
+  ;; (-> (Sequenceof String) Either)
   ;; Check spelling of words in the plain-text source of a file.
 
   on-failure
