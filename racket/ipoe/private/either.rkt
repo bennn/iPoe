@@ -45,8 +45,7 @@
     [(success? expr)
       expr]
     [(failure? expr)
-      ;; Ignores failure src, to avoid duplicating symbols
-      (define loc (string->symbol (format "ipoe:~a" src)))
+      (define loc (string->symbol (format "ipoe:~a:~a" src (failure-src expr))))
       (user-error loc (failure-reason expr))]
     [else
       (either-error 'assert-success expr)]))

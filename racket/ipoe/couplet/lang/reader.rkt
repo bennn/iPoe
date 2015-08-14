@@ -24,9 +24,11 @@
   (define line* (to-line* arg))
   (define stanza* (sequence->list (to-stanza* line*)))
   ;; -- Expecting 1 stanza of two rhyming lines
-  (assert-rhyme-scheme stanza* #:rhyme-scheme '(((A . *) (A . *))) #:src 'couplet)
+  (assert-success #:src 'couplet
+    (check-rhyme-scheme stanza* #:rhyme-scheme '(((A . *) (A . *)))))
   ;; -- Spellcheck the original lines
-  (check-spelling line*)
+  (on-failure (check-spelling line*)
+    (lambda (fl) (alert (failure-reason fl))))
   (string-join line* "\n"))
 
 (define (read/couplet in)
