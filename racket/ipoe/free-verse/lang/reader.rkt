@@ -27,7 +27,8 @@
 (define (free-verse arg)
   (define line* (to-line* arg))
   ;; Could also collect words in a set
-  (check-spelling line*)
+  (on-failure (check-spelling line*)
+    (lambda (fl) (alert (failure-reason fl))))
   (string-join line* "\n"))
 
 (define (read/free-verse in)

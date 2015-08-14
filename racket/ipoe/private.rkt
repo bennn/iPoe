@@ -1,24 +1,30 @@
 #lang racket/base
 
 (provide
+  (struct-out success)
+  (struct-out failure)
+  ;; TODO doc
+
   alert
   ;; (-> String Void)
   ;; Send an alert to the user
 
-  assert-rhyme-scheme
+  assert-success
+  ;; (-> Either #:src Symbol Any)
+  ;; Raise an exception if the argument is not a `success?`
+
+  check-rhyme-scheme
   ;; (-> (Sequenceof (Sequenceof String)) #:rhyme-scheme (Listof (Listof Symbol)) #:src Symbol Void)
   ;; Check the rhyme scheme of the stanzas.
   ;; Use the source for error reporting.
 
   check-spelling
-  ;; (-> (Sequenceof String) Void)
+  ;; (-> (Sequenceof String) Either)
   ;; Check spelling of words in the plain-text source of a file.
 
-  spellchecker
-  ;; (-> (-> String Boolean))
-  ;; Thunk yielding a spellcheck function.
-  ;; The spellcheck function queries the ipoe database to see if
-  ;;  its input is a "real" word.
+  on-failure
+  ;; (-> Either (-> Failure Void) Void)
+  ;; Call the thunk if the argument is not a `success?` struct
 
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
@@ -35,6 +41,7 @@
 ;; -----------------------------------------------------------------------------
 
 (require
+  "private/either.rkt"
   "private/parse.rkt"
   "private/rhymecheck.rkt"
   "private/spellcheck.rkt"
