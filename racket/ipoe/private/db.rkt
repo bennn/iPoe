@@ -54,7 +54,7 @@
   ;; Return the sequence of words that rhyme with the argument
 
   word->syllables
-  ;; (->* [string?] [#:db connection?] natural?)
+  ;; (->* [string?] [#:db connection?] (U #f natural?))
   ;; Get the number of syllables in a word, if it exists
 
   word-exists?

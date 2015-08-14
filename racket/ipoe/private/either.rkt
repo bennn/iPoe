@@ -23,12 +23,12 @@
 (struct success (
   src ;; Symbol
   value ;; Any (this is a little reckless, but we expect the caller knows what to expect)
-))
+) #:transparent )
 
 (struct failure (
   src ;; Symbol
   reason ;; String
-))
+) #:transparent )
 
 ;; -----------------------------------------------------------------------------
 
