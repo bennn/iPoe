@@ -38,7 +38,7 @@
 ;; (: check-duplicate Any #:new-val Any #:src Symbol #:msg String Void)
 (define (check-duplicate old-val #:new-val v #:src src #:msg msg)
   (when old-val
-    (user-error src (format "Parsed two ~as: '~a' and '~a'" old-val v))))
+    (user-error src (format "Parsed two ~as: '~a' and '~a'" msg old-val v))))
 
 ;; Read an input file as a poem specification
 ;; (: ipoe-input->data (-> Input-Port PoemSpec))
@@ -131,3 +131,87 @@
     (check-rhyme line*)
     (check-spelling line*)
     line*))
+
+;; =============================================================================
+
+(module+ test
+  (require
+    rackunit
+    (only-in racket/string string-split)
+  )
+
+  ;; -- check-duplicate
+  ;; Always void if first arg is #f
+  (check-equal? (check-duplicate #f #:new-val 'a #:src 'b #:msg 'c)
+                (void))
+
+  ;; Always an exception if first arg is non-false
+  (let ([src 'cdtest])
+    (check-exn (regexp (symbol->string src))
+               (lambda () (check-duplicate #t #:new-val 'any #:src src #:msg 'any)))
+    (check-exn (regexp (symbol->string src))
+               (lambda () (check-duplicate 'A #:new-val 'any #:src src #:msg 'any)))
+    (check-exn (regexp (symbol->string src))
+               (lambda () (check-duplicate "hi" #:new-val 'any #:src src #:msg 'any))))
+
+  ;; -- input->poem-spec
+  (define (test-input->poem-spec str)
+    (define p (open-input-string str))
+    (define r (input->poem-spec p))
+    (close-input-port p)
+    r)
+  (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A))")
+                (poem-spec 'couplet '((A A)) #f))
+  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:name yes")
+                (poem-spec 'yes '((A) (B) (C)) #f))
+  ;; It's okay to leave out the keywords
+  (check-equal? (test-input->poem-spec "name (((Schema . 42)))")
+                (poem-spec 'name '(((Schema . 42))) #f))
+  ;; --- with #:extra-validator
+  ;(let ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")])
+  ;  (check-true (poem-spec? ps))
+  ;  (check-equal? (poem-spec-name ps) 'has-extra)
+  ;  (check-equal? (poem-spec-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
+  ;  (check-true ((poem-spec-extra-validator ps) '()))
+  ;  (check-true ((poem-spec-extra-validator ps) '(("hello" "world"))))
+  ;  (check-true ((poem-spec-extra-validator ps) '(()))))
+  ;(let ([ps (test-input->poem-spec "name (((Schema . 42))) (lambda (x) #t)")])
+  ;  (check-true (poem-spec? ps))
+  ;  (check-equal? (poem-spec-name ps) 'name)
+  ;  (check-equal? ((poem-spec-extra-validator ps) '()) #t))
+
+  ;; -- read-keyword-value
+  (let* ([src 'rkvtest]
+         [src-regexp (regexp (symbol->string src))])
+    ;; On EOF, raises an exception
+    (check-exn src-regexp
+               (lambda () (read-keyword-value eof boolean? #:kw 'yolo #:src src)))
+    (define (test-read-keyword-value str p?)
+      (define port (open-input-string str))
+      (define res  (read-keyword-value port p? #:kw 'test-kw #:src src))
+      (close-input-port port)
+      res)
+    ;; If value matches predicate, pass
+    (check-equal? (test-read-keyword-value "hello" symbol?)
+                  'hello)
+    (check-equal? (test-read-keyword-value "1" integer?)
+                  1)
+    ;; If value doesn't match predicate, fail
+    (check-exn src-regexp
+               (lambda () (test-read-keyword-value "42" string?)))
+    (check-exn src-regexp
+               (lambda () (test-read-keyword-value "42" symbol?))))
+
+  ;; -- poem-spec->validator
+  (let ([couplet-validator (poem-spec->validator (poem-spec 'couplet '((A A)) #f))]
+        [pass-str "I was born\nhouse was worn\n"]
+        [fail-str "roses are red\nviolets are blue\n"])
+    (define (test-couplet str)
+      (define port (open-input-string str))
+      (define res (couplet-validator port))
+      (close-input-port port)
+      res)
+    (check-equal? (test-couplet pass-str) (string-split pass-str "\n"))
+    (check-exn (regexp "ipoe")
+               (lambda () (test-couplet fail-str))))
+)
