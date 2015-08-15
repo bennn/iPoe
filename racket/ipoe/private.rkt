@@ -26,6 +26,10 @@
   ;; (-> Either (-> Failure Void) Void)
   ;; Call the thunk if the argument is not a `success?` struct
 
+  rhyme-scheme?
+  ;; (-> Any Boolean)
+  ;; Predicate for rhyme schemes
+
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
   ;; Convert a data source to a list of strings where no string in
@@ -36,6 +40,10 @@
   ;; (-> (Sequenceof String) (Sequenceof (Sequenceof String)))
   ;; Convert a sequence of source-file lines to a grouped sequence of stanzas
   ;; A stanza is a group of consecutive lines (no double-newlines between them)
+
+  user-error
+  ;; (-> Symbol String Any)
+  ;; Raise a user-level exception
 )
 
 ;; -----------------------------------------------------------------------------
