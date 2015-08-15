@@ -1,8 +1,9 @@
-#lang s-exp ipoe/reader
+#lang ipoe
 
 ;; One stanza,
-;; no rhyme scheme
+;; no rhyme constraints
 ;; 5 syllables in first line
 ;; 7 in second
 ;; 5 in last
-'(((* . 5) (* . 7) (* . 5)))
+#:name haiku
+#:rhyme-scheme (((* . 5) (* . 7) (* . 5)))

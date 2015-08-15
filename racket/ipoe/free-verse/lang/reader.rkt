@@ -1,4 +1,5 @@
-#lang s-exp ipoe/reader
+#lang ipoe
 
 ;; Anything goes!
-'()
+#:name free-verse
+#:rhyme-scheme ()
