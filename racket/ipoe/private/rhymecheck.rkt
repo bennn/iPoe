@@ -49,7 +49,7 @@
 
 ;; (define-type RhymeScheme (Listof StanzaScheme))
 ;; (define-type StanzaScheme (Listof LineScheme))
-;; (define-type LineScheme (Pairof Rhyme Syllable))
+;; (define-type LineScheme (U Rhyme Syllable (Pairof Rhyme Syllable)))
 ;; (define-type Rhyme (U Wildcard Symbol))
 ;; (define-type Syllable (U Wildcard Natural))
 ;; (define-type Wildcard (U '*))
@@ -67,9 +67,11 @@
          (line-scheme? x))))
 
 (define (line-scheme? x)
-  (and (pair? x)
-       (rhyme? (car x))
-       (syllable? (cdr x))))
+  (or (and (pair? x)
+        (rhyme? (car x))
+        (syllable? (cdr x)))
+      (rhyme? x)
+      (syllable? x)))
 
 (define (rhyme? x)
   (or (wildcard? x)
@@ -83,14 +85,21 @@
   (eq? '* x))
 
 ;; Future-proofing.
-;; A line spec could be done as a struct, but I really want a _convenient_
-;;  read-able representation.
+;; A line spec could be done as a struct, but I really want it easily read-able
 
 (define (line-scheme->rhyme ls)
-  (car ls))
+  (cond
+   [(pair? ls) (car ls)]
+   [(syllable? ls) '*]
+   [(rhyme? ls) ls]
+   [else (internal-error 'rhymecheck (format "Expected a LineScheme, got ~a" ls))]))
 
 (define (line-scheme->syllable ls)
-  (cdr ls))
+  (cond
+   [(pair? ls) (cdr ls)]
+   [(syllable? ls) ls]
+   [(rhyme? ls) '*]
+   [else (internal-error 'rhymecheck (format "Expected a LineScheme, got ~a" ls))]))
 
 (define (split-stanza-scheme* ls)
   (values (map line-scheme->rhyme ls)
@@ -248,6 +257,8 @@
     ['(("anything")) '(((A . *)))]
     ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
     ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+    ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
+    ['(("cat") ("rat") ("mat") ("sat")) '((1) (1) (1) (1))]
     ['(("willful and raisin" "under the weather" "jet set go")
        ("domino effect" "very motivation")
        ("beside our goal" "the free bird" "gory category"))
@@ -267,7 +278,9 @@
     ['(("never" "land")) '(((X . *)))]
     ['(("never" "land")) '(((A . *) (A . *)))]
     ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
+    ['(("never" "land")) '((F U N))]
     ['(("never" "land")) '(((A . *) (B . 2)))]
+    ['(("never" "land")) '((* 2))]
     ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
      '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
     ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
@@ -286,6 +299,10 @@
     ['(((A . 1)))]
     ['(((A . 1) (B . 1) (A . 0) (C . 0))
        ((B . 99) (C . 6) (DA . 1) (e . 3) (f . 1)))]
+    ['((A B A  C )
+       (B C DA e  f ))]
+    ['((1 1 0 0)
+       (99 6 1 3 1))]
   )
   (check-false* rhyme-scheme?
     ['("yolo")]
@@ -301,6 +318,9 @@
     ['((A . 1) (B . 1) (C . 1) (D . 1))]
     ['((* . *))]
     ['((* . 0) (* . 14) (A . *))]
+    ;; -- non-pairs
+    ['(A B C D)]
+    ['(1 1 3)]
   )
 
   (check-false* stanza-scheme?
@@ -315,6 +335,11 @@
     ['(* . *)]
     ['(hello . *)]
     ['(* . 0)]
+    ;; -- non-pairs
+    ['hello]
+    ['*]
+    [0]
+    [83]
   )
 
   (check-false* line-scheme?
@@ -324,7 +349,8 @@
     ['(A A)]
     ['(A 1)]
     ['("yes" . "no")]
-    ['(2 . *)]
+    ['(2 . *)] ;; Reversed order
+    [-2]
   )
 
   ;; -- rhyme?
@@ -381,7 +407,17 @@
     ['(c . 11) == 'c]
     ['(D . *) == 'D]
     ['("yes" . "no") == "yes"]
+    ;; -- syllables => rhyme is a wildcard
+    [41 == '*]
+    [0 == '*]
+    [6 == '*]
+    ;; -- rhyme => rhyme
+    ['* == '*]
+    ['A == 'A]
+    ['hello-world == 'hello-world]
   )
+  (check-exn (regexp "rhymecheck")
+             (lambda () (line-scheme->rhyme "invalid!")))
 
   ;; -- line-scheme->syllable
   (check-apply* line-scheme->syllable
@@ -389,11 +425,28 @@
     ['(B . 0) == 0]
     ['(c . 11) == 11]
     ['(D . *) == '*]
+    ;; -- rhyme => syllables are wildcard
+    ['A == '*]
+    ['yessir == '*]
+    ;; -- syllables => syllables
+    ['* == '*]
+    [0 == 0]
+    [2531 == 2531]
   )
+  (check-exn (regexp "rhymecheck")
+             (lambda () (line-scheme->syllable "invalid!")))
 
   ;; -- split-stanza-scheme*
   (let-values ([(r* s*) (split-stanza-scheme* '((A . 1) (B . 2) (* . 0)))])
     (check-equal? r* '(A B *))
+    (check-equal? s* '(1 2 0)))
+  ;; Rhymes only
+  (let-values ([(r* s*) (split-stanza-scheme* '(A B *))])
+    (check-equal? r* '(A B *))
+    (check-equal? s* '(* * *)))
+  ;; Syllables only
+  (let-values ([(r* s*) (split-stanza-scheme* '(1 2 0))])
+    (check-equal? r* '(* * *))
     (check-equal? s* '(1 2 0)))
 
   ;; ---------------------------------------------------------------------------

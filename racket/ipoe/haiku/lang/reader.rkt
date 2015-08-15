@@ -6,4 +6,4 @@
 ;; 7 in second
 ;; 5 in last
 #:name haiku
-#:rhyme-scheme (((* . 5) (* . 7) (* . 5)))
+#:rhyme-scheme ((5 7 5))
