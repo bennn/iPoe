@@ -8,6 +8,10 @@
   check-rhyme-scheme
   ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either)
   ;; Check that the input text matches the rhyme scheme
+
+  rhyme-scheme?
+  ;; (-> Any Boolean)
+  ;; Predicate defining rhyme schemes
 )
 
 ;; -----------------------------------------------------------------------------
@@ -19,6 +23,7 @@
   ipoe/private/ui
   ;; --
   racket/match
+  (only-in racket/sequence sequence->list) ;; TODO remove this import
 )
 
 ;; =============================================================================
@@ -26,7 +31,9 @@
 
 ;; 2015-08-06: May want to return the VarMap some day
 ;; (: check-rhyme-scheme (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either))
-(define (check-rhyme-scheme stanza* #:rhyme-scheme rs*)
+(define (check-rhyme-scheme stanza*-param #:rhyme-scheme rs*)
+  ;; TODO don't do sequence->list, do everything in one pass
+  (define stanza* (sequence->list stanza*-param))
   ;; -- preconditions
   (either-monad
     (if (rhyme-scheme? rs*)
