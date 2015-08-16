@@ -17,6 +17,7 @@
   racket/syntax
   syntax/strip-context
   (only-in racket/contract -> define/contract listof)
+  (only-in racket/sequence sequence->list)
 )
 
 ;; =============================================================================
@@ -131,15 +132,23 @@
 (define (poem-spec->validator ps)
   ;; If rhyme scheme is empty, do not check
   ;; (Special case for "free verse")
+  (define name (poem-spec-name ps))
   (define rs (poem-spec-rhyme-scheme ps))
+  (define ev (poem-spec-extra-validator ps))
   (define check-rhyme
     (if (null? rs)
-        (lambda (line*) (void))
-        (lambda (line*) (assert-success #:src (poem-spec-name ps)
-                          (check-rhyme-scheme (to-stanza* line*) #:rhyme-scheme rs)))))
+        (lambda (stanza*) (void))
+        (lambda (stanza*) (assert-success #:src name
+                          (check-rhyme-scheme stanza* #:rhyme-scheme rs)))))
+  (define check-extra
+    (cond [(poem-spec-extra-validator ps) => (lambda (x) x)]
+          [else (lambda (x) #t)]))
   (lambda (in) ;; Input-Port
     (define line* (to-line* in))
-    (check-rhyme line*)
+    (define stanza* (sequence->list (to-stanza* line*)))
+    (check-rhyme stanza*)
+    ;; TODO something broken
+    (unless (check-extra stanza*) (user-error name "Failed extra validator (sorry this is a bad error message)"))
     (check-spelling line*)
     line*))
 
