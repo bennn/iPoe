@@ -7,11 +7,6 @@
   (rename-out
     [ipoe-read read]
     [ipoe-read-syntax read-syntax])
-  ;#%app #%datum quote
-  ;;; Enough from racket/base to create lists
-
-  ;(rename-out [ipoe-begin #%module-begin])
-  ;;; The reader.
 )
 
 ;; -----------------------------------------------------------------------------
@@ -21,6 +16,7 @@
   racket/match
   racket/syntax
   syntax/strip-context
+  (only-in racket/contract -> define/contract listof)
 )
 
 ;; =============================================================================
@@ -73,11 +69,13 @@
       (check-duplicate rhyme-scheme #:new-val rs #:src err-loc #:msg "rhyme scheme")
       (loop name rs extra-validator)]
      ['#:extra-validator
-      ;;
-      (define ev (read-keyword-value in procedure?
+      ;; Keyword for validators, i.e. arbitrary boolean functions on stanzas
+      (define ev (read-keyword-value in (lambda (x) #t)
                                      #:kw '#:extra-validator #:src err-loc))
-      (check-duplicate extra-validator #:new-val ev #:src err-loc #:msg "extra validator")
-      (loop name rhyme-scheme ev)]
+      (define ev+ (validator? ev))
+      (unless ev+ (user-error err-loc (format "Expected a function with type (-> (Listof (Listof String)) Boolean), but got '~a'" ev)))
+      (check-duplicate extra-validator #:new-val ev+ #:src err-loc #:msg "extra validator")
+      (loop name rhyme-scheme ev+)]
      ;; -- Infer data from predicates
      [(? symbol? s)
       (check-duplicate name #:new-val s #:src err-loc #:msg "poem name")
@@ -85,12 +83,15 @@
      [(? rhyme-scheme? rs)
       (check-duplicate rhyme-scheme #:new-val rs #:src err-loc #:msg "rhyme scheme")
       (loop name rs extra-validator)]
-     [(? procedure? ev)
-      (check-duplicate extra-validator #:new-val ev #:src err-loc #:msg "extra validator")
-      (loop name rhyme-scheme ev)]
-     ;; --
-     [x (user-error err-loc (format "Unknown value ~a in poem specification" x))]
-     )))
+     [x
+      ;; Try parsing `x` as a validator, otherwise fail because it's undefined data
+      (cond
+       [(validator? x)
+        => (lambda (ev)
+        (check-duplicate extra-validator #:new-val ev #:src err-loc #:msg "extra validator")
+        (loop name rhyme-scheme ev))]
+       [else
+        (user-error err-loc (format "Unknown value ~a in poem specification" x))])])))
 
 (define (ipoe-read in)
   (syntax->datum (ipoe-read-syntax #f in)))
@@ -126,11 +127,21 @@
         (lambda (line*) (void))
         (lambda (line*) (assert-success #:src (poem-spec-name ps)
                           (check-rhyme-scheme (to-stanza* line*) #:rhyme-scheme rs)))))
-  (lambda (in)
+  (lambda (in) ;; Input-Port
     (define line* (to-line* in))
     (check-rhyme line*)
     (check-spelling line*)
     line*))
+
+;; Parse an expression as a contracted function
+;; (: validator? (-> Any (U (-> (Listof (Listof String)) Boolean) #f)))
+(define (validator? expr)
+  (define raw-f (eval expr (make-base-namespace)))
+  (cond
+   [(procedure? raw-f)
+    (define/contract ev (-> (listof (listof string?)) boolean?) raw-f)
+    ev]
+   [else #f]))
 
 ;; =============================================================================
 
@@ -168,17 +179,17 @@
   (check-equal? (test-input->poem-spec "name (((Schema . 42)))")
                 (poem-spec 'name '(((Schema . 42))) #f))
   ;; --- with #:extra-validator
-  ;(let ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")])
-  ;  (check-true (poem-spec? ps))
-  ;  (check-equal? (poem-spec-name ps) 'has-extra)
-  ;  (check-equal? (poem-spec-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
-  ;  (check-true ((poem-spec-extra-validator ps) '()))
-  ;  (check-true ((poem-spec-extra-validator ps) '(("hello" "world"))))
-  ;  (check-true ((poem-spec-extra-validator ps) '(()))))
-  ;(let ([ps (test-input->poem-spec "name (((Schema . 42))) (lambda (x) #t)")])
-  ;  (check-true (poem-spec? ps))
-  ;  (check-equal? (poem-spec-name ps) 'name)
-  ;  (check-equal? ((poem-spec-extra-validator ps) '()) #t))
+  (let ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")])
+    (check-true (poem-spec? ps))
+    (check-equal? (poem-spec-name ps) 'has-extra)
+    (check-equal? (poem-spec-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
+    (check-true ((poem-spec-extra-validator ps) '()))
+    (check-true ((poem-spec-extra-validator ps) '(("hello" "world"))))
+    (check-true ((poem-spec-extra-validator ps) '(()))))
+  (let ([ps (test-input->poem-spec "name (((Schema . 42))) (lambda (x) #t)")])
+    (check-true (poem-spec? ps))
+    (check-equal? (poem-spec-name ps) 'name)
+    (check-equal? ((poem-spec-extra-validator ps) '()) #t))
 
   ;; -- read-keyword-value
   (let* ([src 'rkvtest]
@@ -214,4 +225,28 @@
     (check-equal? (test-couplet pass-str) (string-split pass-str "\n"))
     (check-exn (regexp "ipoe")
                (lambda () (test-couplet fail-str))))
+
+  ;; -- validator?
+  (check-false (validator? '#f))
+  (check-false (validator? #f))
+  (check-false (validator? ''(1 2 3)))
+  (check-false (validator? '(+ 1 1)))
+  (check-false (validator? "hello"))
+
+  (check-pred validator? '(lambda (x) #t))
+  (check-pred validator? '(lambda (x) #f))
+  (check-pred validator? '(lambda (x) (< 5 (length x))))
+  ;; --- test a "good" validator function
+  (let ([v (validator? '(lambda (x) (null? x)))])
+    (check-true (v '()))
+    (check-false (v '(())))
+    (check-exn exn:fail:contract? (lambda () (v 1))))
+  ;; --- invalid validator: wrong domain
+  (check-exn exn:fail:contract?
+             (lambda () (validator? '(lambda (x y) x))))
+  ;; --- invalid validator: wrong codomain
+  (let ([v (validator? '(lambda (x) x))])
+    (check-exn exn:fail:contract?
+               (lambda () (v '()))))
+
 )
