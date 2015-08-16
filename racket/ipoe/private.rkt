@@ -34,6 +34,10 @@
   ;; (-> Any Boolean)
   ;; Predicate for rhyme schemes
 
+  string->word*
+  ;; (-> String (Listof String))
+  ;; Parse a line of text into a list of normalized words.
+
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
   ;; Convert a data source to a list of strings where no string in
