@@ -42,13 +42,14 @@
   (define err-loc 'ipoe:parse)
   ;; Loop & manually parse the keywords and line
   ;; (There's so little to parse we might as well do a good job manually)
-  (let loop ([name #f] [rhyme-scheme #f] [extra-validator #f])
+  (let loop ([name #f] [rhyme-scheme #f] [syllables #f] [extra-validator #f])
     ;; Read one datum & dispatch on it
     (match (read in)
      [(? eof-object?)
       #:when (and name rhyme-scheme)
       ;; This is a GOOD end-of-file
-      (poem-spec name rhyme-scheme extra-validator)]
+      (define rs+s (if syllables (replace-wildcard-syllables rhyme-scheme syllables) rhyme-scheme))
+      (poem-spec name rs+s extra-validator)]
      [(? eof-object?)
       ;; A bad end of file. Missing some data.
       (user-error err-loc (format "Unexpected end-of-file, missing ~a"
@@ -58,16 +59,22 @@
      ;; -- Keywords
      ['#:name
       ;; Keyword for poem name
-      (define s (read-keyword-value in symbol?
+      (define n (read-keyword-value in symbol?
                                     #:kw '#:name #:src err-loc))
-      (check-duplicate name #:new-val s #:src err-loc #:msg "poem name")
-      (loop s rhyme-scheme extra-validator)]
+      (check-duplicate name #:new-val n #:src err-loc #:msg "poem name")
+      (loop n rhyme-scheme syllables extra-validator)]
      ['#:rhyme-scheme
       ;; Keyword for rhyme scheme
       (define rs (read-keyword-value in rhyme-scheme?
                                      #:kw '#:rhyme-scheme #:src err-loc))
       (check-duplicate rhyme-scheme #:new-val rs #:src err-loc #:msg "rhyme scheme")
-      (loop name rs extra-validator)]
+      (loop name rs syllables extra-validator)]
+     ['#:syllables
+      ;; Sets the number of syllables in the rhyme scheme
+      (define s (read-keyword-value in exact-positive-integer?
+                                    #:kw '#:syllables #:src err-loc))
+      (check-duplicate syllables #:new-val s #:src err-loc #:msg "syllable count")
+      (loop name rhyme-scheme s extra-validator)]
      ['#:extra-validator
       ;; Keyword for validators, i.e. arbitrary boolean functions on stanzas
       (define ev (read-keyword-value in (lambda (x) #t)
@@ -75,21 +82,24 @@
       (define ev+ (validator? ev))
       (unless ev+ (user-error err-loc (format "Expected a function with type (-> (Listof (Listof String)) Boolean), but got '~a'" ev)))
       (check-duplicate extra-validator #:new-val ev+ #:src err-loc #:msg "extra validator")
-      (loop name rhyme-scheme ev+)]
+      (loop name rhyme-scheme syllables ev+)]
      ;; -- Infer data from predicates
-     [(? symbol? s)
-      (check-duplicate name #:new-val s #:src err-loc #:msg "poem name")
-      (loop s rhyme-scheme extra-validator)]
+     [(? symbol? n)
+      (check-duplicate name #:new-val n #:src err-loc #:msg "poem name")
+      (loop n rhyme-scheme syllables extra-validator)]
      [(? rhyme-scheme? rs)
       (check-duplicate rhyme-scheme #:new-val rs #:src err-loc #:msg "rhyme scheme")
-      (loop name rs extra-validator)]
+      (loop name rs syllables extra-validator)]
+     [(? exact-positive-integer? s)
+      (check-duplicate syllables #:new-val s #:src err-loc #:msg "syllable count")
+      (loop name rhyme-scheme s extra-validator)]
      [x
       ;; Try parsing `x` as a validator, otherwise fail because it's undefined data
       (cond
        [(validator? x)
         => (lambda (ev)
         (check-duplicate extra-validator #:new-val ev #:src err-loc #:msg "extra validator")
-        (loop name rhyme-scheme ev))]
+        (loop name rhyme-scheme syllables ev))]
        [else
         (user-error err-loc (format "Unknown value ~a in poem specification" x))])])))
 
@@ -171,6 +181,8 @@
     (define r (input->poem-spec p))
     (close-input-port p)
     r)
+  (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A)) #;syllables 10")
+                (poem-spec 'couplet '(((A . 10) (A . 10))) #f))
   (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A))")
                 (poem-spec 'couplet '((A A)) #f))
   (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:name yes")
@@ -178,6 +190,10 @@
   ;; It's okay to leave out the keywords
   (check-equal? (test-input->poem-spec "name (((Schema . 42)))")
                 (poem-spec 'name '(((Schema . 42))) #f))
+  (check-equal? (test-input->poem-spec "name  10 (((Schema . 42)))")
+                (poem-spec 'name '(((Schema . 42))) #f))
+  (check-equal? (test-input->poem-spec "name  10 (((Schema . 42) *))")
+                (poem-spec 'name '(((Schema . 42) (* . 10))) #f))
   ;; --- with #:extra-validator
   (let ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")])
     (check-true (poem-spec? ps))
