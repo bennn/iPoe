@@ -29,24 +29,27 @@
 ;; =============================================================================
 ;; === API
 
+;; (: line (-> Natural (Listof String) String))
 (define (line n l*)
   (safe-list-ref n l* 'line))
 
+;; (: stanza (-> Natural (Listof (Listof String)) String))
 (define (stanza n s*)
   (safe-list-ref n s* 'stanza))
 
-(define (line=? l1 l2)
-  (let loop ([w1* (string->word* l1)] [w2* (string->word* l2)])
+;; (: line=? (-> String String * Boolean))
+(define (line=? line . line*)
+  (let loop ([w1* (string->word* line)] [w2** (map string->word* line*)])
     (cond
-      [(and (null? w1*) (null? w2*))
+      [(and (null? w1*) (andmap null? w2**))
        ;; Base case: empty lines are equal
        #t]
-      [(or (null? w1*) (null? w2*))
+      [(or (null? w1*) (ormap null? w2**))
        ;; False because lines have different numbers of words
        #f]
       [else
-       (and (string=? (car w1*) (car w2*))
-            (loop (cdr w1*) (cdr w2*)))])))
+       (and (apply string=? (cons (car w1*) (map car w2**)))
+            (loop (cdr w1*) (map cdr w2**)))])))
 
 ;; -----------------------------------------------------------------------------
 ;; --- private
@@ -84,6 +87,8 @@
                       "yes."))
   (check-true (line=? "it's not a typo"
                       "its not a typo"))
+  ;; --- should do multiple arguments
+  (check-true (line=? "a" "a" "A" "a"))
 
   (check-false (line=? "A"
                        "B"))
