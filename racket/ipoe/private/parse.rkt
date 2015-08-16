@@ -7,6 +7,10 @@
   ;; (-> String (U #f String))
   ;; Get the last parseable word from a string of text
 
+  ;number->word  ;; TODO implement + test
+  ;; (-> Integer String)
+  ;; Convert a number to an English word
+
   string->word*
   ;; (-> String (Listof String))
   ;; Split a string by whitespace, ensure that each result is a normalized word
@@ -51,13 +55,20 @@
   (define str
     (apply string
            (for/list ([c (in-string word)]
-                      #:when (char-alphabetic? c))
+                      #:when (or (char-alphabetic? c)
+                                 (char-numeric? c)))
              (char-downcase c))))
   (and (not (string-empty? str)) str))
 
 (define (string->word* str)
-  (define normalized (map parse-word (string-split str)))
-  (for/list ([w (in-list normalized)] #:when w) w))
+  (let loop ([str* (string-split str)])
+    (if (null? str*)
+        '()
+        (let ([normalized (parse-word (car str*))]
+              [rest       (lambda () (loop (cdr str*)))])
+          (if normalized
+              (cons normalized (rest))
+              (rest))))))
 
 (define (to-line* arg)
   (cond
@@ -165,21 +176,20 @@
   ;; -- parse-word
   (check-apply* parse-word
     ["asdf" == "asdf"]
-    ["cat61" == "cat"]
+    ["cat61" == "cat61"]
     ["ARGH"  == "argh"]
     ["waiT?" == "wait"]
     ["don't" == "dont"]
     ["hel,p" == "help"]
+    ["123" == "123"]
     ;; --
     ["" == #f]
     ["..,." == #f]
-    ["123" == #f]
   )
 
   ;; -- last-word
   (check-apply* last-word
     ["a red fox" == "fox"]
-    ["" == #f]
     ["a" == "a"]
     ;; --
     ["A" == "a"]
@@ -187,6 +197,10 @@
     ["a few words and some ..." == "some"]
     ["don't do it!" == "it"]
     ["\tdiffn't\nspaces\n" == "spaces"]
+    ["521351" == "521351"]
     ;; --
-    ["521351" == #f])
+    ["" == #f]
+    [",!--?" == #f]
+    ["   \t   \t   \n" == #f]
+  )
 )
