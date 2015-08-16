@@ -26,6 +26,10 @@
   ;; (-> Either (-> Failure Void) Void)
   ;; Call the thunk if the argument is not a `success?` struct
 
+  replace-wildcard-syllables
+  ;; (-> RhymeScheme Natural RhymeScheme)
+  ;; Overwrite all wildcard syllables in the rhyme scheme
+
   rhyme-scheme?
   ;; (-> Any Boolean)
   ;; Predicate for rhyme schemes
