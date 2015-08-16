@@ -141,13 +141,13 @@
         (lambda (stanza*) (assert-success #:src name
                           (check-rhyme-scheme stanza* #:rhyme-scheme rs)))))
   (define check-extra
-    (cond [(poem-spec-extra-validator ps) => (lambda (x) x)]
-          [else (lambda (x) #t)]))
+    (or (poem-spec-extra-validator ps)
+        (lambda (x) #t)))
   (lambda (in) ;; Input-Port
     (define line* (to-line* in))
     (define stanza* (sequence->list (to-stanza* line*)))
     (check-rhyme stanza*)
-    ;; TODO something broken
+    ;; TODO fix the error message
     (unless (check-extra stanza*) (user-error name "Failed extra validator (sorry this is a bad error message)"))
     (check-spelling line*)
     line*))
@@ -155,7 +155,10 @@
 ;; Parse an expression as a contracted function
 ;; (: validator? (-> Any (U (-> (Listof (Listof String)) Boolean) #f)))
 (define (validator? expr)
-  (define raw-f (eval expr (make-base-namespace)))
+  (define raw-f
+    (parameterize ([current-namespace (make-base-namespace)])
+      (namespace-require 'ipoe/sugar)
+      (eval expr (current-namespace))))
   (cond
    [(procedure? raw-f)
     (define/contract ev (-> (listof (listof string?)) boolean?) raw-f)
