@@ -8,11 +8,14 @@
                 (A  B R2)
                 (A  B R1 R2))
 #:syllables 10
-#:extra-validator (lambda (stanza*)
-                     (and (apply string=?
-                            (for/list ([pair (in-list '((0 . 0) (1 . 2) (3 . 2) (5 . 2)))])
-                              (apply string (for/list ([c (in-string (list-ref (list-ref stanza* (car pair)) (cdr pair)))] #:when (char-alphabetic? c))
-                              (char-downcase c)))))
-                          (apply string=?
-                            (for/list ([pair (in-list '((0 . 2) (2 . 2) (4 . 2) (5 . 3)))])
-                              (apply string (for/list ([c (in-string (list-ref (list-ref stanza* (car pair)) (cdr pair)))] #:when (char-alphabetic? c)) (char-downcase c)))))))
+#:extra-validator (lambda (s*)
+                    ;; All R1 lines must be equal,
+                    ;; and all R2 lines must be equal
+                    (and (line=? (line 0 (stanza 0 s*))
+                                 (line 2 (stanza 1 s*))
+                                 (line 2 (stanza 3 s*))
+                                 (line 2 (stanza 5 s*)))
+                         (line=? (line 2 (stanza 0 s*))
+                                 (line 2 (stanza 2 s*))
+                                 (line 2 (stanza 4 s*))
+                                 (line 3 (stanza 5 s*)))))
