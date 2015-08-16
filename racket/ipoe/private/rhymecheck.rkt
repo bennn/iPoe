@@ -9,6 +9,10 @@
   ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either)
   ;; Check that the input text matches the rhyme scheme
 
+  replace-wildcard-syllables
+  ;; (-> RhymeScheme Natural RhymeScheme)
+  ;; Overwrite all wildcard syllables in the rhyme scheme
+
   rhyme-scheme?
   ;; (-> Any Boolean)
   ;; Predicate defining rhyme schemes
@@ -203,6 +207,21 @@
         (begin
           (alert (format "Warning: could not determine syllables for word '~a'" w))
           0))))
+
+(define (replace-wildcard-syllables rs s)
+  (for/list ([stanza-spec (in-list rs)])
+    (for/list ([line-spec (in-list stanza-spec)])
+      (cond
+       [(wildcard? line-spec)
+        ;; Plain wildcard => wildcard rhyme, known syllables
+        (cons '* s)]
+       [(rhyme? line-spec)
+        ;; Add syllables to plain rhymes
+        (cons line-spec s)]
+       [(and (pair? line-spec) (wildcard? (cdr line-spec)))
+        (cons (car line-spec) s)]
+       [else ;; (or (syllable? line-spec) (pair? line-spec))
+        line-spec]))))
 
 ;; True if two words rhyme in the context of this poem
 ;; For now, allowing both rhyme and almost-rhyme
@@ -570,6 +589,14 @@
      ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]
      ["." == 0]
   )))
+
+  ;; -- replace-wildcard-syllables
+  (check-apply* replace-wildcard-syllables
+   ['() 3 == '()]
+   ['((A A A) (B B C)) 1 == '(((A . 1) (A . 1) (A . 1)) ((B . 1) (B . 1) (C . 1)))]
+   ['((1 2 3)) 7 == '((1 2 3))]
+   ['(((A . 42) (B . *)) (*)) 2 == '(((A . 42) (B . 2)) ((* . 2)))]
+  )
 
   ;; -- rhyme=?
   (with-ipoe-db #:commit? #f (lambda ()
