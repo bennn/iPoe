@@ -119,8 +119,9 @@
    [(< n 20)
     (list (vector-ref digit1-cache n))]
    [else
-    (list (vector-ref digit2-cache (- (quotient n 10) 2))
-          (digit->word (modulo n 10)))]))
+    (define r (modulo n 10))
+    (cons (vector-ref digit2-cache (- (quotient n 10) 2))
+          (if (zero? r) '() (list (digit->word (modulo n 10)))))]))
 
 ;; (: digit->word (-> Natural String))
 (define (digit->word n)
@@ -237,6 +238,7 @@
     [901003004111 == '("nine" "hundred" "one" "billion" "three" "million" "four" "thousand" "one" "hundred" "eleven")]
     [121314 == '("one" "hundred" "twenty" "one" "thousand" "three" "hundred" "fourteen")]
     [0 == '("zero")]
+    [860 == '("eight" "hundred" "sixty")]
     [19 == '("nineteen")])
 
   ;; -- split-number
@@ -263,7 +265,8 @@
     [99 == '("ninety" "nine")]
     [71 == '("seventy" "one")]
     [10 == '("ten")]
-    [33 == '("thirty" "three")])
+    [33 == '("thirty" "three")]
+    [40 == '("forty")])
 
   ;; -- digit->word
   (check-apply* digit->word
