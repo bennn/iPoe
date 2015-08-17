@@ -147,8 +147,7 @@
     (define line* (to-line* in))
     (define stanza* (sequence->list (to-stanza* line*)))
     (check-rhyme stanza*)
-    ;; TODO fix the error message
-    (unless (check-extra stanza*) (user-error name "Failed extra validator (sorry this is a bad error message)"))
+    (unless (check-extra stanza*) (user-error name (format "Rhyme scheme OK, but failed extra ~a constraint" name)))
     (check-spelling line*)
     line*))
 
