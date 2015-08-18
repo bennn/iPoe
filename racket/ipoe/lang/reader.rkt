@@ -162,8 +162,8 @@
     (define stanza* (sequence->list (to-stanza* line*)))
     (check-rhyme stanza*)
     (unless (check-extra stanza*)
-      (define d-str (if descr (string-append " " d-str) ""))
-      (user-error name (format "Rhyme scheme OK, but failed extra constraint.~a" name d-str)))
+      (define d-str (if descr (string-append "\n  " descr) ""))
+      (user-error name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str)))
     (check-spelling line*)
     line*))
 
