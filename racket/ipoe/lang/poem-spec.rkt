@@ -31,7 +31,6 @@
 (require
   ipoe/private
   racket/match
-  (only-in racket/contract -> define/contract listof)
   (only-in racket/sequence sequence->list)
 )
 
@@ -170,22 +169,25 @@
     (check-spelling line*)
     line*))
 
-;; Parse an expression as a contracted function
-;; (: validator? (-> Any (U (-> (Listof (Listof String)) Boolean) #f)))
+;; Parse a syntax object as a function in a restricted namespace.
+;; If ok, return the original syntax object.
+;; (: validator? (-> Syntax (U #'(-> (Listof (Listof String)) Boolean) #f)))
 (define (validator? expr)
-  (define raw-f
+  (define evaluated
     (parameterize ([current-namespace (make-base-namespace)])
       (namespace-require 'ipoe/sugar)
       (eval expr (current-namespace))))
   (cond
-   [(procedure? raw-f)
-    (define/contract ev (-> (listof (listof string?)) boolean?) raw-f)
-    ev]
+   [(procedure? evaluated)
+    ;; 2015-08-19: Could create a syntax object protecting `expr` with a
+    ;;   (-> (Listof (Listof String)) Boolean) contract
+    expr]
    [else #f]))
 
 (define validator-requires
   #'(require
       ipoe/private
+      ipoe/sugar
       (only-in racket/sequence sequence->list)))
 
 ;; =============================================================================
@@ -195,6 +197,15 @@
     rackunit
     (only-in racket/string string-split)
   )
+
+  ;; -- helper function, convert a syntactic function into a lambda
+  (define (eval-extra-validator ps)
+    (stx->validator (poem-spec-extra-validator ps)))
+
+  (define (stx->validator stx)
+    (parameterize ([current-namespace (make-base-namespace)])
+      (namespace-require 'ipoe/sugar)
+      (eval stx (current-namespace))))
 
   ;; -- check-duplicate
   ;; Always void if first arg is #f
@@ -235,18 +246,20 @@
                 (poem-spec 'name '(((Schema . 42) (* . 10))) #f #f))
   (check-equal? (test-input->poem-spec "name  \"aha\" (((Schema . 42) *))")
                 (poem-spec 'name '(((Schema . 42) *)) "aha" #f))
-  ;; --- with #:extra-validator
-  (let ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")])
+ ;; --- with #:extra-validator
+  (let* ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")]
+         [ev (eval-extra-validator ps)])
     (check-true (poem-spec? ps))
     (check-equal? (poem-spec-name ps) 'has-extra)
     (check-equal? (poem-spec-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
-    (check-true ((poem-spec-extra-validator ps) '()))
-    (check-true ((poem-spec-extra-validator ps) '(("hello" "world"))))
-    (check-true ((poem-spec-extra-validator ps) '(()))))
-  (let ([ps (test-input->poem-spec "name (((Schema . 42))) (lambda (x) #t)")])
+    (check-true (ev '()))
+    (check-true (ev '(("hello" "world"))))
+    (check-true (ev '(()))))
+  (let* ([ps (test-input->poem-spec "name (((Schema . 42))) (lambda (x) #t)")]
+         [ev (eval-extra-validator ps)])
     (check-true (poem-spec? ps))
     (check-equal? (poem-spec-name ps) 'name)
-    (check-equal? ((poem-spec-extra-validator ps) '()) #t))
+    (check-equal? (ev '()) #t))
 
   ;; -- read-keyword-value
   (let* ([src 'rkvtest]
@@ -270,40 +283,45 @@
     (check-exn src-regexp
                (lambda () (test-read-keyword-value "42" symbol?))))
 
-;  ;; -- poem-spec->validator
-;  (let ([couplet-validator (poem-spec->validator (poem-spec 'couplet '((A A)) #f #f))]
-;        [pass-str "I was born\nhouse was worn\n"]
-;        [fail-str "roses are red\nviolets are blue\n"])
-;    (define (test-couplet str)
-;      (define port (open-input-string str))
-;      (define res (couplet-validator port))
-;      (close-input-port port)
-;      res)
-;    (check-equal? (test-couplet pass-str) (string-split pass-str "\n"))
-;    (check-exn (regexp "ipoe")
-;               (lambda () (test-couplet fail-str))))
-;
-;  ;; -- validator?
-;  (check-false (validator? '#f))
-;  (check-false (validator? #f))
-;  (check-false (validator? ''(1 2 3)))
-;  (check-false (validator? '(+ 1 1)))
-;  (check-false (validator? "hello"))
-;
-;  (check-pred validator? '(lambda (x) #t))
-;  (check-pred validator? '(lambda (x) #f))
-;  (check-pred validator? '(lambda (x) (< 5 (length x))))
-;  ;; --- test a "good" validator function
-;  (let ([v (validator? '(lambda (x) (null? x)))])
-;    (check-true (v '()))
-;    (check-false (v '(())))
-;    (check-exn exn:fail:contract? (lambda () (v 1))))
-;  ;; --- invalid validator: wrong domain
-;  (check-exn exn:fail:contract?
-;             (lambda () (validator? '(lambda (x y) x))))
-;  ;; --- invalid validator: wrong codomain
-;  (let ([v (validator? '(lambda (x) x))])
-;    (check-exn exn:fail:contract?
-;               (lambda () (v '()))))
+  ;; -- poem-spec->validator
+  (let* ([couplet-validator-stx (poem-spec->validator (poem-spec 'couplet '((A A)) #f #f))]
+         [couplet-validator (parameterize ([current-namespace (make-base-namespace)])
+           (eval #`(begin #,validator-requires #,couplet-validator-stx) (current-namespace)))]
+         [pass-str "I was born\nhouse was worn\n"]
+         [fail-str "roses are red\nviolets are blue\n"])
+    (define (test-couplet str)
+      (define port (open-input-string str))
+      (define res (couplet-validator port))
+      (close-input-port port)
+      res)
+    (check-equal? (test-couplet pass-str) (string-split pass-str "\n"))
+    (check-exn (regexp "ipoe")
+               (lambda () (test-couplet fail-str))))
+
+  ;; -- validator?
+  (check-false (validator? '#f))
+  (check-false (validator? #f))
+  (check-false (validator? ''(1 2 3)))
+  (check-false (validator? '(+ 1 1)))
+  (check-false (validator? "hello"))
+
+  (check-pred validator? '(lambda (x) #t))
+  (check-pred validator? '(lambda (x) #f))
+  (check-pred validator? '(lambda (x) (< 5 (length x))))
+  ;; --- test a "good" validator function
+  ;;     2015-08-19: removed contract checks
+  (let* ([v-stx (validator? '(lambda (x) (null? x)))]
+         [v (stx->validator v-stx)])
+    (check-true (v '()))
+    (check-false (v '(())))
+    ; (check-exn exn:fail:contract? (lambda () (v 1)))
+  )
+  ; ;; --- invalid validator: wrong domain
+  ; (check-exn exn:fail:contract?
+  ;            (lambda () (validator? '(lambda (x y) x))))
+  ; ;; --- invalid validator: wrong codomain
+  ; (let ([v (validator? '(lambda (x) x))])
+  ;   (check-exn exn:fail:contract?
+  ;              (lambda () (v '()))))
 
 )
