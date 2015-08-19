@@ -29,19 +29,15 @@
 
 (define (ipoe-read-syntax src-path in)
    (define ps (input->poem-spec in))
-   (with-syntax (
-                 [mod-id   (format-id #f "~a" (poem-spec-name ps))]
+   (with-syntax ([mod-id   (format-id #f "~a" (poem-spec-name ps))]
                  [descr    (poem-spec-description ps)]
                  [validate (poem-spec->validator ps)]
-                 )
+                 [def-req  validator-requires])
      (strip-context
        #'(module mod-id racket/base
            (provide (rename-out [custom-read read] [custom-read-syntax read-syntax]))
-           (require
-             ipoe/private
-             racket/sequence
-             syntax/strip-context ;; 2015-08-15: Really necessary?
-           )
+           def-req
+           (require (only-in syntax/strip-context strip-context))
            (define (custom-read in) (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)
              (with-syntax ([str (validate in)])

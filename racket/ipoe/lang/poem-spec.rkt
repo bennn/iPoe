@@ -17,8 +17,13 @@
   ;; Parse a poem-spec structure from an input stream
 
   poem-spec->validator
-  ;; (-> PoemSpec (-> Input-Port (Listof (Listof String))))
+  ;; (-> PoemSpec #'(-> Input-Port (Listof (Listof String))))
   ;; Return a function to read and validate input given a poem spec
+
+  validator-requires
+  ;; Syntax
+  ;; Represents a require statement that should be evaluated before running
+  ;;  a validator returned by `poem-spec->validator`
 )
 
 ;; -----------------------------------------------------------------------------
@@ -177,6 +182,11 @@
     (define/contract ev (-> (listof (listof string?)) boolean?) raw-f)
     ev]
    [else #f]))
+
+(define validator-requires
+  #'(require
+      ipoe/private
+      (only-in racket/sequence sequence->list)))
 
 ;; =============================================================================
 
