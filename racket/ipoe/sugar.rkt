@@ -4,6 +4,14 @@
 ;;  in a poem spec.
 
 (provide
+  contains-word?
+  ;; (-> (Listof String) String Boolean)
+  ;; True if the line contains the word
+
+  last-word
+  ;; (-> (Listof String) String)
+  ;; Return the final word in the line
+
   line
   ;; (-> Natural (Listof String) String)
   ;; Get a line from a stanza.
@@ -18,6 +26,10 @@
   ;; (-> Natural (Listof (Listof String)) String)
   ;; Get a stanza from a poem.
   ;; (Synonym for `list-ref`)
+
+  word=?
+  ;; (-> String String Boolean)
+  ;; True if two words are equal
 )
 
 ;; -----------------------------------------------------------------------------
@@ -28,6 +40,13 @@
 
 ;; =============================================================================
 ;; === API
+
+;; (: contains-word? (-> (Listof String) String Boolean))
+(define (contains-word? line w-param)
+  (define w1 (parse-word w-param))
+  (and w1
+      (for/or ([w2 (in-list (string->word* line))] #:when w2)
+        (string=? w1 w2))))
 
 ;; (: line (-> Natural (Listof String) String))
 (define (line n l*)
@@ -51,6 +70,13 @@
        (and (apply string=? (cons (car w1*) (map car w2**)))
             (loop (cdr w1*) (map cdr w2**)))])))
 
+(define (word=? w1-param . w*-param)
+  (define w1 (parse-word w1-param))
+  (and w1
+    (for/and ([w2-param (in-list w*-param)])
+      (define w2 (parse-word w2-param))
+      (and w2 (string=? w1 w2)))))
+
 ;; -----------------------------------------------------------------------------
 ;; --- private
 
@@ -67,6 +93,15 @@
 
 (module+ test
   (require rackunit)
+
+  ;; -- contains-word?
+  (check-true (contains-word? "I could not stop for death." "i"))
+  (check-true (contains-word? "I could not stop for death." "stop"))
+  (check-true (contains-word? "I could not stop for death." "death!"))
+
+  (check-false (contains-word? "the raging: milkman" "a"))
+  (check-false (contains-word? "" "hey"))
+  (check-false (contains-word? "" ""))
 
   ;; -- line
   (check-equal? (line 0 '(a)) 'a)
@@ -107,4 +142,13 @@
   (check-exn (regexp "ipoe:safe-list-ref")
              (lambda () (stanza -1 '(a b c))))
 
+  ;; -- word=?
+  (check-true (word=? "YES" "yes"))
+  (check-true (word=? "a" "a"))
+  (check-true (word=? "can't" "cant"))
+  (check-true (word=? "ab" "Ab" "aB," "A.B."))
+
+  (check-false (word=? "a" "B"))
+  (check-false (word=? "" ""))
+  (check-false (word=? "a" "b" "c" "d"))
 )
