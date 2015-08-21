@@ -328,14 +328,18 @@
 
 ;; =============================================================================
 
-(define (repl #:output [port #f])
-  (error 'repl "not implemented"))
-
 (module+ main
-  (require racket/cmdline)
+  (require racket/cmdline xrepl racket/string)
   ;; --
   (define commit? (make-parameter #f))
   (define output-file (make-parameter #f))
+  (define natural? exact-nonnegative-integer?)
+  (define (exit? s)
+    (member s '(exit q quit)))
+  (define (skip n seq)
+    (for ([x seq] [m (in-range n)]) (void)))
+  (define (take n seq)
+    (for/list ([x seq] [m (in-range n)]) x))
   ;; --
   (command-line
    #:program "db-repl"
@@ -344,12 +348,53 @@
     [("-o" "--output") o-p "Save interactions to file" (output-file o-p)]
    #:args ()
    (begin
-    (with-ipoe-db #:commit? (commit?)
-      (lambda ()
-        (if (output-file)
-            (call-with-output-file (output-file) #:exists 'replace
-              (lambda (p) (repl #:output p)))
-            (repl)))))))
+     (printf "Initializing DB connection & starting REPL ...\n")
+     (with-ipoe-db #:commit? (commit?)
+       (lambda ()
+         (let loop ()
+           (display "ipoe> ")
+           (match (read)
+            [(? eof-object?) (void)]
+            [(? exit?) (printf "Goodbye\n")]
+            [(list 'id->word (? natural? n))
+             (displayln (id->word n))
+             (loop)]
+            [(list 'rhymes-with? sym1 sym2)
+             (displayln (rhymes-with? sym1 sym2))
+             (loop)]
+            [(list 'syllables->word* (? natural? n1) '#:limit (? natural? n2))
+             (displayln (take n2 (syllables->word* n1)))
+             (loop)]
+            [(list 'syllables->word* (? natural? n1) '#:limit (? natural? n2) '#:skip (? natural? n3))
+             (define s (syllables->word* n1))
+             (skip n3 s)
+             (displayln (take n2 s))
+             (loop)]
+            [(list 'word->almost-rhyme* w '#:limit (? natural? n))
+             (displayln (take n (word->almost-rhyme* w)))
+             (loop)]
+            [(list 'word->almost-rhyme* w '#:limit (? natural? n) '#:skip (? natural? n2))
+             (define s (word->almost-rhyme* w))
+             (skip n2 s)
+             (displayln (take n s))
+             (loop)]
+            [(list 'word->id w)
+             (displayln (word->id w))
+             (loop)]
+            [(list 'word->rhyme* w '#:limit (? natural? n1))
+             (displayln (take n1 (word->rhyme* w)))
+             (loop)]
+            [(list 'word->rhyme* w '#:limit n1 '#:skip (? natural? n2))
+             (define s (word->rhyme* w))
+             (skip n2 s)
+             (displayln (take n1 s))
+             (loop)]
+            [(list 'word->syllables w)
+             (displayln (word->syllables w))
+             (loop)]
+            [(list 'word-exists? w)
+             (displayln (word-exists? w))]
+            [x  (printf "Unknown command '~a'\n" x)])))))))
 
 ;; =============================================================================
 
