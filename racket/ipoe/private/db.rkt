@@ -328,6 +328,31 @@
 
 ;; =============================================================================
 
+(define (repl #:output [port #f])
+  (error 'repl "not implemented"))
+
+(module+ main
+  (require racket/cmdline)
+  ;; --
+  (define commit? (make-parameter #f))
+  (define output-file (make-parameter #f))
+  ;; --
+  (command-line
+   #:program "db-repl"
+   #:once-each
+    [("-c" "--commit") "Commit to database" (commit? #t)]
+    [("-o" "--output") o-p "Save interactions to file" (output-file o-p)]
+   #:args ()
+   (begin
+    (with-ipoe-db #:commit? (commit?)
+      (lambda ()
+        (if (output-file)
+            (call-with-output-file (output-file) #:exists 'replace
+              (lambda (p) (repl #:output p)))
+            (repl)))))))
+
+;; =============================================================================
+
 (module+ test
   (require rackunit racket/sequence "rackunit-abbrevs.rkt")
 
