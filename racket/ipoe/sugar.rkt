@@ -11,9 +11,13 @@
   ;; (-> Line String Boolean)
   ;; True if the line contains the word
 
-  (rename-out [last-word/loc last-word])
+  last-word
   ;; (-> Line Word)
   ;; Return the final word in the line
+
+  last-stanza
+  ;; (-> Poem Stanza)
+  ;; Return the final stanza in the poem
 
   line
   ;; (-> Natural Stanza Line)
@@ -75,15 +79,19 @@
    [else
     (failure 'contains-word? (format "~a does not contain word '~a'" (line/loc->string line) w1))]))
 
-;; (: last-word/loc (-> Line Word))
-(define (last-word/loc line)
+;; (: last-word (-> Line Word))
+(define (last-word line)
   (match-define (line/loc w* line-num stanza-num) line)
   (when (null? w*)
-    (internal-error 'last-word/loc (format "Invariant error: got empty line ~a" line)))
+    (internal-error 'last-word (format "Invariant error: got empty line ~a" line)))
   (let loop ([w* w*] [word-num 0])
     (if (null? (cdr w*))
         (word/loc (car w*) word-num line-num stanza-num)
         (loop (cdr w*) (add1 word-num)))))
+
+;; (: last-stanza (-> Poem Stanza))
+(define (last-stanza p)
+  (stanza (sub1 (length p)) p))
 
 ;; (: line (-> Natural Stanza Line))
 (define (line line-num s)
@@ -181,12 +189,18 @@
   )
 
   ;; -- last-word
-  (check-apply* last-word/loc
+  (check-apply* last-word
     [(line/loc '("winnie" "the" "boo") 8 3) == (word/loc "boo" 2 8 3)]
     [(line/loc '("heya") 8 113) == (word/loc "heya" 0 8 113)])
 
   (check-exn (regexp "last-word")
-             (lambda () (last-word/loc (line/loc '() 0 0))))
+             (lambda () (last-word (line/loc '() 0 0))))
+
+  ;; -- last-stanza
+  (check-apply* last-stanza
+    ['(()) == (stanza/loc '() 0)]
+    ['(("asdf" "bad" "lkmnue") ("x" "y" "z")) == (stanza/loc '("x" "y" "z") 1)]
+  )
 
   ;; -- line
   (check-equal? (line 0 (stanza/loc '("a") 3)) (line/loc '("a") 0 3))
