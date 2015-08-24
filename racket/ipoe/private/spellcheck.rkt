@@ -14,6 +14,7 @@
   ipoe/private/db
   ipoe/private/either
   ipoe/private/parse
+  ipoe/private/suggest
   ipoe/private/ui
   (only-in racket/string string-split)
   (only-in racket/file file->value))
@@ -23,7 +24,7 @@
 ;; Always succeeds.
 ;; As of 2015-08-06, just makes an alert if words are mispelled
 ;; - doesn't raise an error
-;; - doesn't offer suggestions
+;; - only gives 1 suggestion (be nicer to display in a dropdown)
 ;; (: check-spelling (-> (Sequenceof String) Void))
 (define (check-spelling line*)
   (define misspelled*
@@ -35,7 +36,9 @@
                   ([w (in-list (string->word* line))]
                    [word-num (in-naturals)]
                    #:when (not (word-exists? w)))
-          (alert (format "Warning: mispelled word '~a' on line '~a'" w line-num))
+          (define suggestions (suggest-spelling w #:epsilon 1 #:limit 1))
+          (define suggest-str (if (null? suggestions) "" (format " Maybe you meant '~a'?" (car suggestions))))
+          (alert (format "Warning: mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
           w)))))
   (if (null? (car misspelled*))
       (success 'check-spelling #t)
