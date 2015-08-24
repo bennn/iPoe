@@ -90,7 +90,7 @@
          (format "~a and ~a must have the same number of words."
            (line->string line)
            (line->string (list-ref line* bad-index)))))]
-      [(for/first ([w2* (in-list w2**)] [n (in-naturals)]
+       [(for/first ([w2* (in-list w2**)] [n (in-naturals)]
                    #:when (not (string=? (car w1*) (car w2*)))) n)
        ;; Words don't match
        => (lambda (bad-index)
@@ -130,47 +130,47 @@
   (require rackunit)
 
   ;; -- contains-word?
-  (check-true (contains-word? "I could not stop for death." "i"))
-  (check-true (contains-word? "I could not stop for death." "stop"))
-  (check-true (contains-word? "I could not stop for death." "death!"))
+  (check-true (contains-word? '("I could not stop for death." . 2) "i"))
+  (check-true (contains-word? '("I could not stop for death." . 1) "stop"))
+  (check-true (contains-word? '("I could not stop for death." . 9) "death!"))
 
-  (check-false (contains-word? "the raging: milkman" "a"))
-  (check-false (contains-word? "" "hey"))
-  (check-false (contains-word? "" ""))
+  (check-false (contains-word? '("the raging: milkman" . 2) "a"))
+  (check-false (contains-word? '("" . 0) "hey"))
+  (check-false (contains-word? '("" . 0) ""))
 
   ;; -- line
-  (check-equal? (line 0 '(a)) 'a)
-  (check-equal? (line 1 '(a b c)) 'b)
-  (check-equal? (line 5 '(a b c d e f)) 'f)
+  (check-equal? (line 0 '((a) . 3)) '(a 0 . 3))
+  (check-equal? (line 1 '((a b c) . 7)) '(b 1 . 7))
+  (check-equal? (line 5 '((a b c d e f) . 1)) '(f 5 . 1))
 
   (check-exn (regexp "ipoe:safe-list-ref")
-             (lambda () (line 0 '())))
+             (lambda () (line 0 '(() . 4))))
   (check-exn (regexp "ipoe:safe-list-ref")
-             (lambda () (line -1 '(a b c))))
+             (lambda () (line -1 '((a b c) . 11))))
 
   ;; -- line=?
-  (check-true (line=? ""
-                      ""))
-  (check-true (line=? "shall I compare thee"
-                      "shall, I ComparE Thee!"))
-  (check-true (line=? "YES"
-                      "yes."))
-  (check-true (line=? "it's not a typo"
-                      "its not a typo"))
+  (check-true (success? (line=? '("" 1 . 2)
+                                '("" 4 . 6))))
+  (check-true (success? (line=? '("shall I compare thee" 4 . 4)
+                                '("shall, I ComparE Thee!" 4 . 4))))
+  (check-true (success? (line=? '("YES" 9 . 999)
+                                '("yes." 124 . 0))))
+  (check-true (success? (line=? '("it's not a typo" 5 . 5)
+                                '("its not a typo" 12 . 6))))
   ;; --- should do multiple arguments
-  (check-true (line=? "a" "a" "A" "a"))
+  (check-true (success? (line=? '("a" 0 . 1) '("a" 0 . 1) '("A" 1 . 3) '("a" 7 . 2))))
 
-  (check-false (line=? "A"
-                       "B"))
-  (check-false (line=? "just a minute"
-                       "justaminute"))
-  (check-false (line=? "12 black birds"
-                       "13 black birds"))
+  (check-true (failure? (line=? '("A" 4 . 5)
+                                '("B" 82 . 1))))
+  (check-true (failure? (line=? '("just a minute" 1 . 1)
+                                '("justaminute" 8 . 32))))
+  (check-true (failure? (line=? '("12 black birds" 5 . 8)
+                                '("13 black birds" 6 . 666))))
 
   ;; -- stanza
-  (check-equal? (stanza 0 '(a)) 'a)
-  (check-equal? (stanza 1 '(a b c)) 'b)
-  (check-equal? (stanza 5 '(a b c d e f)) 'f)
+  (check-equal? (stanza 0 '(a)) '(a . 0))
+  (check-equal? (stanza 1 '(a b c)) '(b . 1))
+  (check-equal? (stanza 5 '(a b c d e f)) '(f . 5))
 
   (check-exn (regexp "ipoe:safe-list-ref")
              (lambda () (stanza 0 '())))
