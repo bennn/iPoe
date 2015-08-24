@@ -330,17 +330,17 @@
 
 (module+ main
   (require racket/cmdline xrepl racket/string)
-  ;; --
+  ;; -- parameters
   (define commit? (make-parameter #f))
   (define output-file (make-parameter #f))
   (define natural? exact-nonnegative-integer?)
   (define (exit? s)
-    (member s '(exit q quit)))
+    (memq s '(exit q quit)))
   (define (skip n seq)
     (for ([x seq] [m (in-range n)]) (void)))
   (define (take n seq)
     (for/list ([x seq] [m (in-range n)]) x))
-  ;; --
+  ;; -- repl
   (command-line
    #:program "db-repl"
    #:once-each
@@ -359,7 +359,7 @@
             [(list 'id->word (? natural? n))
              (displayln (id->word n))
              (loop)]
-            [(list 'rhymes-with? sym1 sym2)
+            [(list 'rhymes-with? (? string? sym1) (? string? sym2))
              (displayln (rhymes-with? sym1 sym2))
              (loop)]
             [(list 'syllables->word* (? natural? n1) '#:limit (? natural? n2))
@@ -370,31 +370,33 @@
              (skip n3 s)
              (displayln (take n2 s))
              (loop)]
-            [(list 'word->almost-rhyme* w '#:limit (? natural? n))
+            [(list 'word->almost-rhyme* (? string? w) '#:limit (? natural? n))
              (displayln (take n (word->almost-rhyme* w)))
              (loop)]
-            [(list 'word->almost-rhyme* w '#:limit (? natural? n) '#:skip (? natural? n2))
+            [(list 'word->almost-rhyme* (? string? w) '#:limit (? natural? n) '#:skip (? natural? n2))
              (define s (word->almost-rhyme* w))
              (skip n2 s)
              (displayln (take n s))
              (loop)]
-            [(list 'word->id w)
+            [(list 'word->id (? string? w))
              (displayln (word->id w))
              (loop)]
-            [(list 'word->rhyme* w '#:limit (? natural? n1))
+            [(list 'word->rhyme* (? string? w) '#:limit (? natural? n1))
              (displayln (take n1 (word->rhyme* w)))
              (loop)]
-            [(list 'word->rhyme* w '#:limit n1 '#:skip (? natural? n2))
+            [(list 'word->rhyme* (? string? w) '#:limit (? natural? n1) '#:skip (? natural? n2))
              (define s (word->rhyme* w))
              (skip n2 s)
              (displayln (take n1 s))
              (loop)]
-            [(list 'word->syllables w)
+            [(list 'word->syllables (? string? w))
              (displayln (word->syllables w))
              (loop)]
-            [(list 'word-exists? w)
+            [(list 'word-exists? (? string? w))
              (displayln (word-exists? w))]
-            [x  (printf "Unknown command '~a'\n" x)])))))))
+            [x
+             (printf "Unknown command '~a'\n" x)
+             (loop)])))))))
 
 ;; =============================================================================
 
