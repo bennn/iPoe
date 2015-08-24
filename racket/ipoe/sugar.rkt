@@ -33,6 +33,10 @@
   ;; (-> Natural Poem Stanza)
   ;; Get a stanza from a poem.
 
+  stanza->line*
+  ;; (-> Stanza (Listof Line))
+  ;; Get the lines from a stanza
+
   word
   ;; (-> Natural Line Word)
   ;; Get a word from a line
@@ -68,9 +72,11 @@
           v
           (and/either v* ...)))]))
 
-;; (: contains-word? (-> Line String Boolean))
+;; (: contains-word? (-> Line (U Word String) Boolean))
 (define (contains-word? line w-param)
-  (define w1 (parse-word w-param))
+  (define w1 (if (word/loc? w-param)
+                 (word/loc-word w-param) ;; Keep the locations?
+                 (parse-word w-param)))
   (cond
    [(not w1)
     (failure 'contains-word? (format "Could not parse word from string '~a'" w1))]
@@ -133,6 +139,12 @@
 (define (stanza stanza-num s*)
   (stanza/loc (safe-list-ref stanza-num s* 'stanza) stanza-num))
 
+;; (: stanza->line* (-> Stanza (Listof Line)))
+(define (stanza->line* s)
+  (match-define (stanza/loc l* stanza-num) s)
+  (for/list ([l (in-list l*)] [line-num (in-naturals)])
+    (line/loc (string->word* l) line-num stanza-num)))
+
 ;; (: word (-> Natural Line Word))
 (define (word word-num ln)
   (match-define (line/loc w* line-num stanza-num) ln)
@@ -142,7 +154,8 @@
 (define (word=? w1/loc . w*/loc)
   (define w1 (word/loc-word w1/loc))
   (cond
-   [(for/first ([w2/loc (in-list w*/loc)] #:when (not (string=? w1 (word/loc-word w2/loc)))) w2/loc)
+   [(for/first ([w2/loc (in-list w*/loc)]
+                #:when (not (string=? w1 (word/loc-word w2/loc)))) w2/loc)
     => (lambda (w2/loc)
     (failure 'word=? (format "~a and ~a must match" (word->string w1/loc) (word->string w2/loc))))]
    [else
@@ -248,6 +261,17 @@
              (lambda () (stanza 0 '())))
   (check-exn (regexp "ipoe:safe-list-ref")
              (lambda () (stanza -1 '(a b c))))
+
+  ;; -- stanza->line*
+  (check-apply* stanza->line*
+   [(stanza/loc '() 0) == '()]
+   [(stanza/loc '("a" "b") 1) == (list (line/loc '("a") 0 1)
+                                       (line/loc '("b") 1 1))]
+   [(stanza/loc '("yes sir" "you've" "got IT") 3)
+    == (list (line/loc '("yes" "sir") 0 3)
+             (line/loc '("youve")     1 3)
+             (line/loc '("got" "it")  2 3))]
+  )
 
   ;; -- word
   (check-apply* word
