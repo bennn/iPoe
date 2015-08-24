@@ -28,10 +28,9 @@
                       ;; Tercet constraints.
                       ;; A specific pair of words must appear in each line the second
                       ;;  in each pair must be the last word in the line.
-                      (for/and ([ln (in-list (stanza 6 s*))]
+                      (for/and ([ln (in-list (stanza->line* (last-stanza s*)))]
                                 [fw (in-list '(1 3 5))]
                                 [lw (in-list '(4 2 0))])
-                        ;;(printf "Checking that ~a & ~a are in line '~a'\n" fw lw line)
                         (and (contains-word? ln (last-word (line fw (stanza 0 s*))))
                              (word=? (last-word ln) (last-word (line lw (stanza 0 s*))))))))
 
