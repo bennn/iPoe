@@ -354,8 +354,10 @@
          (let loop ()
            (display "ipoe> ")
            (match (read)
-            [(? eof-object?) (void)]
-            [(? exit?) (printf "Goodbye\n")]
+            [(or (? eof-object?)
+                 (? exit?)
+                 (and (? list?) (? (lambda (x) (exit? (car x))))))
+             (printf "Goodbye\n")]
             [(list 'id->word (? natural? n))
              (displayln (id->word n))
              (loop)]
