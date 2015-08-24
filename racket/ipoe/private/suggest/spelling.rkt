@@ -1,6 +1,7 @@
 #lang racket/base
 
 (provide
+  filter-similar
   suggest-spelling
 )
 
@@ -12,11 +13,28 @@
 ;; =============================================================================
 
 (define default-epsilon 2)
+(define default-limit 10)
 (define-runtime-path common-words "./common-words.rktd")
+
+(define (filter-similar w w* #:limit [lim default-limit])
+  (define top-N (make-vector lim #f))
+  (for ([w2 w*])
+    (define score (string-levenshtein w w2))
+    (define new-pos
+      (for/first ([old+score (in-vector top-N)]
+                  [n         (in-naturals)]
+                  #:when (or (not old+score)
+                             (< score (cdr old+score))))
+        n))
+   (when new-pos
+     (vector-set! top-N new-pos (cons w2 score))))
+   (for/list ([w+s (in-vector top-N)]
+              #:when w+s)
+     (car w+s)))
 
 (define (suggest-spelling str-param
                           #:epsilon [eps default-epsilon]
-                          #:limit   [lim 10])
+                          #:limit   [lim default-limit])
   (define num-matches (box 0))
   (define str (string-downcase str-param))
   (with-input-from-file common-words
@@ -31,6 +49,13 @@
 
 (module+ test
   (require rackunit ipoe/private/rackunit-abbrevs)
+
+  (check-apply* filter-similar
+    ["car" '("cat" "boat" "wolf" "march") #:limit 1 == '("cat")]
+    ["car" '("cat" "boat" "wolf" "march") #:limit 3 == '("cat" "boat" "march")]
+    ["car" '("cat" "boat" "wolf" "march") #:limit 5 == '("cat" "boat" "march")]
+    ["ace" '("ace" "ace" "ace") #:limit 2 == '("ace" "ace")]
+  )
 
   (check-apply* suggest-spelling
     ["the" #:limit 1 == '("the")]
