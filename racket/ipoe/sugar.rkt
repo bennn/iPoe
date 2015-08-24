@@ -138,6 +138,8 @@
   (check-false (contains-word? '("" . 0) "hey"))
   (check-false (contains-word? '("" . 0) ""))
 
+  ;; -- last-word TODO
+
   ;; -- line
   (check-equal? (line 0 '((a) . 3)) '(a 0 . 3))
   (check-equal? (line 1 '((a b c) . 7)) '(b 1 . 7))
