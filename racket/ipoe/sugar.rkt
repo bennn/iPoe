@@ -4,6 +4,9 @@
 ;;  in a poem spec.
 
 (provide
+  (rename-out [and/either and])
+  ;; TODO
+
   contains-word?
   ;; (-> (Listof String) String Boolean)
   ;; True if the line contains the word
@@ -36,39 +39,71 @@
 
 (require
   ipoe/private
+  (for-syntax racket/base syntax/parse)
 )
 
 ;; =============================================================================
 ;; === API
 
-;; (: contains-word? (-> (Listof String) String Boolean))
+;; (define-type Line (Pairof String (Pairof Index Index)))
+;; (define-type Stanza (Pairof (Listof String) Index))
+
+(define-syntax (and/either stx)
+  (syntax-parse stx
+   [(_ v)
+    (syntax/loc stx v)]
+   [(_ v v* ...)
+    (syntax/loc stx
+      (if (or (not v) (failure? v))
+          v
+          (and/either v* ...)))]))
+
+;; (: contains-word? (-> Line String Boolean))
 (define (contains-word? line w-param)
   (define w1 (parse-word w-param))
   (and w1
-      (for/or ([w2 (in-list (string->word* line))] #:when w2)
+      (for/or ([w2 (in-list (string->word* (car line)))] #:when w2)
         (string=? w1 w2))))
 
-;; (: line (-> Natural (Listof String) String))
+;; (: line (-> Natural Stanza Line))
 (define (line n l*)
-  (safe-list-ref n l* 'line))
+  (cons (safe-list-ref n (car l*) 'line)
+        (cons n (cdr l*))))
 
-;; (: stanza (-> Natural (Listof (Listof String)) String))
+;; (: stanza (-> Natural (Listof (Listof String)) Stanza))
 (define (stanza n s*)
-  (safe-list-ref n s* 'stanza))
+  (cons (safe-list-ref n s* 'stanza) n))
 
 ;; (: line=? (-> String String * Boolean))
 (define (line=? line . line*)
-  (let loop ([w1* (string->word* line)] [w2** (map string->word* line*)])
+  (let loop ([w1* (string->word* (car line))] [w2** (map (compose1 string->word* car) line*)])
     (cond
       [(and (null? w1*) (andmap null? w2**))
        ;; Base case: empty lines are equal
-       #t]
-      [(or (null? w1*) (ormap null? w2**))
+       (success 'line=? #t)]
+      [(or (and (null? w1*)
+                (for/first ([w2* (in-list w2**)] [n (in-naturals)] #:when (not (null? w2*))) n))
+           (for/first ([w2* (in-list w2**)] [n (in-naturals)] #:when (null? w2*)) n))
        ;; False because lines have different numbers of words
-       #f]
+       => (lambda (bad-index)
+       (failure 'line=?
+         (format "~a and ~a must have the same number of words."
+           (line->string line)
+           (line->string (list-ref line* bad-index)))))]
+      [(for/first ([w2* (in-list w2**)] [n (in-naturals)]
+                   #:when (not (string=? (car w1*) (car w2*)))) n)
+       ;; Words don't match
+       => (lambda (bad-index)
+       (failure 'line=?
+         (format
+           "~a and ~a must contain the same words."
+           (line->string line)
+           (line->string (list-ref line* bad-index)))))]
       [else
-       (and (apply string=? (cons (car w1*) (map car w2**)))
-            (loop (cdr w1*) (map cdr w2**)))])))
+       (loop (cdr w1*) (map cdr w2**))])))
+
+(define (line->string ln)
+  (format "Line ~a of Stanza ~a" (cadr ln) (cddr ln)))
 
 (define (word=? w1-param . w*-param)
   (define w1 (parse-word w1-param))
