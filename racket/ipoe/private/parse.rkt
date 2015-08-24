@@ -289,6 +289,7 @@
     ["hello, world" == '("hello" "world")]
     ["WHAT IS THIS" == '("what" "is" "this")]
     ["161 things!" == '("one" "hundred" "sixty" "one" "things")]
+    ["non-word cruft ... gets filtered !" == '("nonword" "cruft" "gets" "filtered")]
   )
 
   ;; -- to-line*
