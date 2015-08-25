@@ -14,6 +14,7 @@
   ipoe/private/db
   ipoe/private/either
   ipoe/private/parse
+  ipoe/private/suggest
   ipoe/private/ui
   (only-in racket/string string-split)
   (only-in racket/file file->value))
@@ -23,7 +24,7 @@
 ;; Always succeeds.
 ;; As of 2015-08-06, just makes an alert if words are mispelled
 ;; - doesn't raise an error
-;; - doesn't offer suggestions
+;; - only gives 1 suggestion (be nicer to display in a dropdown)
 ;; (: check-spelling (-> (Sequenceof String) Void))
 (define (check-spelling line*)
   (define misspelled*
@@ -35,8 +36,10 @@
                   ([w (in-list (string->word* line))]
                    [word-num (in-naturals)]
                    #:when (not (word-exists? w)))
-          (alert (format "Warning: mispelled word '~a' on line '~a'" w line-num))
-          w)))))
+          (define suggestions (suggest-spelling w #:limit 7))
+          (define suggest-str (if (null? suggestions) "" (format " Maybe you meant '~a'?" (car suggestions))))
+          (alert (format "Warning: mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
+          (cons w suggestions))))))
   (if (null? (car misspelled*))
       (success 'check-spelling #t)
       (failure 'check-spelling (apply append misspelled*))))
@@ -54,10 +57,12 @@
 
   (let ([bad1 "asdvhuhewdv"]
         [bad2 "uhnojfyondvwhbonvwf"]
-        [bad3 "hjvndkwcxs"])
+        [bad3 "hjvndkwcxs"]
+        [bad4 "xz"])
     (check-apply* check-spelling
-      [(list bad1) == (failure 'check-spelling (list bad1))]
-      [(list bad1 bad2 bad3) == (failure 'check-spelling (list bad1 bad2 bad3))]
+      [(list bad1) == (failure 'check-spelling (list (list bad1)))]
+      [(list bad1 bad2 bad3) == (failure 'check-spelling (list (list bad1) (list bad2) (list bad3)))]
+      [(list bad4) == (failure 'check-spelling (list (list bad4 "be" "of" "to" "a" "in" "I" "it")))]
     ))
 
 )
