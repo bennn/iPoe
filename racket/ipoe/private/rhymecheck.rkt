@@ -24,9 +24,11 @@
   ipoe/private/db
   ipoe/private/either
   ipoe/private/parse
+  ipoe/private/suggest
   ipoe/private/ui
   ;; --
   racket/match
+  (only-in racket/string string-join)
 )
 
 ;; =============================================================================
@@ -247,11 +249,22 @@
                            #:line-number (add1 ln))]
       [(varmap-lookup vm var)
        => (lambda (rhyme)
-       (if (not (rhyme=? rhyme lw))
-           (failure src (format "Line ~a of stanza ~a does not match rhyme scheme. Expected a word to rhyme with '~a' but got '~a'" (add1 ln) (add1 sn) rhyme lw))
-           (unify-rhyme-scheme vm st* rs*
-                               #:stanza-number sn
-                               #:line-number (add1 ln))))]
+       (cond
+        [(rhyme=? rhyme lw)
+         ;; Success!
+         (unify-rhyme-scheme vm st* rs*
+                             #:stanza-number sn
+                             #:line-number (add1 ln))]
+        [else
+         (define r* (filter-similar lw (word->rhyme* rhyme) #:limit 3))
+         (define a* (filter-similar lw (word->almost-rhyme* rhyme) #:limit 2))
+         (define suggest-str
+           (if (and (null? r*) (null? a*))
+               ""
+               (string-append " Suggestions: '"
+                              (string-join (append r* a*) "', '")
+                              "'")))
+         (failure src (format "Line ~a of stanza ~a does not match rhyme scheme. Expected a word to rhyme with '~a' but got '~a'.~a" (add1 ln) (add1 sn) rhyme lw suggest-str))]))]
       [else
        (unify-rhyme-scheme (varmap-add vm var lw) st* rs*
                            #:stanza-number sn
