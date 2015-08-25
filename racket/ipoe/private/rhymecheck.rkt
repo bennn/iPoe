@@ -238,7 +238,7 @@
     [(cons (cons line st*) (cons var rs*))
      ;; Match the last word of the line with a rhyme,
      ;;  either the rhyme stored in the varmap OR bind the rhyme scheme variable
-     (define lw (last-word line))
+     (define lw (string-last line))
      (cond
       [(wildcard? var)
        ;; Ignore wildcards
