@@ -3,23 +3,23 @@
 ;; Generic word/line parsing tools
 
 (provide
-  last-word
-  ;; (-> String (U #f String))
-  ;; Get the last parseable word from a string of text
-
   integer->word*
   ;; (-> Integer String)
   ;; Convert a number to an English word
   ;; Current limit is 999 trillion
 
-  string->word*
-  ;; (-> String (Listof String))
-  ;; Split a string by whitespace, ensure that each result is a normalized word
-
   parse-word
   ;; (-> String String)
   ;; Filter unimportant things from some text.
   ;; i.e. Remove punctuation, convert to lowercase.
+
+  string-last
+  ;; (-> String (U #f String))
+  ;; Get the last parseable word from a string of text
+
+  string->word*
+  ;; (-> String (Listof String))
+  ;; Split a string by whitespace, ensure that each result is a normalized word
 
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
@@ -42,13 +42,6 @@
 
 ;; =============================================================================
 ;; TODO library should be lazy enough to handle Dickens
-
-(define (last-word str)
-  ;; Collect a reverse-order list of parsed words
-  ;; (Basically, rev-map)
-  (define word* (string->word* str))
-  (and (not (null? word*))
-       (last word*)))
 
 ;; Serves as a map from small naturals to their string representations
 ;; (: digit1-cache (Vectorof String))
@@ -139,6 +132,13 @@
              (char-downcase c))))
   (and (not (string-empty? str)) str))
 
+(define (string-last str)
+  ;; Collect a reverse-order list of parsed words
+  ;; (Basically, rev-map)
+  (define word* (string->word* str))
+  (and (not (null? word*))
+       (last word*)))
+
 (define (string->word* str)
   (let loop ([str* (string-split str)])
     (if (null? str*)
@@ -198,8 +198,8 @@
 (module+ test
   (require rackunit "rackunit-abbrevs.rkt")
 
-  ;; -- last-word
-  (check-apply* last-word
+  ;; -- string-last
+  (check-apply* string-last
     ["a red fox" == "fox"]
     ["a" == "a"]
     ;; --
@@ -289,6 +289,7 @@
     ["hello, world" == '("hello" "world")]
     ["WHAT IS THIS" == '("what" "is" "this")]
     ["161 things!" == '("one" "hundred" "sixty" "one" "things")]
+    ["non-word cruft ... gets filtered !" == '("nonword" "cruft" "gets" "filtered")]
   )
 
   ;; -- to-line*

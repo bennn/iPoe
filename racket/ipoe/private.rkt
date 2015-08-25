@@ -22,10 +22,6 @@
   ;; (-> (Sequenceof String) Either)
   ;; Check spelling of words in the plain-text source of a file.
 
-  last-word
-  ;; (-> String (U #f String))
-  ;; Return the last word in a line
-
   on-failure
   ;; (-> Either (-> Failure Void) Void)
   ;; Call the thunk if the argument is not a `success?` struct
