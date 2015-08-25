@@ -3,9 +3,11 @@
 ;; User-end library, helpers for specifying #:extra-validator functions
 ;;  in a poem spec.
 
+;; TODO this is becoming a real DSL. Document heavily.
+
 (provide
-  (rename-out [and/either and])
-  ;; The and macro, lifted to accept Either types as well as Booleans
+  (rename-out [and/either and] [for/and/either for/and])
+  ;; The `and` macro, lifted to accept Either types as well as Booleans
 
   contains-word?
   ;; (-> Line String Boolean)
@@ -71,6 +73,11 @@
       (if (or (not v) (failure? v))
           v
           (and/either v* ...)))]))
+
+(define-syntax (for/and/either stx)
+  (syntax-parse stx
+   [(_ iterator body)
+    (syntax/loc stx (for/fold ([tmp #t]) iterator (and/either tmp body)))]))
 
 ;; (: contains-word? (-> Line (U Word String) Boolean))
 (define (contains-word? line w-param)
