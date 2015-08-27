@@ -196,7 +196,7 @@
       (when (failure? extra?)
         (user-error '#,name (failure-reason extra?)))
       (check-spelling line*)
-      line*))
+      (cons line* option*)))
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
@@ -313,9 +313,10 @@
                (lambda () (test-read-keyword-value "42" symbol?))))
 
   ;; -- poem-spec->validator
-  (let* ([couplet-validator-stx (poem-spec->validator (poem-spec 'couplet '((A A)) #f #f))]
-         [couplet-validator (parameterize ([current-namespace (make-base-namespace)])
-           (eval #`(begin #,validator-requires #,couplet-validator-stx) (current-namespace)))]
+  (define-syntax-rule (make-validator spec)
+    (parameterize ([current-namespace (make-base-namespace)])
+      (eval #`(begin #,validator-requires #,(poem-spec->validator spec)) (current-namespace))))
+  (let* ([couplet-validator (make-validator (poem-spec 'couplet '((A A)) #f #f))]
          [pass-str "I was born\nhouse was worn\n"]
          [fail-str "roses are red\nviolets are blue\n"])
     (define (test-couplet str)
@@ -323,9 +324,20 @@
       (define res (couplet-validator port))
       (close-input-port port)
       res)
-    (check-equal? (test-couplet pass-str) (string-split pass-str "\n"))
+    (check-equal? (car (test-couplet pass-str)) (string-split pass-str "\n"))
     (check-exn (regexp "ipoe")
                (lambda () (test-couplet fail-str))))
+  ;; --- an examples with options
+  (let* ([free-validator (make-validator (poem-spec 'free '() #f #f))]
+         [str "#:one option\n   #:another option\n\n\n#:third  thing    \nsome text\n\nmore text\n#:not anoption\n"])
+    (define (test-free str)
+      (define port (open-input-string str))
+      (define res (free-validator port))
+      (close-input-port port)
+      res)
+    (define res (test-free str))
+    (check-equal? (car res) '("some text" "" "more text" "#:not anoption"))
+    (check-equal? (sort (hash->list (cdr res)) string<? #:key car) '(("another" . "option") ("one" . "option") ("third" . "thing"))))
 
   ;; -- validator?
   (check-false (validator? '#f))
