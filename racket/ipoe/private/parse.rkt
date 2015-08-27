@@ -2,11 +2,20 @@
 
 ;; Generic word/line parsing tools
 
+;; (define-type V (U Integer String Symbol Boolean))
 (provide
+  init-option*
+  ;; (-> Option*)
+  ;; Initialize a hash of run-time configuration data
+
   integer->word*
   ;; (-> Integer String)
   ;; Convert a number to an English word
   ;; Current limit is 999 trillion
+
+  option?
+  ;; (-> String Match)
+  ;; True if the first characters in the argument are '#:'
 
   parse-word
   ;; (-> String String)
@@ -42,6 +51,10 @@
 
 ;; =============================================================================
 ;; TODO library should be lazy enough to handle Dickens
+
+;; TODO search dotfiles ~/.ipoe and .ipoe
+(define (init-option*)
+  (make-hasheq))
 
 ;; Serves as a map from small naturals to their string representations
 ;; (: digit1-cache (Vectorof String))
@@ -120,6 +133,14 @@
 (define (digit->word n)
   (vector-ref digit1-cache n))
 
+;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
+;; Ignore any extra whitespace before/after "#:KEY" or "VAL"
+(define option-regexp #px"^[\\s]*#:([\\S]+)[\\s]+([\\S]+)[\\s]*$")
+
+;; (: option? (-> String Match))
+(define (option? str)
+  (regexp-match option-regexp str))
+
 ;; Convert a string to an "equivalent" string that might be in the database.
 ;; i.e., remove things like '?' and '!'.
 ;; (: parse-word (-> String String))
@@ -197,6 +218,23 @@
 
 (module+ test
   (require rackunit "rackunit-abbrevs.rkt")
+
+  ;; -- init-option*
+  (check-equal? (init-option*) (make-hasheq))
+  (check-true (hash-empty? (init-option*)))
+
+  ;; -- option?
+  (check-apply* option?
+   ["nope" == #f]
+   ["" == #f]
+   ["    \t   " == #f]
+   ["viet cong" == #f]
+   ["#w x" == #f]
+   ["a = b" == #f]
+   ;; --
+   ["#:key val" == (list "#:key val" "key" "val")]
+   ["   #:mr smith" == (list "   #:mr smith" "mr" "smith")]
+  )
 
   ;; -- string-last
   (check-apply* string-last
@@ -290,6 +328,7 @@
     ["WHAT IS THIS" == '("what" "is" "this")]
     ["161 things!" == '("one" "hundred" "sixty" "one" "things")]
     ["non-word cruft ... gets filtered !" == '("nonword" "cruft" "gets" "filtered")]
+    ["\t    \t " == '()]
   )
 
   ;; -- to-line*
@@ -304,10 +343,9 @@
 
   ;; -- to-stanza*
   (define-syntax-rule (check-to-stanza* [text stanza*] ...)
-    (begin (check-true
-             (for/and ([stanza-line* (to-stanza* (to-line* text))]
-                       [line* (in-list stanza*)])
-               (equal? stanza-line* line*))) ...))
+    (begin (for ([stanza-line* (to-stanza* (to-line* text))]
+                 [line* (in-list stanza*)])
+             (check-equal? stanza-line* line*)) ...))
   (check-to-stanza*
     ["a\na\na\n\nb\nb\nb\n"
      '(("a" "a" "a") ("b" "b" "b"))]
