@@ -160,17 +160,43 @@
     (or (poem-spec-extra-validator ps)
         #'(lambda (x) #t)))
   #`(lambda (in) ;; Input-Port
-    (define line* (to-line* in))
-    (define stanza* (sequence->list (to-stanza* line*)))
-    (#,check-rhyme stanza*)
-    (define extra? (#,check-extra stanza*))
-    (when (not extra?)
-      (define d-str (if #,descr (string-append "\n  " #,descr) ""))
-      (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str)))
-    (when (failure? extra?)
-      (user-error '#,name (failure-reason extra?)))
-    (check-spelling line*)
-    line*))
+      ;; Read & process data from the input in-line.
+      (define configuring? (box #t))
+      (define option* (init-option*))
+      ;; TODO process the file as a stream, do not build list of lines
+      ;; TODO stop abusing that poor #:when clause
+      (define line*
+        (for/list ([raw-line (in-lines in)]
+                   #:when (or (not (unbox configuring?))
+                              ;; Try to read an option
+                              (cond
+                               [(string-empty? raw-line)
+                                ;; Ignore blank lines
+                                #f]
+                               [(option? raw-line)
+                                => (lambda (match)
+                                ;; Got an option, add to param. hash
+                                (hash-set! option* (cadr match) (caddr match))
+                                #f)]
+                               [else
+                                ;; Non-blank, non-option => done configuring!
+                                (set-box! configuring? #f)
+                                #t])))
+          raw-line))
+      (printf "Got options ~a\n" option*)
+      ;; TODO use parameters to setup a monad handler
+      ;; TODO check for new words
+      ;; TODO close to compiling, please finish
+      (define stanza* (sequence->list (to-stanza* line*)))
+      (#,check-rhyme stanza*)
+      (define extra? (#,check-extra stanza*))
+      (when (not extra?)
+        (define d-str (if #,descr (string-append "\n  " #,descr) ""))
+        (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str)))
+      (when (failure? extra?)
+        (user-error '#,name (failure-reason extra?)))
+      (check-spelling line*)
+      line*))
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
@@ -319,6 +345,7 @@
     (check-false (v '(())))
     ; (check-exn exn:fail:contract? (lambda () (v 1)))
   )
+  ;; 2015-08-27: Commented validator tests until we bring back the contracts
   ; ;; --- invalid validator: wrong domain
   ; (check-exn exn:fail:contract?
   ;            (lambda () (validator? '(lambda (x y) x))))
