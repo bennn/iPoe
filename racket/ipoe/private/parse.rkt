@@ -4,6 +4,10 @@
 
 ;; (define-type V (U Integer String Symbol Boolean))
 (provide
+  check-new-words
+  ;; (-> Poem Either)
+  ;; Search the poem for unknown, valid words
+
   init-option*
   ;; (-> Option*)
   ;; Initialize a hash of run-time configuration data
@@ -55,6 +59,14 @@
 
 ;; =============================================================================
 ;; TODO library should be lazy enough to handle Dickens
+
+(define (check-new-words p)
+  ;; May eventually want `scrape-word` to return more information
+  (for*/list ([stanza (in-list p)]
+              [line (in-list stanza)]
+              [word (in-list line)]
+              #:when (scrape-word word))
+    word))
 
 ;; TODO search dotfiles ~/.ipoe and .ipoe
 (define (init-option*)
@@ -222,6 +234,8 @@
 
 (module+ test
   (require rackunit "rackunit-abbrevs.rkt")
+
+  ;; -- check-new-words TODO
 
   ;; -- init-option*
   (check-equal? (init-option*) (make-hasheq))
