@@ -22,9 +22,23 @@
   ;; (-> (Sequenceof String) Either)
   ;; Check spelling of words in the plain-text source of a file.
 
+  init-option*
+  ;; (-> KVStore)
+  ;; Initialize a set of key-value mappings;
+  ;; used to represent options/parameters
+
   on-failure
   ;; (-> Either (-> Failure Void) Void)
   ;; Call the thunk if the argument is not a `success?` struct
+
+  option?
+  ;; (-> String (U #f (List String String String)))
+  ;; Parses a keyword option "#:KEY VAL" from a string.
+  ;; Ignores extra spaces in the string.
+
+  parse-word
+  ;; (-> String String)
+  ;; Filter punctuation from a word
 
   replace-wildcard-syllables
   ;; (-> RhymeScheme Natural RhymeScheme)
@@ -34,13 +48,13 @@
   ;; (-> Any Boolean)
   ;; Predicate for rhyme schemes
 
-  parse-word
-  ;; (-> String String)
-  ;; Filter punctuation from a word
-
   string->word*
   ;; (-> String (Listof String))
   ;; Parse a line of text into a list of normalized words.
+
+  string-empty?
+  ;; (-> String Boolean)
+  ;; True if the argument contains only whitepsace
 
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))

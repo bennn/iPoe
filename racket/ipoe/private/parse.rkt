@@ -22,6 +22,10 @@
   ;; Filter unimportant things from some text.
   ;; i.e. Remove punctuation, convert to lowercase.
 
+  string-empty?
+  ;; (-> String Boolean)
+  ;; True if the argument contains only whitespace
+
   string-last
   ;; (-> String (U #f String))
   ;; Get the last parseable word from a string of text
