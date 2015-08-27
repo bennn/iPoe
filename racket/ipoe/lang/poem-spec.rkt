@@ -184,19 +184,27 @@
                                 #t])))
           raw-line))
       (printf "Got options ~a\n" option*)
-      ;; TODO use parameters to setup a monad handler
-      ;; TODO check for new words
-      ;; TODO close to compiling, please finish
+      ;; 2015-08-27: If we need punctuation some day, get it from line*
       (define stanza* (sequence->list (to-stanza* line*)))
-      (#,check-rhyme stanza*)
-      (define extra? (#,check-extra stanza*))
-      (when (not extra?)
-        (define d-str (if #,descr (string-append "\n  " #,descr) ""))
-        (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str)))
-      (when (failure? extra?)
-        (user-error '#,name (failure-reason extra?)))
-      (check-spelling line*)
-      (cons line* option*)))
+      (hash->parameterize option* (lambda ()
+        ;; -- Check for new words, optionally.
+        (when (online?)
+          (add-word* w* (check-new-words stanza*)))
+        ;; -- Check spelling, optionally
+        (when (spellcheck?)
+          (check-spelling line*))
+        ;; -- Check rhyme scheme
+        (#,check-rhyme stanza*) ;; TODO poetic license option/param
+        ;; -- Check extra validator
+        (define extra? (#,check-extra stanza*))
+        (cond
+         [(not extra?)
+          (define d-str (if #,descr (string-append "\n  " #,descr) ""))
+          (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str))]
+         [(failure? extra?)
+          (user-error '#,name (failure-reason extra?))])
+        ;; -- Done! Return anything needed to make testing easy
+        (cons line* option*)))))
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
