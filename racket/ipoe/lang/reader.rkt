@@ -12,12 +12,8 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  ;ipoe/private
   syntax/strip-context
-  ;(only-in racket/splicing splicing-let-syntax)
   racket/splicing
-
-  ;; TODO maybe, the issue's that we use this function at 2 levels
   ipoe/lang/poem-spec
   (only-in racket/syntax format-id)
 )
