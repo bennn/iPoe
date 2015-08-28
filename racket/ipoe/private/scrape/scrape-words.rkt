@@ -26,10 +26,11 @@
 
 
 (define (scrape-word w)
-  (or (dictionary.com w)))
-  ;urban-dictionary (they don't have syllables)
-  ;merriam-webster
-  ;the-free-dictionary
+  (or (american-heritage w)
+      (dictionary.com w)
+      (merriam-webster w)
+      (the-free-dictionary w)))
+      ;urban-dictionary (they don't have syllables)
 
 ;; -----------------------------------------------------------------------------
 ;; Data Definition: Word Scraper
@@ -132,15 +133,26 @@
     ;; src
     'merriam-webster))
 
-;; -----------------------------------------------------------------------------
-;(define TODO
-;  (word-scraper
-;    ;; word->url
-;    ;; sxml->definition
-;    ;; sxml->num-syllables
-;    ;; src
-;    ))
-;; -----------------------------------------------------------------------------
+(define american-heritage
+  (word-scraper
+    ;; word->url
+    (lambda (w) (string-append "https://www.ahdictionary.com/word/search.html?q=" w))
+
+    ;; sxml->definition
+    (lambda (sxml)
+      (let ([d (or
+                 ((if-car-sxpath `(// div ,(class? "ds-list") *text*)) sxml)
+                 ((if-car-sxpath `(// div ,(class? "ds-single") *text*)) sxml))])
+        d))
+
+    ;; sxml->num-syllables
+    (lambda (sxml)
+      (let* ([div ((if-car-sxpath `(// div ,(class? "rtseg"))) sxml)]
+             [res ((if-car-sxpath `(// *text*)) div)])
+        (and res (add1 (count-chars #\· res)))))
+
+    ;; src
+    'american-heritage))
 
 ;; =============================================================================
 
@@ -165,23 +177,30 @@
    [not-a-word == #f]
   )
 
-  ;(check-apply* dictionary.com
-  ; ["penguin" == (word-result "penguin" "any of several flightless, aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having webbed feet and wings reduced to flippers." 2 'dictionary.com)]
-  ; ["flower" == (word-result "flower" "the blossom of a plant." 2 'dictionary.com)]
-  ;  [not-a-word == #f]
-  ;)
+  (check-apply* dictionary.com
+   ["penguin" == (word-result "penguin" "any of several flightless, aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having webbed feet and wings reduced to flippers." 2 'dictionary.com)]
+   ["flower" == (word-result "flower" "the blossom of a plant." 2 'dictionary.com)]
+    [not-a-word == #f]
+  )
 
-  ;(check-apply* the-free-dictionary
-  ; ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
-  ; ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
-  ; [not-a-word == #f]
-  ;)
+  (check-apply* the-free-dictionary
+   ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
+   ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
+   [not-a-word == #f]
+  )
 
   (check-apply* merriam-webster
-    ["penguin" == (word-result "penguin" "a black-and-white bird that cannot fly, that uses its wings for swimming, and that lives in or near the Antarctic" 2 'merriam-webster)]
-    ["candelabra" == (word-result "candelabra" "an object with several branches for holding candles or lights" 4 'merriam-webster)]
     ["day" == (word-result "day" "the part of the day when people are usually most active and when most businesses are open" 1 'merriam-webster)]
+    ["penguin" == (word-result "penguin" "a black-and-white bird that cannot fly, that uses its wings for swimming, and that lives in or near the Antarctic" 2 'merriam-webster)]
     ["umbrella" == (word-result "umbrella" "something that includes several or many different things" 3 'merriam-webster)]
+    ["candelabra" == (word-result "candelabra" "an object with several branches for holding candles or lights" 4 'merriam-webster)]
     [not-a-word == #f]
    )
+
+  (check-apply* american-heritage
+   ["trip" == (word-result "trip" "A going from one place to another; a journey." 1 'american-heritage)]
+   ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'american-heritage)]
+   ["hardcover" == (word-result "hardcover" "Having a rigid binding, as of cardboard covered with cloth or with leather. Used of books." 3 'american-heritage)]
+   [not-a-word == #f]
+  )
 )
