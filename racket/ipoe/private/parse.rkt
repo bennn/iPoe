@@ -54,6 +54,7 @@
   (only-in racket/port port->lines)
   (only-in racket/string string-split string-trim)
   (only-in racket/generator in-generator generator yield)
+  ipoe/private/scrape
   ipoe/private/ui
 )
 
