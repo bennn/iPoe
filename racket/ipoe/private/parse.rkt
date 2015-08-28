@@ -54,7 +54,8 @@
   (only-in racket/port port->lines)
   (only-in racket/string string-split string-trim)
   (only-in racket/generator in-generator generator yield)
-  ipoe/private/scrape
+  (only-in ipoe/private/db word-exists? with-ipoe-db)
+  (only-in ipoe/private/scrape scrape-word)
   ipoe/private/ui
 )
 
@@ -65,8 +66,9 @@
   ;; May eventually want `scrape-word` to return more information
   (for*/list ([stanza (in-list p)]
               [line (in-list stanza)]
-              [word (in-list line)]
-              #:when (scrape-word word))
+              [word (in-list (string->word* line))]
+              #:when (and (not (word-exists? word))
+                          (scrape-word word)))
     word))
 
 ;; TODO search dotfiles ~/.ipoe and .ipoe
@@ -234,9 +236,19 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit "rackunit-abbrevs.rkt")
+  (require
+    rackunit
+    (only-in racket/sequence sequence->list)
+    "rackunit-abbrevs.rkt")
 
-  ;; -- check-new-words TODO
+  ;; -- check-new-words
+  ;;  TODO outcome depends on the words in this database & current scrapers
+  (with-ipoe-db #:commit? #f
+    (lambda ()
+      (check-apply* (lambda (text) (check-new-words (sequence->list (to-stanza* (to-line* text)))))
+        ["wait for the neverneverland" == '("neverneverland")]
+        ["asoivnawetga vjifanspetaw" == '()]
+      )))
 
   ;; -- init-option*
   (check-equal? (init-option*) (make-hasheq))
