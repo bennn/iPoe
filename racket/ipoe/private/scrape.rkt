@@ -1,6 +1,7 @@
 #lang racket/base
 
 (provide
+  scrape-word
   resolve-rhyme*
   resolve-syllables
   ;; --
@@ -13,4 +14,5 @@
 (require
   "scrape/scrape-rhymes.rkt"
   "scrape/scrape-syllables.rkt"
+  "scrape/scrape-words.rkt"
 )
