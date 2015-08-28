@@ -30,10 +30,12 @@
                            #:offline? [offline? #f]
                            #:interactive? [interactive? #t])
   (define-values (ref-syllables src)
-    (let ([wr (and (not offline?) (scrape-word word))])
-      (if (word-result? wr)
-          (values (word-result-num-syllables wr) (word-result-src wr))
-          (values (naive-syllables word) "our-heuristic"))))
+    (if offline?
+        (values (naive-syllables word) "our-heuristic")
+        (let ([wr (scrape-word word)])
+          (if (word-result? wr)
+              (values (word-result-num-syllables wr) (word-result-src wr))
+              (values #f #f)))))
   (cond
    [(not syllables)
     ref-syllables]
@@ -110,7 +112,7 @@
     ["never" == 2]
     ["mississippi" == 4]
     ["continuity" == 5]
-    ["asbferufvzfjuvfds" == 4] ;; If the internet fails, we go local
+    ["asbferufvzfjuvfds" == #f]
   )
 
   ;; Should run a local algorithm (and get the wrong answer for "hour"
