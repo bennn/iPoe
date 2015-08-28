@@ -27,7 +27,7 @@
 
 (define (scrape-word w)
   (or (dictionary.com w)))
-  ;urban-dictionary
+  ;urban-dictionary (they don't have syllables)
   ;merriam-webster
   ;the-free-dictionary
 
@@ -68,7 +68,6 @@
 )
 
 ;; -----------------------------------------------------------------------------
-;; dictionary.com
 
 (define dictionary.com
   (word-scraper
@@ -85,10 +84,38 @@
     (lambda (sxml)
       (let ([h1 ((if-car-sxpath '(// h1 span @ data-syllable *text*)) sxml)])
         (and h1
-             (add1 (count-chars (lambda (c) (char=? c #\·)) h1)))))
+             (add1 (count-chars #\· h1)))))
 
     ;; src
     'dictionary.com))
+
+(define the-free-dictionary
+  (word-scraper
+    ;; word->url
+    (lambda (w) (string-append "http://www.thefreedictionary.com/" w))
+
+    ;; sxml->definition
+    (lambda (sxml)
+     (let ([div ((if-car-sxpath `(// div ,(class? "ds-list") *text*)) sxml)])
+       (and div (string-trim div))))
+
+    ;; sxml->num-syllables
+    (lambda (sxml)
+     (let ([h2 ((if-car-sxpath `(// div ,(id? "Definition") section h2 *text*)) sxml)])
+       (and h2 (add1 (count-chars #\· h2)))))
+
+    ;; src
+    'the-free-dictionary
+    ))
+;; -----------------------------------------------------------------------------
+;(define TODO
+;  (word-scraper
+;    ;; word->url
+;    ;; sxml->definition
+;    ;; sxml->num-syllables
+;    ;; src
+;    ))
+;; -----------------------------------------------------------------------------
 
 ;; =============================================================================
 
@@ -106,13 +133,22 @@
 (module+ test
   (require rackunit ipoe/private/rackunit-abbrevs)
 
+  (define not-a-word "hguwisdvzodxv")
+
   (check-apply* (lambda (w) (word-result? (scrape-word w)))
    ["yes" == #t]
-   ["hguwisdvzodxv" == #f]
+   [not-a-word == #f]
   )
 
-  (check-apply* dictionary.com
-   ["penguin" == (word-result "penguin" "any of several flightless, aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having webbed feet and wings reduced to flippers." 2 'dictionary.com)]
-   ["flower" == (word-result "flower" "the blossom of a plant." 2 'dictionary.com)]
+  ;(check-apply* dictionary.com
+  ; ["penguin" == (word-result "penguin" "any of several flightless, aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having webbed feet and wings reduced to flippers." 2 'dictionary.com)]
+  ; ["flower" == (word-result "flower" "the blossom of a plant." 2 'dictionary.com)]
+  ;  [not-a-word == #f]
+  ;)
+
+  (check-apply* the-free-dictionary
+   ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
+   ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
+   [not-a-word == #f]
   )
 )
