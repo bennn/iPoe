@@ -1,7 +1,7 @@
 #lang racket/base
 
 (provide
-  add-word
+  add-word add-word*
   ;; (->* (string?) (#:db connection? #:syllables (U Natural #f) #:rhymes (U (Listof String) #f) #:almost-rhymes (U (Listof String) #f) #:interactive? boolean? #:offline? boolean?) Void)
   ;; Add a new word to the database.
   ;; First three optional arguments supply information for the word's syllables, rhymes,
@@ -168,6 +168,13 @@
     (define rhyme* (rhyme-result-rhyme* rr))
     (define almost-rhyme* (rhyme-result-almost-rhyme* rr))
     (add-word/unsafe word syllables rhyme* almost-rhyme* #:db pgc)]))
+
+(define (add-word* word*
+                   #:db [pgc (current-ipoe-db)]
+                   #:interactive? [interactive? #f]
+                   #:offline? [offline? #f])
+  (for ([w (in-list word*)])
+    (add-word w #:db pgc #:interactive? interactive? #:offline? offline?)))
 
 (define (add-rhyme word r #:db [pgc (current-ipoe-db)])
   (add-rhyme* word (list r) #:db pgc))
@@ -574,6 +581,16 @@
       (let ([new-word "yolo"])
         (begin
           (check-true (and (add-word "yolo" #:interactive? #f #:offline? #f) #t))))))
+
+  ;; -- add-word* (use offline mode to never fail)
+  (with-db-test
+    (let ([new1 "onething"]
+          [new2 "anotherthing"])
+      (with-output-to-file "/dev/null" #:exists 'append
+        (lambda ()
+          (check-true (and (add-word* (list new1 new2) #:interactive? #f #:offline? #t) #t))))
+      (check-true (word-exists? new1))
+      (check-true (word-exists? new2))))
 
   ;; -- add-rhyme / add-almost-rhyme
   (with-db-test
