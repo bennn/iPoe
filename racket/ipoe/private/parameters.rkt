@@ -4,9 +4,10 @@
 ;; X move init-options* from parse
 ;; X fuck, move anything else
 ;; X make paraemters, so we can override them
-;; - implemented "from-hash"
-;; - warn on unknown params
+;; X implemented "from-hash"
+;; X warn on unknown params
 ;; - default config in file
+;; - document
 
 (provide
   ;; NOTE: every 'define-parameter' is provided
@@ -36,11 +37,6 @@
 ;; =============================================================================
 ;; Parameters
 ;; TODO get defaults from a .ipoe file
-
-;; TODO define-option macro?
-;; - provide
-;; - register smbol
-;; - make parameter, with default
 
 (define ALL-PARAMETERS (mutable-set))
 
@@ -171,11 +167,16 @@
    ["viet cong" == #f]
    ["#w x" == #f]
    ["a = b" == #f]
-   ;; --
+   ;; -- valid keys
    ["#:key val" == (option-match 'key 'val)]
    ["   #:mr smith" == (option-match 'mr 'smith)]
    [" #:yes 411" == (option-match 'yes 411)]
   )
+  ;; -- option?, with custom parser
+  (check-equal? (option? "#:xxx yyy" #:parse-value (lambda (x) x))
+                (option-match 'xxx "yyy"))
+  (check-equal? (option? "#:cat tac" #:parse-value (lambda (x) 42))
+                (option-match 'cat 42))
 
   ;; -- parameterize-from-hash
   (let ([opt (options-init)]
