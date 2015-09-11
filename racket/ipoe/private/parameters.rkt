@@ -9,6 +9,8 @@
 ;; - default config in file
 
 (provide
+  ;; NOTE: every 'define-parameter' is provided
+
   ;; -- Option parsing / binding
 
   options-init
@@ -26,7 +28,9 @@
 )
 
 (require
+  (only-in racket/set mutable-set set-member? set-add!)
   (only-in racket/port with-input-from-string)
+  (for-syntax racket/base syntax/parse racket/syntax)
 )
 
 ;; =============================================================================
@@ -38,22 +42,34 @@
 ;; - register smbol
 ;; - make parameter, with default
 
+(define ALL-PARAMETERS (mutable-set))
+
+(define-syntax (define-parameter stx)
+  (syntax-parse stx
+   [(_ name-stx:id val)
+    (with-syntax ([param-id (format-id stx "*~a*" (syntax-e #'name-stx))])
+      #`(begin
+          (define param-id (make-parameter val))
+          (define name-stx (quote #,(syntax-e #'name-stx)))
+          (set-add! ALL-PARAMETERS name-stx)
+          (provide param-id)))]))
+
 ;; -- general parameters
-(define *online?* (make-parameter #t))
-(define *spellcheck?* (make-parameter #t))
-(define *grammarcheck?* (make-parameter #f))
-(define *suggest-rhyme?* (make-parameter #t))
-(define *suggest-spelling?* (make-parameter #t))
+(define-parameter online? #t)
+(define-parameter spellcheck? #t)
+(define-parameter grammarcheck? #t)
+(define-parameter suggest-rhyme? #t)
+(define-parameter suggest-spelling? #t)
 
 ;; -- poetic license / demerits
-(define *poetic-license* (make-parameter 0))
-(define *almost-rhyme-penalty* (make-parameter 0))
-(define *bad-rhyme-penalty* (make-parameter 0))
-(define *bad-word-penalty* (make-parameter 0))
-(define *bad-extra-penalty* (make-parameter 0))
-(define *bad-syllable-penalty* (make-parameter 0))
-(define *bad-stanza-penalty* (make-parameter 0))
-(define *bad-lines-penalty* (make-parameter 0))
+(define-parameter poetic-license 0)
+(define-parameter almost-rhyme-penalty 0)
+(define-parameter bad-rhyme-penalty 0)
+(define-parameter bad-word-penalty 0)
+(define-parameter bad-extra-penalty 0)
+(define-parameter bad-syllable-penalty 0)
+(define-parameter bad-stanza-penalty 0)
+(define-parameter bad-lines-penalty 0)
 
 ;; -----------------------------------------------------------------------------
 
@@ -97,21 +113,25 @@
 ;; Reset all parameters, using new values from hash.
 ;; Warn if there are any unknown options in the hash.
 (define (parameterize-from-hash o* thunk)
+  ;; -- check for unknown keys
+  (for ([k (in-hash-keys o*)])
+    (unless (set-member? ALL-PARAMETERS k)
+      (printf "WARNING: unknown key '~a'\n" k)))
+  ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
-    [*online?*      (hash-ref o* 'online? *online?*)]
-    [*spellcheck?* (hash-ref o* 'spellcheck? *spellcheck?*)]
-    [*grammarcheck?* (hash-ref o* 'grammarcheck? *grammarcheck?*)]
-    [*suggest-rhyme?* (hash-ref o* 'suggest-rhyme? *suggest-rhyme?*)]
-    [*suggest-spelling?* (hash-ref o* 'suggest-spelling? *suggest-spelling?*)]
-    [*poetic-license* (hash-ref o* 'poetic-license *poetic-license*)]
-    [*almost-rhyme-penalty* (hash-ref o* 'almost-rhyme-penalty *almost-rhyme-penalty*)]
-    [*bad-rhyme-penalty* (hash-ref o* 'bad-rhyme-penalty *bad-rhyme-penalty*)]
-    [*bad-word-penalty* (hash-ref o* 'bad-word-penalty *bad-word-penalty*)]
-    [*bad-extra-penalty* (hash-ref o* 'bad-extra-penalty *bad-extra-penalty*)]
-    [*bad-syllable-penalty* (hash-ref o* 'bad-syllable-penalty *bad-syllable-penalty*)]
-    [*bad-stanza-penalty* (hash-ref o* 'bad-stanza-penalty *bad-stanza-penalty*)]
-    [*bad-lines-penalty* (hash-ref o* 'bad-lines-penalty *bad-lines-penalty*)])
-
+    [*online?*      (hash-ref o* online? *online?*)]
+    [*spellcheck?*  (hash-ref o* spellcheck? *spellcheck?*)]
+    [*grammarcheck?* (hash-ref o* grammarcheck? *grammarcheck?*)]
+    [*suggest-rhyme?* (hash-ref o* suggest-rhyme? *suggest-rhyme?*)]
+    [*suggest-spelling?* (hash-ref o* suggest-spelling? *suggest-spelling?*)]
+    [*poetic-license* (hash-ref o* poetic-license *poetic-license*)]
+    [*almost-rhyme-penalty* (hash-ref o* almost-rhyme-penalty *almost-rhyme-penalty*)]
+    [*bad-rhyme-penalty* (hash-ref o* bad-rhyme-penalty *bad-rhyme-penalty*)]
+    [*bad-word-penalty* (hash-ref o* bad-word-penalty *bad-word-penalty*)]
+    [*bad-extra-penalty* (hash-ref o* bad-extra-penalty *bad-extra-penalty*)]
+    [*bad-syllable-penalty* (hash-ref o* bad-syllable-penalty *bad-syllable-penalty*)]
+    [*bad-stanza-penalty* (hash-ref o* bad-stanza-penalty *bad-stanza-penalty*)]
+    [*bad-lines-penalty* (hash-ref o* bad-lines-penalty *bad-lines-penalty*)])
     (thunk)))
 
 ;; TODO move this somewhere more common?
