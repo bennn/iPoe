@@ -8,18 +8,10 @@
   ;; (-> Poem Either)
   ;; Search the poem for unknown, valid words
 
-  init-option*
-  ;; (-> Option*)
-  ;; Initialize a hash of run-time configuration data
-
   integer->word*
   ;; (-> Integer String)
   ;; Convert a number to an English word
   ;; Current limit is 999 trillion
-
-  option?
-  ;; (-> String Match)
-  ;; True if the first characters in the argument are '#:'
 
   parse-word
   ;; (-> String String)
@@ -70,10 +62,6 @@
               #:when (and (not (word-exists? word))
                           (scrape-word word)))
     word))
-
-;; TODO search dotfiles ~/.ipoe and .ipoe
-(define (init-option*)
-  (make-hasheq))
 
 ;; Serves as a map from small naturals to their string representations
 ;; (: digit1-cache (Vectorof String))
@@ -151,14 +139,6 @@
 ;; (: digit->word (-> Natural String))
 (define (digit->word n)
   (vector-ref digit1-cache n))
-
-;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
-;; Ignore any extra whitespace before/after "#:KEY" or "VAL"
-(define option-regexp #px"^[\\s]*#:([\\S]+)[\\s]+([\\S]+)[\\s]*$")
-
-;; (: option? (-> String Match))
-(define (option? str)
-  (regexp-match option-regexp str))
 
 ;; Convert a string to an "equivalent" string that might be in the database.
 ;; i.e., remove things like '?' and '!'.
@@ -249,23 +229,6 @@
         ["wait for the neverneverland" == '("neverneverland")]
         ["asoivnawetga vjifanspetaw" == '()]
       )))
-
-  ;; -- init-option*
-  (check-equal? (init-option*) (make-hasheq))
-  (check-true (hash-empty? (init-option*)))
-
-  ;; -- option?
-  (check-apply* option?
-   ["nope" == #f]
-   ["" == #f]
-   ["    \t   " == #f]
-   ["viet cong" == #f]
-   ["#w x" == #f]
-   ["a = b" == #f]
-   ;; --
-   ["#:key val" == (list "#:key val" "key" "val")]
-   ["   #:mr smith" == (list "   #:mr smith" "mr" "smith")]
-  )
 
   ;; -- string-last
   (check-apply* string-last
