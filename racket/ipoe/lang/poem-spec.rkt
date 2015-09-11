@@ -162,21 +162,22 @@
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
       (define configuring? (box #t))
-      (define option* (init-option*))
+      (define option* (options-init))
       ;; TODO process the file as a stream, do not build list of lines
       ;; TODO stop abusing that poor #:when clause
+      ;;      (it's abused for now because we need to keep the first non-configure line)
       (define line*
         (for/list ([raw-line (in-lines in)]
                    #:when (or (not (unbox configuring?))
                               ;; Try to read an option
                               (cond
                                [(string-empty? raw-line)
-                                ;; Ignore blank lines
+                                ;; Ignore blank lines while configuring
                                 #f]
                                [(option? raw-line)
-                                => (lambda (match)
+                                => (lambda (opt)
                                 ;; Got an option, add to param. hash
-                                (hash-set! option* (cadr match) (caddr match))
+                                (options-set option* opt)
                                 #f)]
                                [else
                                 ;; Non-blank, non-option => done configuring!
@@ -186,12 +187,12 @@
       (printf "Got options ~a\n" option*)
       ;; 2015-08-27: If we need punctuation some day, get it from line*
       (define stanza* (sequence->list (to-stanza* line*)))
-      (hash->parameterize option* (lambda ()
+      (parameterize-from-hash option* (lambda ()
         ;; -- Check for new words, optionally.
-        (when (online?)
+        (when (*online?*)
           (add-word* w* (check-new-words stanza*)))
         ;; -- Check spelling, optionally
-        (when (spellcheck?)
+        (when (*spellcheck?*)
           (check-spelling line*))
         ;; -- Check rhyme scheme
         (#,check-rhyme stanza*) ;; TODO poetic license option/param
