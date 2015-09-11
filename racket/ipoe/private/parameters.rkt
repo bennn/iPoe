@@ -33,6 +33,11 @@
 ;; Parameters
 ;; TODO get defaults from a .ipoe file
 
+;; TODO define-option macro?
+;; - provide
+;; - register smbol
+;; - make parameter, with default
+
 ;; -- general parameters
 (define *online?* (make-parameter #t))
 (define *spellcheck?* (make-parameter #t))
@@ -89,8 +94,25 @@
       (option-match (string->symbol (cadr m))
                     (read-val (caddr m)))))
 
-(define (parameterize-from-hash H thunk)
-  'TODO)
+;; Reset all parameters, using new values from hash.
+;; Warn if there are any unknown options in the hash.
+(define (parameterize-from-hash o* thunk)
+  (parameterize (
+    [*online?*      (hash-ref o* 'online? *online?*)]
+    [*spellcheck?* (hash-ref o* 'spellcheck? *spellcheck?*)]
+    [*grammarcheck?* (hash-ref o* 'grammarcheck? *grammarcheck?*)]
+    [*suggest-rhyme?* (hash-ref o* 'suggest-rhyme? *suggest-rhyme?*)]
+    [*suggest-spelling?* (hash-ref o* 'suggest-spelling? *suggest-spelling?*)]
+    [*poetic-license* (hash-ref o* 'poetic-license *poetic-license*)]
+    [*almost-rhyme-penalty* (hash-ref o* 'almost-rhyme-penalty *almost-rhyme-penalty*)]
+    [*bad-rhyme-penalty* (hash-ref o* 'bad-rhyme-penalty *bad-rhyme-penalty*)]
+    [*bad-word-penalty* (hash-ref o* 'bad-word-penalty *bad-word-penalty*)]
+    [*bad-extra-penalty* (hash-ref o* 'bad-extra-penalty *bad-extra-penalty*)]
+    [*bad-syllable-penalty* (hash-ref o* 'bad-syllable-penalty *bad-syllable-penalty*)]
+    [*bad-stanza-penalty* (hash-ref o* 'bad-stanza-penalty *bad-stanza-penalty*)]
+    [*bad-lines-penalty* (hash-ref o* 'bad-lines-penalty *bad-lines-penalty*)])
+
+    (thunk)))
 
 ;; TODO move this somewhere more common?
 ;; (: read-from-string (-> String Any))
@@ -135,5 +157,13 @@
    [" #:yes 411" == (option-match 'yes 411)]
   )
 
+  ;; -- parameterize-from-hash
+  ;(let ([opt TODO])
+  ;  ;; -- pre-test
+  ;  (parameterize-from-hash opt (lambda ()
+  ;    ;; -- mid-test
+  ;    ))
+  ;  ;; -- post-test
+  ;  )
 
 )
