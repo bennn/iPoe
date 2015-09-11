@@ -132,7 +132,7 @@
   (let* ([opt (options-init)]
          [o1 (option? "")]
          [o2 (option? "#:a b")]
-         [o3 (option? "#:offline? #f")])
+         [o3 (option? "#:online? #f")])
     (check-equal? (options-count opt) 0)
     (check-false (options-set opt o1))
     (check-equal? (options-count opt) 0)
@@ -141,7 +141,7 @@
     (check-equal? (options-get opt 'a) 'b)
     (check-true (options-set opt o3))
     (check-equal? (options-count opt) 2)
-    (check-equal? (options-get opt 'offline?) #f))
+    (check-equal? (options-get opt 'online?) #f))
 
   ;; -- option?
   (check-apply* option?
@@ -158,12 +158,25 @@
   )
 
   ;; -- parameterize-from-hash
-  ;(let ([opt TODO])
-  ;  ;; -- pre-test
-  ;  (parameterize-from-hash opt (lambda ()
-  ;    ;; -- mid-test
-  ;    ))
-  ;  ;; -- post-test
-  ;  )
+  (let ([opt (options-init)]
+        [o1  (option? "#:online? #f")]
+        [o2  (option? "  #:bad-lines-penalty -666")]
+        [o3  (option? "nothin")]
+        [o4  (option? "#:not real")])
+    (for ([o (in-list (list o1 o2 o3 o4))])
+      (options-set opt o))
+    ;; -- pre-test
+    (check-equal? (options-count opt) 3)
+    (check-true (*online?*))
+    (check-true (<= 0 (*bad-lines-penalty*)))
+    (parameterize-from-hash opt (lambda ()
+      ;; -- mid-test
+      (check-false (*online?*))
+      (check-true (negative? (*bad-lines-penalty*)))
+      ))
+    ;; -- post-test
+    (check-true (*online?*))
+    (check-true (<= 0 (*bad-lines-penalty*)))
+    )
 
 )
