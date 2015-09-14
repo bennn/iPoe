@@ -1,8 +1,6 @@
 #lang racket/base
 
-;; TODO
-
-;; -----------------------------------------------------------------------------
+;; Functions for checking rhyme schemes
 
 (provide
   check-rhyme-scheme
@@ -301,7 +299,7 @@
          ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
          ((L . *) (M . *)))]
     )
-  
+
     (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
       ['() '((A))]
       ['(("never" "land")) '()]

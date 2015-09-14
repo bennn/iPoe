@@ -15,23 +15,32 @@
   ;; -- Option parsing / binding
 
   almost-option?
-  ;; TODO
+  ;; (-> String Boolean)
+  ;; True if the line of text looks kind of like a configuration option.
+  ;; Used to raise a warning message.
 
   options-get
-  ;; TODO
+  ;; (-> OptionTbl Symbol Any)
+  ;; Return the value associated with the symbol key in the table.
 
   options-init
-  ;; (-> (HashTable Key Value))
-  ;; Initialize a hash of run-time configuration data
+  ;; (-> OptionTbl)
+  ;; Initialize a table of run-time configuration options
 
   options-set
-  ;; TODO
+  ;; (-> OptionTbl Symbol Any Boolean)
+  ;; Add the the (Symbol Any) pair to the OptionTbl
 
   option?
-  ;; (-> String option)
-  ;; True if the first characters in the argument are '#:'
+  ;; (->* [String] [#:TODO TODO] (U #f Option))
+  ;; If the string has the form "#:KEY VALUE" for any atoms `KEY` and `VALUE`,
+  ;; parse the values TODO
+  ;; On success, returns an option struct.
 
   parameterize-from-hash
+  ;; (-> OptionTbl (-> Any))
+  ;; Update all parameters defined in this file with data from the OptionTbl,
+  ;;  then execute the thunk in this updated context.
 )
 
 (require
@@ -43,7 +52,6 @@
 
 ;; =============================================================================
 ;; Parameters
-;; TODO get defaults from a .ipoe file
 
 (define ALL-PARAMETERS (mutable-set))
 
@@ -84,6 +92,12 @@
   val ;; String
 ) #:transparent)
 
+(define almost-option-regexp (regexp "#:"))
+
+;; (: almost-option? (-> String Boolean))
+(define (almost-option? line)
+  (regexp-match? almost-option-regexp line))
+
 ;; Add output from `option?` to a table created by `options-init`.
 ;; (: options-set (-> Option* Option Void))
 (define (options-set o* o)
@@ -91,6 +105,7 @@
        (hash-set! o* (option-match-key o) (option-match-val o))
        #t))
 
+;; Count the number of bindings in a table of options
 (define options-count hash-count)
 
 (define (options-get o* k)
@@ -100,12 +115,6 @@
 ;; TODO search dotfiles ~/.ipoe and .ipoe
 (define (options-init)
   (make-hasheq))
-
-(define almost-option-regexp (regexp "#:"))
-
-;; (: almost-option? (-> String Boolean))
-(define (almost-option? line)
-  (regexp-match? almost-option-regexp line))
 
 ;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
 ;; Ignore any extra whitespace before/after "#:KEY" or "VAL"
@@ -212,7 +221,6 @@
       ))
     ;; -- post-test
     (check-true (*online?*))
-    (check-true (<= 0 (*bad-lines-penalty*)))
-    )
+    (check-true (<= 0 (*bad-lines-penalty*))))
 
 )

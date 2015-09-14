@@ -3,11 +3,26 @@
 (provide
   (struct-out success)
   (struct-out failure)
+
   either?
+  ;; Either success or failure.
+
   ;; --
+
   assert-success
+  ;; (-> Any #:src Symbol Any)
+  ;; Unless the argument is a success struct, raise an exception
+
   either-monad
+  ;; #'(-> Syntax ... Any)
+  ;; Run a sequence of operations.
+  ;; If any is a `failure?`, return the failure value immediately.
+  ;; Raise an exception if an intermediate computation doesn't return an either?
+
   on-failure
+  ;; (-> Any (-> Any) Any)
+  ;; If the first argument is a `failure?`, call the second argument.
+  ;; Else return the first argument
 )
 
 (require

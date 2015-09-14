@@ -1,10 +1,12 @@
 #lang racket/base
 
+;; Find rhymes for a word
+
 (provide
   (struct-out rhyme-result)
 
   resolve-rhyme*
-  ;; (->* [String (U #f (Listof String)) (U #f (Listof String))] [#:offline? Boolean #:interactive? Boolean] (Listof String))
+  ;; (->* [String (U #f (Listof String)) (U #f (Listof String))] [#:offline? Boolean #:interactive? Boolean] Rhyme-Result)
   ;; Check for additional rhymes and almost rhymes for a word.
   ;; Optional argument `#:offline?` decides whether to search the internet.
   ;; Optional argument `#:interactive?` decides which new suggestions are saved.

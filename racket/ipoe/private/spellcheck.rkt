@@ -1,6 +1,6 @@
 #lang racket/base
 
-;; A very simple spellchecker
+;; A simple spellchecker
 
 (provide
   check-spelling

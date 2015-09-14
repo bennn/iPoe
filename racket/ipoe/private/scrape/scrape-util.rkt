@@ -1,5 +1,7 @@
 #lang racket/base
 
+;; Helper functions for scrapers
+
 (provide
   count-chars
   ;; (-> (U Char (-> Char Boolean)) String Natural)

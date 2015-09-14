@@ -1,5 +1,7 @@
 #lang racket/base
 
+;; Search the internet for data about a word
+
 (provide
   scrape-word
   ;; (-> String Boolean)
