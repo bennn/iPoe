@@ -1,6 +1,6 @@
 #lang racket/base
 
-;; 
+;; TODO
 
 ;; -----------------------------------------------------------------------------
 
@@ -8,6 +8,7 @@
   check-rhyme-scheme
   ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either)
   ;; Check that the input text matches the rhyme scheme
+  ;; Assumes DB context
 
   replace-wildcard-syllables
   ;; (-> RhymeScheme Natural RhymeScheme)
@@ -44,9 +45,8 @@
       (success 'type-check (void))
       (failure 'rhyme-scheme (format "Expected a RhymeScheme, got ~a" rs*)))
     (check-num-stanzas stanza* rs*)
-    ;; -- check rhyme
-    (with-ipoe-db (lambda ()
-      (check-stanza* '() stanza* rs* #:stanza-number 0)))))
+    ;; -- check rhyme (requires DB connection)
+    (check-stanza* '() stanza* rs* #:stanza-number 0)))
 
 ;; -----------------------------------------------------------------------------
 ;; -- dynamic typechecking predicates
@@ -281,45 +281,46 @@
   (require rackunit "rackunit-abbrevs.rkt")
 
   ;; -- check-rhyme-scheme
-  (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
-    ['() '()]
-    ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
-    ['(("anything")) '(((A . *)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
-    ['(("cat") ("rat") ("mat") ("sat")) '((1) (1) (1) (1))]
-    ['(("willful and raisin" "under the weather" "jet set go")
-       ("domino effect" "very motivation")
-       ("beside our goal" "the free bird" "gory category"))
-     '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
-    ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
-       ("in" "a" "land" "full" "of" "snow")
-       ("the" "end"))
-     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-       ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
-       ((L . *) (M . *)))]
-  )
-
-  (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
-    ['() '((A))]
-    ['(("never" "land")) '()]
-    ['(("never" "land")) '(())]
-    ['(("never" "land")) '(((X . *)))]
-    ['(("never" "land")) '(((A . *) (A . *)))]
-    ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
-    ['(("never" "land")) '((F U N))]
-    ['(("never" "land")) '(((A . *) (B . 2)))]
-    ['(("never" "land")) '((* 2))]
-    ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
-     '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
-    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
-       ("in" "a" "land" "full" "of" "snow")
-       ("the" "end"))
-     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-       ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
-       ((L . *) (M . *)))]
-  )
+  (with-ipoe-db #:commit? #f (lambda ()
+    (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
+      ['() '()]
+      ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
+      ['(("anything")) '(((A . *)))]
+      ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
+      ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+      ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
+      ['(("cat") ("rat") ("mat") ("sat")) '((1) (1) (1) (1))]
+      ['(("willful and raisin" "under the weather" "jet set go")
+         ("domino effect" "very motivation")
+         ("beside our goal" "the free bird" "gory category"))
+       '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
+      ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
+         ("in" "a" "land" "full" "of" "snow")
+         ("the" "end"))
+       '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
+         ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
+         ((L . *) (M . *)))]
+    )
+  
+    (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
+      ['() '((A))]
+      ['(("never" "land")) '()]
+      ['(("never" "land")) '(())]
+      ['(("never" "land")) '(((X . *)))]
+      ['(("never" "land")) '(((A . *) (A . *)))]
+      ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
+      ['(("never" "land")) '((F U N))]
+      ['(("never" "land")) '(((A . *) (B . 2)))]
+      ['(("never" "land")) '((* 2))]
+      ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
+       '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
+      ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
+         ("in" "a" "land" "full" "of" "snow")
+         ("the" "end"))
+       '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
+         ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
+         ((L . *) (M . *)))]
+    )))
 
   ;; ---------------------------------------------------------------------------
   ;; -- rhyme-scheme?
