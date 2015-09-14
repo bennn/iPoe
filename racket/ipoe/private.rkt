@@ -13,6 +13,10 @@
   ;; (-> Either #:src Symbol Any)
   ;; Raise an exception if the argument is not a `success?`
 
+  check-new-words
+  ;; (-> Poem Either)
+  ;; Search the poem for unknown, valid words
+
   check-rhyme-scheme
   ;; (-> (Sequenceof (Sequenceof String)) #:rhyme-scheme (Listof (Listof Symbol)) #:src Symbol Void)
   ;; Check the rhyme scheme of the stanzas.
@@ -22,19 +26,9 @@
   ;; (-> (Sequenceof String) Either)
   ;; Check spelling of words in the plain-text source of a file.
 
-  init-option*
-  ;; (-> KVStore)
-  ;; Initialize a set of key-value mappings;
-  ;; used to represent options/parameters
-
   on-failure
   ;; (-> Either (-> Failure Void) Void)
   ;; Call the thunk if the argument is not a `success?` struct
-
-  option?
-  ;; (-> String (U #f (List String String String)))
-  ;; Parses a keyword option "#:KEY VAL" from a string.
-  ;; Ignores extra spaces in the string.
 
   parse-word
   ;; (-> String String)
@@ -75,10 +69,10 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  "private/either.rkt"
-  "private/parse.rkt"
-  "private/rhymecheck.rkt"
-  "private/spellcheck.rkt"
-  "private/ui.rkt"
+  ipoe/private/either
+  ipoe/private/parse
+  ipoe/private/rhymecheck
+  ipoe/private/spellcheck
+  ipoe/private/ui
 )
 
