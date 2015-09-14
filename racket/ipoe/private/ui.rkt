@@ -8,7 +8,10 @@
   ;; Display a message to the user
 
   get-user-input
-  ;;
+  ;; (->* [(-> String A) #:prompt String] [#:descr (U #f String)] A)
+  ;; Run a simple interactive loop to get input from (current-input-port).
+  ;; The first argument is used to accept/reject input at each step.
+  ;; @optional{descr} Detailed information about what the user should enter 
 
   internal-error
   ;; (-> Symbol String Any)
@@ -49,19 +52,15 @@
     (display "> "))
   (show-prompt)
   (let loop ([response (read-line)])
-    (define result (valid? response))
-    (cond
-      [result
-       ;; Successfully parsed result, we're done
-       result]
-      [else
-       ;; Optimistically send a help message
-       (when (and desc-str (or (regexp-match "help" response)
-                               (regexp-match "\\?"    response)))
-         (alert desc-str))
-       ;; Re-show the prompt and loop
-       (show-prompt)
-       (loop (read-line))])))
+    (or (valid? response)
+        (begin
+         ;; Optimistically send a help message
+         (when (and desc-str (or (regexp-match "help" response)
+                                 (regexp-match "\\?"  response)))
+           (alert desc-str))
+         ;; Re-show the prompt and loop
+         (show-prompt)
+         (loop (read-line))))))
 
 (define (internal-error src str)
   (define err-loc (string->symbol (format "ipoe:~a:internal-error" src)))
