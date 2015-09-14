@@ -14,6 +14,9 @@
 
   ;; -- Option parsing / binding
 
+  almost-option?
+  ;; TODO
+
   options-get
   ;; TODO
 
@@ -96,6 +99,12 @@
 ;; TODO search dotfiles ~/.ipoe and .ipoe
 (define (options-init)
   (make-hasheq))
+
+(define almost-option-regexp (regexp "#:"))
+
+;; (: almost-option? (-> String Boolean))
+(define (almost-option? line)
+  (regexp-match? almost-option-regexp line))
 
 ;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
 ;; Ignore any extra whitespace before/after "#:KEY" or "VAL"
