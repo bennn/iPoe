@@ -222,7 +222,6 @@
     "rackunit-abbrevs.rkt")
 
   ;; -- check-new-words
-  ;;  TODO outcome depends on the words in this database & current scrapers
   (with-ipoe-db #:commit? #f
     (lambda ()
       (check-apply* (lambda (text) (check-new-words (sequence->list (to-stanza* (to-line* text)))))

@@ -1,5 +1,7 @@
 #lang racket/base
 
+;; For validating new words, rhymes, and syllables via the internet.
+
 (provide
   scrape-word
   resolve-rhyme*
