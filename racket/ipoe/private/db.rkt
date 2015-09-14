@@ -67,6 +67,8 @@
   db/postgresql
   racket/match
   racket/sequence
+  (only-in ipoe/private/ui
+    alert)
   (only-in ipoe/private/scrape
     resolve-syllables
     resolve-rhyme*
@@ -158,6 +160,8 @@
                   #:almost-rhymes [almost-rhyme-param '()]
                   #:interactive? [interactive? #f]
                   #:offline? [offline? #f])
+  (when interactive?
+    (alert (format "Adding new word '~a' to the database" word)))
   (cond
    [(word-exists? word #:db pgc)
     (duplicate-word-error (format "Cannot add word '~a', already in database" word))]
