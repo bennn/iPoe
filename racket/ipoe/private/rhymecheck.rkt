@@ -205,7 +205,7 @@
   (for/sum ([w (in-list (string->word* line))])
     (or (word->syllables w)
         (begin
-          (alert (format "Warning: could not determine syllables for word '~a'" w))
+          (alert (format "Could not determine syllables for word '~a'" w))
           0))))
 
 (define (replace-wildcard-syllables rs s)

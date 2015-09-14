@@ -38,7 +38,7 @@
                  #:when (not (word-exists? w)))
         (define suggestions (suggest-spelling w #:limit 7))
         (define suggest-str (if (null? suggestions) "" (format " Maybe you meant '~a'?" (car suggestions))))
-        (alert (format "Warning: mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
+        (alert (format "Mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
         (cons w suggestions))))
   (if (null? (car misspelled*))
       (success 'check-spelling #t)
