@@ -173,10 +173,11 @@
                                 #f)]
                                [else
                                 ;; Non-blank, non-option => done configuring!
+                                (when (#,almost-option? raw-line)
+                                  (#,alert (format "Treating line '~a' as part of the poem text." raw-line)))
                                 (set-box! configuring? #f)
                                 #t])))
           raw-line))
-      (printf "Got options ~a\n" option*)
       ;; 2015-08-27: If we need punctuation some day, get it from line*
       (define stanza* (sequence->list (to-stanza* line*)))
       (#,parameterize-from-hash option* (lambda ()
@@ -233,8 +234,6 @@
     rackunit
     (only-in racket/string string-split)
   )
-
-  ;(*interactive?* #f)
 
   ;; -- helper function, convert a syntactic function into a lambda
   (define (eval-extra-validator ps)
@@ -342,26 +341,31 @@
   ;; --- Testing options
   (let* ([free-validator (make-validator (poem-spec 'free '() #f #f))]
          [fake-options "#:one option\n   #:another option\n\n\n#:third  thing    \nsome text\n\nmore text\n#:not anoption\n"]
-         [real-options "#:online? #f\n#:interactive? #f\n#:spellcheck? #f\n#:poetic-license 9001\n\nThings are good these days.\n"])
+         [real-options "#:online? #f\n#:interactive? #f\n#:spellcheck? #f\n#:poetic-license 9001\n\nThings are good these days.\n"]
+         [runon-options "#:online? #t #:interactive? #f\n\nyoooolo\n"])
     (define (test-free str)
       (define port (open-input-string str))
       (define res (parameterize ([*interactive?* #f])
         (free-validator port)))
       (close-input-port port)
       res)
+    ;; --- Test for unknown / invalid options (they do nothing)
     (let ([fake-res (test-free fake-options)])
       (check-equal? (car fake-res)
                     '("some text" "" "more text" "#:not anoption"))
       (check-equal? (sort (hash->list (cdr fake-res)) symbol<? #:key car)
                     '((another . option) (one . option) (third . thing))))
+    ;; --- Test for known options (run-time config should change)
     (let ([real-res (test-free real-options)])
       (check-equal? (car real-res) '("Things are good these days."))
       (check-equal? (options-get (cdr real-res) 'online?) #f)
       (check-equal? (options-get (cdr real-res) 'interactive?) #f)
       (check-equal? (options-get (cdr real-res) 'spellcheck?) #f)
       (check-equal? (options-get (cdr real-res) 'poetic-license) 9001))
-    ;; -- TODO test options on one line
-    )
+    ;; -- Test options on one line
+    (let ([runon-res (test-free runon-options)])
+      (check-equal? (car runon-res) '("#:online? #t #:interactive? #f" "" "yoooolo"))
+      (check-equal? (cdr runon-res) (options-init))))
 
   ;; -- validator?
   (check-false (validator? '#f))
