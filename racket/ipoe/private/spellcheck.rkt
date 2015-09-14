@@ -6,6 +6,7 @@
   check-spelling
   ;; (-> (Sequenceof String) Either)
   ;; Check all words in a sequence of lines for spelling errors
+  ;; Assumes DB context.
 )
 
 ;; -----------------------------------------------------------------------------
@@ -28,18 +29,17 @@
 ;; (: check-spelling (-> (Sequenceof String) Void))
 (define (check-spelling line*)
   (define misspelled*
-    (with-ipoe-db (lambda ()
+    (for/list
+              ([line line*]
+               [line-num (in-naturals)])
       (for/list
-                ([line line*]
-                 [line-num (in-naturals)])
-        (for/list
-                  ([w (in-list (string->word* line))]
-                   [word-num (in-naturals)]
-                   #:when (not (word-exists? w)))
-          (define suggestions (suggest-spelling w #:limit 7))
-          (define suggest-str (if (null? suggestions) "" (format " Maybe you meant '~a'?" (car suggestions))))
-          (alert (format "Warning: mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
-          (cons w suggestions))))))
+                ([w (in-list (string->word* line))]
+                 [word-num (in-naturals)]
+                 #:when (not (word-exists? w)))
+        (define suggestions (suggest-spelling w #:limit 7))
+        (define suggest-str (if (null? suggestions) "" (format " Maybe you meant '~a'?" (car suggestions))))
+        (alert (format "Warning: mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
+        (cons w suggestions))))
   (if (null? (car misspelled*))
       (success 'check-spelling #t)
       (failure 'check-spelling (apply append misspelled*))))
@@ -50,19 +50,19 @@
   (require rackunit "rackunit-abbrevs.rkt")
 
   ;; -- check-spelling
-  (check-true* (lambda line* (success? (check-spelling line*)))
-    ["yes" "why"]
-    ["all" "these words are" "spelled correctly! I promise"]
-  )
+  (with-ipoe-db #:commit? #f (lambda ()
+    (check-true* (lambda line* (success? (check-spelling line*)))
+      ["yes" "why"]
+      ["all" "these words are" "spelled correctly! I promise"])
 
-  (let ([bad1 "asdvhuhewdv"]
-        [bad2 "uhnojfyondvwhbonvwf"]
-        [bad3 "hjvndkwcxs"]
-        [bad4 "xz"])
-    (check-apply* check-spelling
-      [(list bad1) == (failure 'check-spelling (list (list bad1)))]
-      [(list bad1 bad2 bad3) == (failure 'check-spelling (list (list bad1) (list bad2) (list bad3)))]
-      [(list bad4) == (failure 'check-spelling (list (list bad4 "be" "of" "to" "a" "in" "I" "it")))]
-    ))
+    (let ([bad1 "asdvhuhewdv"]
+          [bad2 "uhnojfyondvwhbonvwf"]
+          [bad3 "hjvndkwcxs"]
+          [bad4 "xz"])
+      (check-apply* check-spelling
+        [(list bad1) == (failure 'check-spelling (list (list bad1)))]
+        [(list bad1 bad2 bad3) == (failure 'check-spelling (list (list bad1) (list bad2) (list bad3)))]
+        [(list bad4) == (failure 'check-spelling (list (list bad4 "be" "of" "to" "a" "in" "I" "it")))]
+      ))))
 
 )
