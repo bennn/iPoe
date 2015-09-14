@@ -339,18 +339,29 @@
     (check-exn (regexp "ipoe")
                (lambda () (test-couplet fail-str))))
 
-  ;; --- an examples with options
+  ;; --- Testing options
   (let* ([free-validator (make-validator (poem-spec 'free '() #f #f))]
-         [str "#:one option\n   #:another option\n\n\n#:third  thing    \nsome text\n\nmore text\n#:not anoption\n"])
+         [fake-options "#:one option\n   #:another option\n\n\n#:third  thing    \nsome text\n\nmore text\n#:not anoption\n"]
+         [real-options "#:online? #f\n#:interactive? #f\n#:spellcheck? #f\n#:poetic-license 9001\n\nThings are good these days.\n"])
     (define (test-free str)
       (define port (open-input-string str))
       (define res (parameterize ([*interactive?* #f])
         (free-validator port)))
       (close-input-port port)
       res)
-    (define res (test-free str))
-    (check-equal? (car res) '("some text" "" "more text" "#:not anoption"))
-    (check-equal? (sort (hash->list (cdr res)) symbol<? #:key car) '((another . option) (one . option) (third . thing))))
+    (let ([fake-res (test-free fake-options)])
+      (check-equal? (car fake-res)
+                    '("some text" "" "more text" "#:not anoption"))
+      (check-equal? (sort (hash->list (cdr fake-res)) symbol<? #:key car)
+                    '((another . option) (one . option) (third . thing))))
+    (let ([real-res (test-free real-options)])
+      (check-equal? (car real-res) '("Things are good these days."))
+      (check-equal? (options-get (cdr real-res) 'online?) #f)
+      (check-equal? (options-get (cdr real-res) 'interactive?) #f)
+      (check-equal? (options-get (cdr real-res) 'spellcheck?) #f)
+      (check-equal? (options-get (cdr real-res) 'poetic-license) 9001))
+    ;; -- TODO test options on one line
+    )
 
   ;; -- validator?
   (check-false (validator? '#f))
