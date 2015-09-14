@@ -35,6 +35,7 @@
 )
 
 (require
+  ipoe/private/ui
   (only-in racket/set mutable-set set-member? set-add!)
   (only-in racket/port with-input-from-string)
   (for-syntax racket/base syntax/parse racket/syntax)
@@ -125,7 +126,7 @@
   ;; -- check for unknown keys
   (for ([k (in-hash-keys o*)])
     (unless (set-member? ALL-PARAMETERS k)
-      (printf "WARNING: unknown key '~a'\n" k)))
+      (alert (format "Unknown key '~a'\n" k))))
   ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
     [*interactive?* (hash-ref o* interactive? *interactive?*)]

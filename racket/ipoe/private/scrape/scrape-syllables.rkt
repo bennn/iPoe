@@ -47,7 +47,7 @@
                     #:prompt (format "Please enter the correct number of syllables for '~a'." word)
                     #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
    [else
-    (printf "WARNING: ~a claims word '~a' has ~a syllables (instead of the given ~a syllables).\n" src ref-syllables word syllables)
+    (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables).\n" src word ref-syllables syllables))
     syllables]))
 
 ;; Naively count syllables (doesn't require an internet connection)
