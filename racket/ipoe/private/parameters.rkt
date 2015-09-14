@@ -1,13 +1,6 @@
 #lang racket/base
 
-;; TODO 
-;; X move init-options* from parse
-;; X fuck, move anything else
-;; X make paraemters, so we can override them
-;; X implemented "from-hash"
-;; X warn on unknown params
-;; - default config in file
-;; - document
+;; Run-time parameters and their parsing and setting
 
 (provide
   ;; NOTE: every 'define-parameter' is provided
@@ -36,21 +29,27 @@
   ;; Add the the (Symbol Any) pair to the OptionTbl
 
   option?
-  ;; (->* [String] [#:TODO TODO] (U #f Option))
-  ;; If the string has the form "#:KEY VALUE" for any atoms `KEY` and `VALUE`,
-  ;; parse the values TODO
-  ;; On success, returns an option struct.
+  ;; (->* [String] [#:parse-value (-> String Any)] (U #f Option))
+  ;; If the string has the form "#:KEY VALUE" for any symbol `KEY`
+  ;;  and Racket value `VALUE`, create and return an option structure.
+  ;; @optional{parse-value} controls how Racket values are parsed
+  ;;  from the string `VALUE`.
 
   parameterize-from-hash
   ;; (-> OptionTbl (-> Any))
   ;; Update all parameters defined in this file with data from the OptionTbl,
   ;;  then execute the thunk in this updated context.
+
+  save-option
+  ;; (->* [Symbol Any] [#:location (U 'local 'global)] Boolean)
+  ;; Write the `#:Symbol Any` pair to a configuration file.
+  ;; By default, saves to the global config.
 )
 
 (require
+  ipoe/private/string
   ipoe/private/ui
   (only-in racket/set mutable-set set-member? set-add!)
-  (only-in racket/port with-input-from-string)
   (for-syntax racket/base syntax/parse racket/syntax)
 )
 
@@ -70,6 +69,8 @@
           (provide param-id)))]))
 
 ;; -- general parameters
+(define-parameter user #f)
+(define-parameter dbname #f)
 (define-parameter interactive? #t)
 (define-parameter online? #t)
 (define-parameter spellcheck? #t)
@@ -105,6 +106,15 @@
 (define (almost-option? line)
   (regexp-match? almost-option-regexp line))
 
+;; Generate the filenames for local & global configs
+;; (: get-config-filenames (-> (Values String String)))
+(define (get-config-filenames)
+  (define global-config
+    (string-append (path->string (find-system-path 'home-dir)) "/" IPOE-CONFIG))
+  (define local-config
+    (string-append "./" IPOE-CONFIG))
+  (values global-config local-config))
+
 ;; Add output from `option?` to a table created by `options-init`.
 ;; (: options-set (-> Option* Option Void))
 (define (options-set o* o)
@@ -133,8 +143,7 @@
 
 (define (options-init)
   (define o* (make-hasheq))
-  (define global-config (string-append (path->string (find-system-path 'home-dir)) "/" IPOE-CONFIG))
-  (define local-config  (string-append "./" IPOE-CONFIG))
+  (define-values [global-config local-config] (get-config-filenames))
   (when (file-exists? global-config)
     (options-set-from-file o* global-config))
   (when (file-exists? local-config)
@@ -163,6 +172,8 @@
       (alert (format "Unknown key '~a'\n" k))))
   ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
+    [*user*  (hash-ref o* user *user*)]
+    [*dbname*  (hash-ref o* dbname *dbname*)]
     [*interactive?* (hash-ref o* interactive? *interactive?*)]
     [*online?*      (hash-ref o* online? *online?*)]
     [*spellcheck?*  (hash-ref o* spellcheck? *spellcheck?*)]
@@ -179,34 +190,67 @@
     [*bad-lines-penalty* (hash-ref o* bad-lines-penalty *bad-lines-penalty*)])
     (thunk)))
 
-;; TODO move this somewhere more common?
-;; (: read-from-string (-> String Any))
-(define (read-from-string str)
-  (with-input-from-string str read))
+(define (save-option k v #:location [loc 'global])
+  (define-values [global-config local-config] (get-config-filenames))
+  (define fname
+    (case loc
+     [(global) global-config]
+     [(local)  local-config]
+     [else     (error 'parameters:save-option
+                      (format "Unknown config location '~e'" loc))]))
+  (with-output-to-file fname #:exists 'append
+    (lambda () (printf "#:~a ~s\n" k v))))
 
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require
+    rackunit
+    ipoe/private/rackunit-abbrevs
+    (only-in racket/list last)
+    (only-in racket/file file->lines))
 
   ;; -- options-init
-  (check-equal? (options-init) (make-hasheq))
-  (check-true (hash-empty? (options-init)))
+  (let ([o* (options-init)])
+    (define-values [g l] (get-config-filenames))
+    (cond
+     [(hash-empty? o*)
+      (check-false (file-exists? g))
+      (check-false (file-exists? l))
+      ;; -- create a dummy .ipoe file, to make sure init works
+      (parameterize ([current-directory (find-system-path 'temp-dir)])
+        (unless (file-exists? IPOE-CONFIG)
+          (with-output-to-file IPOE-CONFIG
+            (lambda () (displayln "#:test output"))))
+        (define ln* (file->lines IPOE-CONFIG))
+        (define o*+ (options-init))
+        (check-equal? (options-count o*+) (length ln*)))]
+     [else
+      ;; -- Number of default options should be at least the length of
+      ;;    each config file. (It's not the sum because duplicates don't
+      ;;    add to the count.)
+      (define (L fname)
+        (if (file-exists? fname) (length (file->lines fname)) 0))
+      (check-true (<= (L g) (options-count o*)))
+      (check-true (<= (L l) (options-count o*)))]))
 
   ;; -- options-set (options-count, options-get)
   (let* ([opt (options-init)]
          [o1 (option? "")]
          [o2 (option? "#:a b")]
-         [o3 (option? "#:online? #f")])
-    (check-equal? (options-count opt) 0)
+         ;; TODO o3 tests depend on what's in the user's config files.
+         ;;      if the option's already there, the number of values in the
+         ;;      hash won't increase
+         [o3 (option? "#:grammarcheck? #f")])
+    (define N (options-count opt))
     (check-false (options-set opt o1))
-    (check-equal? (options-count opt) 0)
+    (check-equal? (options-count opt) N)
     (check-true (options-set opt o2))
-    (check-equal? (options-count opt) 1)
+    (check-equal? (options-count opt) (+ 1 N))
     (check-equal? (options-get opt 'a) 'b)
     (check-true (options-set opt o3))
-    (check-equal? (options-count opt) 2)
-    (check-equal? (options-get opt 'online?) #f))
+    (check-equal? (options-count opt) (+ 2 N))
+    (check-equal? (options-get opt 'grammarcheck?) #f))
 
   ;; -- option?
   (check-apply* option?
@@ -247,5 +291,23 @@
     ;; -- post-test
     (check-true (*online?*))
     (check-true (<= 0 (*bad-lines-penalty*))))
+
+  ;; -- save-option (TODO tests local options only)
+  (parameterize ([current-directory (find-system-path 'temp-dir)])
+    ;; -- Get contents of old config file
+    (unless (file-exists? IPOE-CONFIG)
+      (with-output-to-file IPOE-CONFIG (lambda () (displayln ""))))
+    (define old-lines (file->lines IPOE-CONFIG))
+    ;; -- Write k/v pair to config file
+    (define key 'hello)
+    (define val 'world)
+    (save-option key val #:location 'local)
+    ;; -- Check new contents against the old
+    (define new-lines (file->lines IPOE-CONFIG))
+    (check-equal? (add1 (length old-lines)) (length new-lines))
+    (for ([o (in-list old-lines)] [n (in-list new-lines)])
+      (check-equal? o n))
+    (define opt (option? (last new-lines)))
+    (check-equal? opt (option-match key val)))
 
 )
