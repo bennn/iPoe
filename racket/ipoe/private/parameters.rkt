@@ -14,6 +14,10 @@
 
   ;; -- Option parsing / binding
 
+  IPOE-CONFIG
+  ;; Path-String
+  ;; Expected name of the local / global ipoe configuration file
+
   almost-option?
   ;; (-> String Boolean)
   ;; True if the line of text looks kind of like a configuration option.
@@ -92,6 +96,9 @@
   val ;; String
 ) #:transparent)
 
+;; Name of the config file
+(define IPOE-CONFIG ".ipoe")
+
 (define almost-option-regexp (regexp "#:"))
 
 ;; (: almost-option? (-> String Boolean))
@@ -105,6 +112,18 @@
        (hash-set! o* (option-match-key o) (option-match-val o))
        #t))
 
+;; Parse options from each line of a file
+;; Unless every line is a well-formed option, raise an exception
+;; (: options-set-from-file (-> OptionTbl Path-String Void))
+(define (options-set-from-file o* fname)
+  (with-input-from-file fname
+    (lambda ()
+      (for ([ln (in-lines)] [i (in-naturals)])
+        (define o (option? ln))
+        (unless o
+          (raise-user-error 'ipoe:config "Error reading configuration file '~a', syntax error on line ~a\n    '~a'" fname i ln))
+        (options-set o* o)))))
+
 ;; Count the number of bindings in a table of options
 (define options-count hash-count)
 
@@ -112,9 +131,15 @@
   (hash-ref o* k (lambda ()
                    (raise-user-error 'option-get (format "Unbound option ~e" k)))))
 
-;; TODO search dotfiles ~/.ipoe and .ipoe
 (define (options-init)
-  (make-hasheq))
+  (define o* (make-hasheq))
+  (define global-config (string-append (path->string (find-system-path 'home-dir)) "/" IPOE-CONFIG))
+  (define local-config  (string-append "./" IPOE-CONFIG))
+  (when (file-exists? global-config)
+    (options-set-from-file o* global-config))
+  (when (file-exists? local-config)
+    (options-set-from-file o* local-config))
+  o*)
 
 ;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
 ;; Ignore any extra whitespace before/after "#:KEY" or "VAL"
