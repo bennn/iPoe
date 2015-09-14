@@ -30,8 +30,10 @@
 
 (require
   ipoe/private
+  ipoe/private/parameters
   racket/match
   (only-in racket/sequence sequence->list)
+  (only-in ipoe/private/db add-word* with-ipoe-db)
 )
 
 ;; =============================================================================
@@ -145,16 +147,6 @@
   (define rs (poem-spec-rhyme-scheme ps))
   (define descr (poem-spec-description ps))
   (define ev (poem-spec-extra-validator ps))
-  ;; (: check-rhyme #'(-> Poem Void))
-  (define check-rhyme
-    ;; If rhyme scheme is empty, do not check
-    ;; (Special case for "free verse")
-    (if (null? rs)
-        #'(lambda (stanza*)
-            (void))
-        #`(lambda (stanza*)
-            (assert-success #:src '#,name
-              (check-rhyme-scheme stanza* #:rhyme-scheme '#,rs)))))
   ;; (: check-extra #'(-> Poem Void))
   (define check-extra
     (or (poem-spec-extra-validator ps)
@@ -162,7 +154,7 @@
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
       (define configuring? (box #t))
-      (define option* (options-init))
+      (define option* (#,options-init))
       ;; TODO process the file as a stream, do not build list of lines
       ;; TODO stop abusing that poor #:when clause
       ;;      (it's abused for now because we need to keep the first non-configure line)
@@ -174,10 +166,10 @@
                                [(string-empty? raw-line)
                                 ;; Ignore blank lines while configuring
                                 #f]
-                               [(option? raw-line)
+                               [(#,option? raw-line)
                                 => (lambda (opt)
                                 ;; Got an option, add to param. hash
-                                (options-set option* opt)
+                                (#,options-set option* opt)
                                 #f)]
                                [else
                                 ;; Non-blank, non-option => done configuring!
@@ -187,25 +179,31 @@
       (printf "Got options ~a\n" option*)
       ;; 2015-08-27: If we need punctuation some day, get it from line*
       (define stanza* (sequence->list (to-stanza* line*)))
-      (parameterize-from-hash option* (lambda ()
-        ;; -- Check for new words, optionally.
-        (when (*online?*)
-          (add-word* w* (check-new-words stanza*)))
-        ;; -- Check spelling, optionally
-        (when (*spellcheck?*)
-          (check-spelling line*))
-        ;; -- Check rhyme scheme
-        (#,check-rhyme stanza*) ;; TODO poetic license option/param
-        ;; -- Check extra validator
-        (define extra? (#,check-extra stanza*))
-        (cond
-         [(not extra?)
-          (define d-str (if #,descr (string-append "\n  " #,descr) ""))
-          (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str))]
-         [(failure? extra?)
-          (user-error '#,name (failure-reason extra?))])
-        ;; -- Done! Return anything needed to make testing easy
-        (cons line* option*)))))
+      (#,parameterize-from-hash option* (lambda ()
+        (#,with-ipoe-db (lambda ()
+          ;; -- Check for new words, optionally.
+          (when (#,*online?*)
+            (#,add-word* (#,check-new-words stanza*)
+                         #:interactive? (#,*interactive?*)))
+          ;; -- Check spelling, optionally (and someday, check grammar)
+          (when (#,*spellcheck?*)
+            (#,check-spelling line*))
+          ;; -- Check rhyme scheme
+          (let ([rs '#,rs])
+            (when (not (null? rs))
+              (#,assert-success #:src '#,name
+                (#,check-rhyme-scheme stanza* #:rhyme-scheme rs))))
+          ;(#,check-rhyme stanza*) ;; TODO poetic license option/param
+          ;; -- Check extra validator
+          (define extra? (#,check-extra stanza*))
+          (cond
+           [(not extra?)
+            (define d-str (if #,descr (string-append "\n  " #,descr) ""))
+            (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str))]
+           [(failure? extra?)
+            (user-error '#,name (failure-reason extra?))])
+          ;; -- Done! Return anything needed to make testing easy
+          (cons line* option*)))))))
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
@@ -235,6 +233,8 @@
     rackunit
     (only-in racket/string string-split)
   )
+
+  ;(*interactive?* #f)
 
   ;; -- helper function, convert a syntactic function into a lambda
   (define (eval-extra-validator ps)
@@ -325,28 +325,32 @@
   (define-syntax-rule (make-validator spec)
     (parameterize ([current-namespace (make-base-namespace)])
       (eval #`(begin #,validator-requires #,(poem-spec->validator spec)) (current-namespace))))
+
   (let* ([couplet-validator (make-validator (poem-spec 'couplet '((A A)) #f #f))]
          [pass-str "I was born\nhouse was worn\n"]
          [fail-str "roses are red\nviolets are blue\n"])
     (define (test-couplet str)
       (define port (open-input-string str))
-      (define res (couplet-validator port))
+      (define res (parameterize ([*interactive?* #f])
+        (couplet-validator port)))
       (close-input-port port)
       res)
     (check-equal? (car (test-couplet pass-str)) (string-split pass-str "\n"))
     (check-exn (regexp "ipoe")
                (lambda () (test-couplet fail-str))))
+
   ;; --- an examples with options
   (let* ([free-validator (make-validator (poem-spec 'free '() #f #f))]
          [str "#:one option\n   #:another option\n\n\n#:third  thing    \nsome text\n\nmore text\n#:not anoption\n"])
     (define (test-free str)
       (define port (open-input-string str))
-      (define res (free-validator port))
+      (define res (parameterize ([*interactive?* #f])
+        (free-validator port)))
       (close-input-port port)
       res)
     (define res (test-free str))
     (check-equal? (car res) '("some text" "" "more text" "#:not anoption"))
-    (check-equal? (sort (hash->list (cdr res)) string<? #:key car) '(("another" . "option") ("one" . "option") ("third" . "thing"))))
+    (check-equal? (sort (hash->list (cdr res)) symbol<? #:key car) '((another . option) (one . option) (third . thing))))
 
   ;; -- validator?
   (check-false (validator? '#f))
