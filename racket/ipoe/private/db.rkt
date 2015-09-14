@@ -220,6 +220,7 @@
 
 ;; (: find-word (->* [PGC (U String Integer)] [#:column (U 'id 'word 'num_syllables #f)] (U #f (Vector Integer String Integer))))
 (define (find-word word-property #:db [pgc (current-ipoe-db)] #:column [col-param #f])
+  (assert-pgc pgc #:src 'find-word)
   (case (or (validate-word-column col-param) (infer-word-column word-property))
     [(id)
      (query-maybe-row pgc "SELECT * FROM word WHERE word.id=$1" word-property)]
@@ -234,6 +235,7 @@
 ;; If one parameter is present, returns a sequence of matches.
 ;; (: find-r (-> PGC (U Natural #f) (U Natural #f) #:table (U 'rhyme 'almost_rhyme) (U (Vector Integer Integer) (Sequenceof (Values Integer Integer)))))
 (define (find-r [wid #f] [rid #f] #:db [pgc (current-ipoe-db)] #:table loc)
+  (assert-pgc pgc #:src 'find-rhyme)
   (assert-rhyme-table? loc #:src 'find-rhyme)
   (cond
    [(and wid rid)
@@ -307,6 +309,11 @@
 (define (rhyme-table? sym)
   (or (eq? sym 'rhyme)
       (eq? sym 'almost_rhyme)))
+
+(define (assert-pgc pgc #:src loc)
+  (unless (connection? pgc)
+    (error (string->symbol (format "ipoe:db:~a" loc))
+           (format "Expected a database connection, got '~e'" pgc))))
 
 (define (assert-rhyme-table? sym #:src loc)
   (unless (rhyme-table? sym)
@@ -423,6 +430,10 @@
       ["sweet" == '#(653512 "sweet" 1)]
       ["blimp" == '#(526807 "blimp" 1)]
       ["anonymous" == '#(517406 "anonymous" 4)]))
+
+  ;; --- without a DB, should get a "useful" error message
+  (check-exn (regexp "ipoe:db:find-word")
+             (lambda () (find-word "yolo")))
 
   ;; -- syllables->word*
   (define-syntax-rule (check-syllables->word* [syllables word-expected*] ...)
