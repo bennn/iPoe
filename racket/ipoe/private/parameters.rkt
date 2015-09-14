@@ -14,6 +14,9 @@
 
   ;; -- Option parsing / binding
 
+  options-get
+  ;; TODO
+
   options-init
   ;; (-> (HashTable Key Value))
   ;; Initialize a hash of run-time configuration data
@@ -51,11 +54,12 @@
           (provide param-id)))]))
 
 ;; -- general parameters
+(define-parameter interactive? #t)
 (define-parameter online? #t)
 (define-parameter spellcheck? #t)
-(define-parameter grammarcheck? #t)
-(define-parameter suggest-rhyme? #t)
-(define-parameter suggest-spelling? #t)
+(define-parameter grammarcheck? #t) ;;bg; How should this work?
+(define-parameter suggest-rhyme? #t) ;; unused
+(define-parameter suggest-spelling? #t) ;; unused
 
 ;; -- poetic license / demerits
 (define-parameter poetic-license 0)
@@ -115,6 +119,7 @@
       (printf "WARNING: unknown key '~a'\n" k)))
   ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
+    [*interactive?* (hash-ref o* interactive? *interactive?*)]
     [*online?*      (hash-ref o* online? *online?*)]
     [*spellcheck?*  (hash-ref o* spellcheck? *spellcheck?*)]
     [*grammarcheck?* (hash-ref o* grammarcheck? *grammarcheck?*)]
