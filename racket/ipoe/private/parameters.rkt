@@ -36,7 +36,7 @@
   ;;  from the string `VALUE`.
 
   parameterize-from-hash
-  ;; (-> OptionTbl (-> Any))
+  ;; (-> OptionTbl (-> Any) Any)
   ;; Update all parameters defined in this file with data from the OptionTbl,
   ;;  then execute the thunk in this updated context.
 

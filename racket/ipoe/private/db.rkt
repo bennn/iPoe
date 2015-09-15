@@ -28,6 +28,10 @@
   ;; (->* [natural/c] [#:db connection?] string?)
   ;; Convert a primary key to its matching word string.
 
+  ipoe-db-connected?
+  ;; (-> Boolean)
+  ;; True if currently connected to a database
+
   rhymes-with?
   ;; (->* [string? string?] [#:db connection?] boolean?)
   ;; Calling `(rhymes-with? w r)` returns true if `w` rhymes with `r`.
@@ -67,51 +71,103 @@
   db/postgresql
   racket/match
   racket/sequence
+  ipoe/private/parameters
   (only-in ipoe/private/ui
-    alert)
+    alert get-user-input read-yes-or-no)
   (only-in ipoe/private/scrape
+    almost-rhymes?
     resolve-syllables
     resolve-rhyme*
     rhyme-result-rhyme*
-    rhyme-result-almost-rhyme*)
+    rhyme-result-almost-rhyme*
+    rhymes?
+    scrape-rhyme
+    scrape-word)
+  (only-in ipoe/private/string
+    string-empty?)
 )
 
 ;; =============================================================================
 
-;; TODO these constants should be in an external config file
-(define DB-USER "ben")
-(define DB-NAME "ipoe")
 ;;(define DB-LOG  "./ipoe.log")
 
-(define current-ipoe-db  (make-parameter #f))
-;;(define current-ipoe-log (make-parameter #f))
+(define *connection*  (make-parameter #f))
+;;(define *logfile* (make-parameter #f))
+
+(define DBNAME-PROMPT "Enter the name of your local ipoe database.")
+(define DBNAME-DESCRIPTION
+  (string-append "Missing run-time parameter for ipoe database name." " "
+                 "Please enter the database name."))
+
+;; Special value for *connection*, says that we're not using a database
+;;  but rather querying the internet for everything.
+(define ONLINE 'online-only)
+
+;; TODO make a hash and cache all word & rhyme results
+
+(define USER-PROMPT "Enter your database username")
+(define USER-DESCRIPTION
+  (string-append "Missing run-time parameter for database username." " "
+                 "Please enter a username to connect to the ipoe database."))
 
 ;; -----------------------------------------------------------------------------
 
 ;; Open a database connection & set parameters
-(define (db-init)
-  ;;(current-ipoe-log (open-output-file DB-LOG #:exists? 'error))
-  (current-ipoe-db  (postgresql-connect #:user DB-USER #:database DB-NAME))
-  (start-transaction (current-ipoe-db))
-  (current-ipoe-db))
+(define (db-init #:user [u-param #f]
+                 #:dbname [db-param #f]
+                 #:interactive? [interactive? #f])
+  ;; -- Resolve username and dbname
+  (define u (or u-param
+                (and interactive?
+                     (get-user-input string?
+                                     #:prompt USER-PROMPT
+                                     #:description USER-DESCRIPTION))))
+  (define db (or db-param
+                 (and interactive?
+                      (get-user-input string?
+                                      #:prompt DBNAME-PROMPT
+                                      #:description DBNAME-DESCRIPTION))))
+  (cond
+   [(and u db (not (or (string-empty? u) (string-empty? db))))
+    ;; -- Have all parameters, try connecting to the database
+    (*connection* (postgresql-connect #:user u #:database db))
+    ;;(current-ipoe-log (open-output-file DB-LOG #:exists? 'error))
+    (start-transaction (*connection*))
+    ;; -- Ask whether to save current user & db for future sessions
+    (when (or (not u-param) (not db-param))
+      (case (get-user-input read-yes-or-no
+                            #:prompt "Save current database preferences? (Y/N)")
+       [(Y)
+        ;; Write the previously unset values to the global config
+        (when (not  u-param)  (save-option 'user u))
+        (when (not db-param)  (save-option 'dbname db))]
+       [(N) (void)]))]
+   [else
+    (when interactive?
+      (alert "Starting ipoe without a database connection (in online-only mode)"))
+    (*connection* ONLINE)])
+  ;; -- Return the new connection
+  (*connection*))
 
 ;; Close a database connection & unset parameters
-(define (db-close #:db [pgc (current-ipoe-db)]
+(define (db-close #:db [pgc (*connection*)]
                   #:commit? [commit? #t])
   ;;(close-output-port (current-ipoe-log))
-  (if commit?
-    (begin (commit-transaction pgc)
-           #;(logfile->sql DB-LOG))
-    (begin (rollback-transaction pgc)
-           #;(delete-file DB-LOG)))
-  (disconnect pgc)
-  (current-ipoe-db  #f)
-  ;;(current-ipoe-log #f)
-  (void))
+  (when (connection? pgc)
+    (if commit?
+      (commit-transaction pgc)
+      (rollback-transaction pgc))
+    (disconnect pgc)
+    (*connection* #f)
+    ;;(current-ipoe-log #f)
+    (void)))
 
-(define (with-ipoe-db thunk #:commit? [commit? #t])
+(define (with-ipoe-db thunk #:user [u #f]
+                            #:dbname [db #f]
+                            #:commit? [commit? #t]
+                            #:interactive? [i #f])
   ;; Open a database connection
-  (let* ([pgc (db-init)])
+  (let* ([pgc (db-init #:user u #:dbname db #:interactive? i)])
     (call-with-exception-handler
       ;; On error, close the DB connection
       (lambda (exn)
@@ -148,13 +204,14 @@
 (define-syntax-rule (table-error sym loc)
   (db-error sym "Cannot infer table from symbol '~a'" loc))
 
+(define-syntax-rule (query-error loc query)
+  (db-error loc "Cannot search for ~a, currently disconnected from database and internet." query))
+
 ;; -----------------------------------------------------------------------------
-;; 2015-08-05... should these all return booleans, or make an Either type?
-;; 2015-08-10 definitiely an Either type
 
 ;; Add a new word to the database
 (define (add-word word
-                  #:db [pgc (current-ipoe-db)]
+                  #:db [pgc (*connection*)]
                   #:syllables [syllables-param #f]
                   #:rhymes [rhyme-param '()]
                   #:almost-rhymes [almost-rhyme-param '()]
@@ -163,6 +220,14 @@
   (when interactive?
     (alert (format "Adding new word '~a' to the database" word)))
   (cond
+   [(online-mode? pgc)
+    (when interactive?
+      (alert (format "Cannot add word '~a', currently in online-only mode")))
+    #f]
+   [(not (connection? pgc))
+    (when interactive?
+      (alert (format "Cannot add word '~a', not connected to a database.")))
+    #f]
    [(word-exists? word #:db pgc)
     (duplicate-word-error (format "Cannot add word '~a', already in database" word))]
    [else
@@ -174,44 +239,48 @@
     (add-word/unsafe word syllables rhyme* almost-rhyme* #:db pgc)]))
 
 (define (add-word* word*
-                   #:db [pgc (current-ipoe-db)]
+                   #:db [pgc (*connection*)]
                    #:interactive? [interactive? #f]
                    #:offline? [offline? #f])
   (for ([w (in-list word*)])
     (add-word w #:db pgc #:interactive? interactive? #:offline? offline?)))
 
-(define (add-rhyme word r #:db [pgc (current-ipoe-db)])
+;; Add one new rhyme for a word
+(define (add-rhyme word r #:db [pgc (*connection*)])
   (add-rhyme* word (list r) #:db pgc))
 
-(define (add-rhyme* word r* #:db [pgc (current-ipoe-db)])
+;; Add multiple new rhymes for a word
+(define (add-rhyme* word r* #:db [pgc (*connection*)])
   (define wid (or (word->id word #:db pgc)
                   (db-error "Cannot add rhyme for unknown word '~a'" word)))
   (add-rhyme*/unsafe wid r* #:db pgc))
 
-(define (add-almost-rhyme word a #:db [pgc (current-ipoe-db)])
+(define (add-almost-rhyme word a #:db [pgc (*connection*)])
   (add-almost-rhyme* word (list a) #:db pgc))
 
-(define (add-almost-rhyme* word a* #:db [pgc (current-ipoe-db)])
+(define (add-almost-rhyme* word a* #:db [pgc (*connection*)])
   (define wid (or (word->id word #:db pgc)
                   (db-error "Cannot add almost-rhyme for unknown word '~a'" word)))
   (add-almost-rhyme*/unsafe wid a* #:db pgc))
 
-(define (add-word/unsafe word syllables rhyme* almost-rhyme* #:db [pgc (current-ipoe-db)])
+(define (add-word/unsafe word syllables rhyme* almost-rhyme* #:db [pgc (*connection*)])
   (query-exec pgc "INSERT INTO word (word, num_syllables) VALUES ($1, $2);" word syllables)
   (define wid (word->id word #:db pgc))
   (unless wid (db-error 'add-word "Cannot find ID for newly-added word '~a'" word))
   (add-rhyme*/unsafe wid rhyme* #:db pgc)
   (add-almost-rhyme*/unsafe wid almost-rhyme* #:db pgc))
 
-(define (add-rhyme*/unsafe wid rhyme* #:db [pgc (current-ipoe-db)])
+(define (add-rhyme*/unsafe wid rhyme* #:db [pgc (*connection*)])
   (add-r*/unsafe wid rhyme* #:db pgc #:table 'rhyme))
 
-(define (add-almost-rhyme*/unsafe wid almost-rhyme* #:db [pgc (current-ipoe-db)])
+(define (add-almost-rhyme*/unsafe wid almost-rhyme* #:db [pgc (*connection*)])
   (add-r*/unsafe wid almost-rhyme* #:db pgc #:table 'almost_rhyme))
 
 ;; Abstraction for adding rhymes or almost-rhymes
-(define (add-r*/unsafe wid r* #:db [pgc (current-ipoe-db)] #:table loc)
-  ;; It'd be better to build one large insert statement, but I'm not sure how to format.
+(define (add-r*/unsafe wid r* #:db [pgc (*connection*)] #:table loc)
+  ;; It's maybe better to build one large insert statement,
+  ;;  but I'm not sure how to format that for racket/db
+  ;; (At least, this way should give better errors & commit partial successes)
   (assert-rhyme-table? loc #:src 'add-rhyme)
   (define query-str
     (format "INSERT INTO word_~as (word, ~a) VALUES ($1, $2);" loc loc))
@@ -223,8 +292,8 @@
       (db-warning loc "Could not find ID for word '~a'" r)])))
 
 ;; (: find-word (->* [PGC (U String Integer)] [#:column (U 'id 'word 'num_syllables #f)] (U #f (Vector Integer String Integer))))
-(define (find-word word-property #:db [pgc (current-ipoe-db)] #:column [col-param #f])
-  (assert-pgc pgc #:src 'find-word)
+(define (find-word word-property #:db [pgc (*connection*)] #:column [col-param #f])
+  (assert-connected pgc #:src 'find-word)
   (case (or (validate-word-column col-param) (infer-word-column word-property))
     [(id)
      (query-maybe-row pgc "SELECT * FROM word WHERE word.id=$1" word-property)]
@@ -238,8 +307,8 @@
 ;; If both parameters are present, returns a row vector.
 ;; If one parameter is present, returns a sequence of matches.
 ;; (: find-r (-> PGC (U Natural #f) (U Natural #f) #:table (U 'rhyme 'almost_rhyme) (U (Vector Integer Integer) (Sequenceof (Values Integer Integer)))))
-(define (find-r [wid #f] [rid #f] #:db [pgc (current-ipoe-db)] #:table loc)
-  (assert-pgc pgc #:src 'find-rhyme)
+(define (find-r [wid #f] [rid #f] #:db [pgc (*connection*)] #:table loc)
+  (assert-connected pgc #:src 'find-rhyme)
   (assert-rhyme-table? loc #:src 'find-rhyme)
   (cond
    [(and wid rid)
@@ -257,20 +326,21 @@
    [else
     (db-error 'find-rhyme "Cannot execute find with two #f arguments. Need to supply word id or rhyme id.")]))
 
-(define (id->word wid #:db [pgc (current-ipoe-db)])
+(define (id->word wid #:db [pgc (*connection*)])
   (match (find-word wid #:db pgc #:column 'id)
     [#f #f]
     [(vector id word syllables) word]))
 
-(define (syllables->word* num-syllables #:db [pgc (current-ipoe-db)])
+(define (syllables->word* num-syllables #:db [pgc (*connection*)])
+  (assert-connected pgc #:src 'syllables->word*)
   (in-query pgc "SELECT word FROM word WHERE word.num_syllables=$1" num-syllables))
 
-(define (word->id word #:db [pgc (current-ipoe-db)])
+(define (word->id word #:db [pgc (*connection*)])
   (match (find-word word #:column 'word #:db pgc)
     [#f #f]
     [(vector id word syllables) id]))
 
-(define (word->almost-rhyme* word #:db [pgc (current-ipoe-db)])
+(define (word->almost-rhyme* word #:db [pgc (*connection*)])
   (word->r* word #:db pgc #:table 'almost_rhyme))
 
 (define (word->r* word #:db pgc #:table loc)
@@ -279,28 +349,47 @@
   (define rid* (find-r wid #:db pgc #:table loc))
   (sequence-map (lambda (wid rid) (id->word rid #:db pgc)) rid*))
 
-(define (word->rhyme* word #:db [pgc (current-ipoe-db)])
+(define (word->rhyme* word #:db [pgc (*connection*)])
   (word->r* word #:db pgc #:table 'rhyme))
 
-(define (word->syllables word #:db [pgc (current-ipoe-db)])
+(define (word->syllables word #:db [pgc (*connection*)])
   (match (find-word word #:db pgc #:column 'word)
     [#f #f]
     [(vector id word syllables) syllables]))
 
 ;; -----------------------------------------------------------------------------
 ;; --- queries
+;;     These are permitted in online mode
 
 ;; True if `word` is already in the database
-(define (word-exists? word #:db [pgc (current-ipoe-db)])
-  (and (find-word word #:column 'word #:db pgc) #t))
+(define (word-exists? word #:db [pgc (*connection*)])
+  (cond
+   [(connection? pgc)
+    (and (find-word word #:column 'word #:db pgc) #t)]
+   [(online-mode? pgc)
+    (and (scrape-word word) #t)]
+   [else
+    (query-error 'word-exists? (format "word '~a'" word))]))
 
-(define (almost-rhymes-with? w r #:db [pgc (current-ipoe-db)])
-  (r-with? w r #:db pgc #:table 'almost_rhyme))
+(define (almost-rhymes-with? w r #:db [pgc (*connection*)])
+  (cond
+   [(connection? pgc)
+    (r-with? w r #:db pgc #:table 'almost_rhyme)]
+   [(online-mode? pgc)
+    (almost-rhymes? (scrape-rhyme w) r)]
+   [else
+    (query-error 'almost-rhymes-with? (format "rhymes of '~a'" w))]))
 
-(define (rhymes-with? w r #:db [pgc (current-ipoe-db)])
-  (r-with? w r #:db pgc #:table 'rhyme))
+(define (rhymes-with? w r #:db [pgc (*connection*)])
+  (cond
+   [(connection? pgc)
+    (r-with? w r #:db pgc #:table 'rhyme)]
+   [(online-mode? pgc)
+    (rhymes? (scrape-rhyme w) r)]
+   [else
+    (query-error 'rhymes-with? (format "rhymes of '~a'" w))]))
 
-(define (r-with? w r #:db [pgc (current-ipoe-db)] #:table loc)
+(define (r-with? w r #:db [pgc (*connection*)] #:table loc)
   (define wid (word->id w #:db pgc))
   (unless wid (db-error 'r-with "Cannot check ~a-with? for word '~a'" loc w))
   (define rid (word->id r #:db pgc))
@@ -314,7 +403,7 @@
   (or (eq? sym 'rhyme)
       (eq? sym 'almost_rhyme)))
 
-(define (assert-pgc pgc #:src loc)
+(define (assert-connected pgc #:src loc)
   (unless (connection? pgc)
     (error (string->symbol (format "ipoe:db:~a" loc))
            (format "Expected a database connection, got '~e'" pgc))))
@@ -322,6 +411,9 @@
 (define (assert-rhyme-table? sym #:src loc)
   (unless (rhyme-table? sym)
     (table-error loc sym)))
+
+(define (ipoe-db-connected?)
+  (connection? (*connection*)))
 
 (define (infer-word-column param)
   (cond
@@ -336,6 +428,9 @@
     'id]
    [else
     (db-error 'infer-word-column "Cannot infer column in word database from parameter '~a'" param)]))
+
+(define (online-mode? pgc)
+  (eq? pgc ONLINE))
 
 (define (validate-word-column col)
   (cond
@@ -423,8 +518,23 @@
 (module+ test
   (require rackunit racket/sequence "rackunit-abbrevs.rkt")
 
+  (define o*
+    (if (file-exists? IPOE-CONFIG)
+        (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
+        (options-init)))
+
   (define-syntax-rule (with-db-test e)
-    (with-ipoe-db (lambda () e) #:commit? #f))
+    (parameterize-from-hash o* (lambda ()
+      (with-ipoe-db #:commit? #f
+                    #:interactive? #f
+                    #:user (*user*)
+                    #:dbname (*dbname*)
+        (lambda () e)))))
+
+;  ;; -- TODO test init prompt for username
+;  ;; -- TODO test init prompt for dbname
+;  ;; -- TODO test init, save preferences
+;  ;; -- TODO test online-only queries
 
   ;; -- find-word
   (with-db-test
@@ -438,6 +548,10 @@
   ;; --- without a DB, should get a "useful" error message
   (check-exn (regexp "ipoe:db:find-word")
              (lambda () (find-word "yolo")))
+  ;; --- online-mode
+  (check-exn (regexp "ipoe:db:find-word")
+             (lambda ()
+               (with-ipoe-db #:commit? #f (lambda () (find-word "apple")))))
 
   ;; -- syllables->word*
   (define-syntax-rule (check-syllables->word* [syllables word-expected*] ...)
@@ -453,6 +567,11 @@
           "electroencephalographically" "overindividualistically")]
     [9  '("antimilitaristically")])
 
+   (check-exn (regexp "ipoe:db:syllables->word*")
+     (lambda () (syllables->word* 3)))
+   (check-exn (regexp "ipoe:db:syllables->word*")
+     (lambda () (with-ipoe-db #:commit? #f (lambda () (syllables->word* 3)))))
+
   ;; -- id->word
   (define-syntax-rule (check-id-word-bijection [w ...])
     ;; Spot-check id->word = word->id
@@ -460,6 +579,13 @@
       (begin (check-equal? (id->word (word->id w)) w) ...)))
   (check-id-word-bijection
    ["yes" "under" "africa" "polymorphism" "a" "heating"])
+
+  ;; -- ipoe-db-connected?
+  (check-false (ipoe-db-connected?))
+  (with-ipoe-db #:commit? #f
+    (lambda () (check-false (ipoe-db-connected?))))
+  (with-db-test
+    (check-true (ipoe-db-connected?)))
 
   ;; -- infer-word-column
   (check-apply* infer-word-column
@@ -477,6 +603,15 @@
    [-51     == 'id]
    [55      == 'id]
    [8675309 == 'id])
+
+  ;; -- online-mode?
+  (check-false (online-mode? (*connection*)))
+  (check-false (online-mode? #f))
+  (check-false (online-mode? #t))
+  (with-db-test
+    (check-false (online-mode? (*connection*))))
+  (parameterize ([*connection* ONLINE])
+    (check-true (online-mode? (*connection*))))
 
   ;; -- validate-word-column
   (check-apply* validate-word-column
@@ -512,6 +647,11 @@
        ["yolo" != 1]
        ["demon" != 12])))
 
+   (check-exn (regexp "ipoe:db:find-word")
+     (lambda () (word->id "sea")))
+   (check-exn (regexp "ipoe:db:find-word")
+     (lambda () (with-ipoe-db #:commit? #f (lambda () (word->id "car")))))
+
   ;; -- word->syllables
   (with-db-test
     (begin
@@ -532,72 +672,83 @@
         ["balloon" != 3]
         ["hour" != 2])))
 
+  (check-exn (regexp "ipoe:db:find-word")
+    (lambda () (word->syllables "yes")))
+  (check-exn (regexp "ipoe:db:find-word")
+    (lambda ()
+      (with-ipoe-db #:commit? #f (lambda () (word->syllables "yes")))))
+
   ;; -- add-word/unsafe
-  (with-db-test
-    (begin
-      (let ([new-word "ycvgpadfwd"])
-        ;; Add a word without rhymes
-        (begin
-          (add-word/unsafe new-word 1 '() '())
-          ;; New word should be defined
-          (check-true (word-exists? new-word))
-          (check-equal? (word->syllables new-word) 1)))
+  (let ([new-word "ycvgpadfwd"])
+    ;; Add a word without rhymes
+    (with-db-test
+      (begin
+        (add-word/unsafe new-word 1 '() '())
+        ;; New word should be defined
+        (check-true (word-exists? new-word))
+        (check-equal? (word->syllables new-word) 1))))
 
-      ;; Add a word with known rhymes
-      (let* ([new-word "nasdofiz"]
-             [r*   '("yes")]
-             [a*   '("later")])
-        (begin
-          ;; -- assert rhymes exist
-          (for ([r (in-list r*)])
-            (check-true (word-exists? r)))
-          (for ([a (in-list a*)])
-            (check-true (word-exists? a)))
-          ;; -- add word
-          (add-word/unsafe new-word 11 r* a*)
-          ;; -- assert word added
-          (check-true (word-exists? new-word))
-          (check-equal? (word->syllables new-word) 11)
-          (check-equal? (id->word (word->id new-word)) new-word)
-          ;; -- check rhymes
-          (check-equal? (sequence->list (word->rhyme* new-word)) r*)
-          (check-equal? (sequence->list (word->almost-rhyme* new-word)) a*)))
+  ;; Add a word with known rhymes
+  (let* ([new-word "nasdofiz"]
+         [r*   '("yes")]
+         [a*   '("later")])
+   (with-db-test
+     (begin
+       ;; -- assert rhymes exist
+       (for ([r (in-list r*)])
+         (check-true (word-exists? r)))
+       (for ([a (in-list a*)])
+         (check-true (word-exists? a)))
+       ;; -- add word
+       (add-word/unsafe new-word 11 r* a*)
+       ;; -- assert word added
+       (check-true (word-exists? new-word))
+       (check-equal? (word->syllables new-word) 11)
+       (check-equal? (id->word (word->id new-word)) new-word)
+       ;; -- check rhymes
+       (check-equal? (sequence->list (word->rhyme* new-word)) r*)
+       (check-equal? (sequence->list (word->almost-rhyme* new-word)) a*))))
 
-      ;; Add a word with unknown rhymes
-      (let* ([new-word "hvzx8da"]
-             [r* '("asvhcuivhw")]
-             [a* '()])
-        (begin
-          ;; -- assert rhymes do NOT exist
-          (for ([r (in-list r*)])
-            (check-false (word-exists? r)))
-          (for ([a (in-list a*)])
-            (check-true (word-exists? a)))
-          ;; -- add word
-          (add-word/unsafe new-word 5 r* a*) ;; Should trigger a printout
-          (check-true (word-exists? new-word))
-          ;; -- should have no rhymes
-          (check-equal? (sequence->list (word->rhyme* new-word)) '())))
+  ;; Add a word with unknown rhymes
+  (let* ([new-word "hvzx8da"]
+         [r* '("asvhcuivhw")]
+         [a* '()])
+    (with-db-test
+      (begin
+        ;; -- assert rhymes do NOT exist
+        (for ([r (in-list r*)])
+          (check-false (word-exists? r)))
+        (for ([a (in-list a*)])
+          (check-true (word-exists? a)))
+        ;; -- add word
+        (add-word/unsafe new-word 5 r* a*) ;; Should trigger a printout
+        (check-true (word-exists? new-word))
+        ;; -- should have no rhymes
+        (check-equal? (sequence->list (word->rhyme* new-word)) '()))))
 
-      ;; -- add-word
-      (let ([nonsense1 "asdv8uazxcvasd_1"]
-            [nonsense2 "asdv8uazxcvasd_2"]
-            [nonsense3 "asdv8uazxcvasd_3"])
-        (begin
-          ;; Fails in online mode, cannot tell number of syllables
-          (check-exn exn:fail? (lambda () (add-word nonsense1 #:interactive? #f #:offline? #f)))
-          ;; Succeeds with an explicit number of syllables
-          (with-output-to-file "/dev/null" #:exists 'append
-            (lambda ()
-              (check-true (and (add-word nonsense2 #:syllables 32 #:interactive? #f #:offline? #f) #t))))
-          ;; Succeeds offline because the naive test never fails
-          (check-true (and (add-word nonsense3 #:interactive? #f #:offline? #t) #t))))
+  ;; -- add-word
+  (let ([nonsense1 "asdv8uazxcvasd_1"]
+        [nonsense2 "asdv8uazxcvasd_2"]
+        [nonsense3 "asdv8uazxcvasd_3"])
+    (with-db-test
+      (begin
+        ;; Fails in online mode, cannot tell number of syllables
+        (check-exn exn:fail? (lambda () (add-word nonsense1 #:interactive? #f #:offline? #f)))
+        ;; Succeeds with an explicit number of syllables
+        (with-output-to-file "/dev/null" #:exists 'append
+          (lambda ()
+            (check-true (and (add-word nonsense2 #:syllables 32 #:interactive? #f #:offline? #f) #t))))
+        ;; Succeeds offline because the naive test never fails
+        (check-true (and (add-word nonsense3 #:interactive? #f #:offline? #t) #t)))))
 
-      (let ([new-word "yolo"])
-        (begin
-          (check-true (and (add-word "yolo" #:interactive? #f #:offline? #f) #t))))))
+  ;; --- add-word failures
+  (let ([new-word "asdhvuianjsdkvasd"])
+    (check-false (add-word new-word))
+    (check-false
+      (with-ipoe-db #:commit? #f (lambda () (add-word new-word)))))
 
-  ;; -- add-word* (use offline mode to never fail)
+
+  ;; -- add-word* (when offline?, never fails)
   (with-db-test
     (let ([new1 "onething"]
           [new2 "anotherthing"])
@@ -606,6 +757,13 @@
           (check-true (and (add-word* (list new1 new2) #:interactive? #f #:offline? #t) #t))))
       (check-true (word-exists? new1))
       (check-true (word-exists? new2))))
+
+  (let ([w* '("rafflehsnarcuvjawe" "vpoawetz")])
+    (with-output-to-file "/dev/null" #:exists 'append
+      (lambda ()
+        (check-true (and (add-word* w* #:interactive? #f #:offline? #t) #t))))
+    (with-db-test
+      (check-false (word-exists? (car w*)))))
 
   ;; -- add-rhyme / add-almost-rhyme
   (with-db-test
@@ -635,6 +793,15 @@
       (add-almost-rhyme w r)
       (check-true (rhymes-with? w r))
       (check-true (and (almost-rhymes-with? w r) #t))))
+
+   (let ([w "asdfasv"]
+         [v "avhoiuswvp"])
+     ;; Fails when disconnected from DB
+     (check-exn (regexp "ipoe:db:find-word")
+       (lambda () (add-rhyme w v)))
+     (check-exn (regexp "ipoe:db:find-word")
+       (lambda ()
+         (with-ipoe-db #:commit? #f (lambda () (add-rhyme w v))))))
 
   ;; -- (assert-)rhyme-table?
   (check-true* rhyme-table?
@@ -668,6 +835,14 @@
        ["4axz"]
        [""])))
 
+  ;; Fails if no DB and offline
+  (check-exn (regexp "ipoe:db:word-exists?")
+    (lambda () (word-exists? "yes")))
+
+  ;; Succeeds in online mode (for real words)
+  (with-ipoe-db #:commit? #f (lambda ()
+    (check-true (word-exists? "paper"))))
+
   ;; -- (almost-)rhymes-with?
   (with-db-test
     (begin
@@ -692,5 +867,16 @@
        ["cat" "cat"]
        ["yoyo" "wolf"]
       )))
+
+  ;; Fails if no DB and offline
+  (check-exn (regexp "ipoe:db:rhymes-with?")
+    (lambda () (rhymes-with? "yes" "yes")))
+  (check-exn (regexp "ipoe:db:almost-rhymes-with?")
+    (lambda () (almost-rhymes-with? "yes" "yes")))
+
+  ;; Succeeds in online mode (for real words)
+  (with-ipoe-db #:commit? #f (lambda ()
+    (check-true (rhymes-with? "paper" "draper"))
+    (check-true (almost-rhymes-with? "paper" "pager"))))
 
 )
