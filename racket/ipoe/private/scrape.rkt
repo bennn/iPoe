@@ -11,6 +11,9 @@
   rhyme-result?
   rhyme-result-rhyme*
   rhyme-result-almost-rhyme*
+  rhymes?
+  almost-rhymes?
+  scrape-rhyme
 )
 
 (require
