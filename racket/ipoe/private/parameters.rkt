@@ -272,15 +272,16 @@
                 (option-match 'cat 42))
 
   ;; -- parameterize-from-hash
-  (let ([opt (options-init)]
-        [o1  (option? "#:online? #f")]
-        [o2  (option? "  #:bad-lines-penalty -666")]
-        [o3  (option? "nothin")]
-        [o4  (option? "#:not real")])
+  (let* ([opt (options-init)]
+         [init-count (options-count opt)]
+         [o1  (option? "#:online? #f")]
+         [o2  (option? "  #:bad-lines-penalty -666")]
+         [o3  (option? "nothin")]
+         [o4  (option? "#:not real")])
     (for ([o (in-list (list o1 o2 o3 o4))])
       (options-set opt o))
     ;; -- pre-test
-    (check-equal? (options-count opt) 3)
+    (check-true (< init-count (options-count opt)))
     (check-true (*online?*))
     (check-true (<= 0 (*bad-lines-penalty*)))
     (parameterize-from-hash opt (lambda ()

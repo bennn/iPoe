@@ -575,6 +575,10 @@
                     #:dbname (*dbname*)
         (lambda () e)))))
 
+  ;; -- TODO test init prompt for username
+  ;; -- TODO test init prompt for dbname
+  ;; -- TODO test init, save preferences
+
   ;; -- find-word
   (with-db-test
     (check-apply* find-word
@@ -918,11 +922,23 @@
     (check-true (rhymes-with? "paper" "draper"))
     (check-true (almost-rhymes-with? "paper" "pager"))))
 
-  ;; -- TODO test cache
-  ;; -- TODO test init prompt for username
-  ;; -- TODO test init prompt for dbname
-  ;; -- TODO test init, save preferences
-  ;; -- TODO test online-only queries
-
+  ;; -- scrape-word/cache & scrape-rhyme/cache
+  (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
+    ;; --- word
+    (check-true (online-mode? (*connection*)))
+    (check-true (word-exists? "car"))
+    (check-true (word-exists? "car"))
+    ;; Beyond the abstraction barrier...
+    (check-equal? (hash-count (*connection*)) 1)
+    (check-true (word-exists? "rake"))
+    (check-equal? (hash-count (*connection*)) 2)
+    ;; --- rhyme-scheme
+    (check-true (rhymes-with? "car" "far"))
+    (check-true (rhymes-with? "far" "car"))
+    ;; False because we never search for the word
+    (check-false (car (hash-ref (*connection*) "far")))
+    ;; False because we never searched for the rhyme
+    (check-false (cdr (hash-ref (*connection*) "rake")))
+    (check-equal? (hash-count (*connection*)) 3)))
 
 )
