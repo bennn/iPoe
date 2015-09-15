@@ -4,7 +4,7 @@
 
 (provide
   scrape-word
-  ;; (-> String Boolean)
+  ;; (-> String Word-Result)
   ;; Search a poem for new words.
 
   (struct-out word-result)

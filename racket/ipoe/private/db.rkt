@@ -91,6 +91,9 @@
 
 ;;(define DB-LOG  "./ipoe.log")
 
+;; (: *connection* (Parameterof (U #f connection?
+;;                              (HashTable String (Pairof (U #f WordResult)
+;;                                                        (U #f RhymeResult)))))
 (define *connection*  (make-parameter #f))
 ;;(define *logfile* (make-parameter #f))
 
@@ -98,12 +101,6 @@
 (define DBNAME-DESCRIPTION
   (string-append "Missing run-time parameter for ipoe database name." " "
                  "Please enter the database name."))
-
-;; Special value for *connection*, says that we're not using a database
-;;  but rather querying the internet for everything.
-(define ONLINE 'online-only)
-
-;; TODO make a hash and cache all word & rhyme results
 
 (define USER-PROMPT "Enter your database username")
 (define USER-DESCRIPTION
@@ -145,7 +142,7 @@
    [else
     (when interactive?
       (alert "Starting ipoe without a database connection (in online-only mode)"))
-    (*connection* ONLINE)])
+    (*connection* (make-hasheq))])
   ;; -- Return the new connection
   (*connection*))
 
@@ -358,6 +355,53 @@
     [(vector id word syllables) syllables]))
 
 ;; -----------------------------------------------------------------------------
+;; --- 
+
+(define (scrape/cache tag w #:cache c
+                            #:scrape f-scrape)
+  (cond
+   [(online-mode? c)
+    ;; If word is unbound, scrape.
+    ;; Also initialize an placeholder rhyme result.
+    (define-values [sel inj]
+      (case tag
+       [(word)  (values car (lambda (x) (cons x #f)))]
+       [(rhyme) (values cdr (lambda (x) (cons #f x)))]
+       [else (error 'scrape/cache
+                    (format "Undefined tag '~e'" tag))]))
+    (define (on-failure)
+      (define R (f-scrape w))
+      (and R (let ([wr+rr (inj R)])
+               (hash-set! c w wr+rr)
+               wr+rr)))
+    (define res (hash-ref c w on-failure))
+    (cond
+     [(eq? #f res)
+      ;; Nothing cached & scraping (in `on-failure`) failed.
+      #f]
+     [(not (pair? res))
+      (error 'scrape/cache (format "Expected a pair, got '~e'" res))]
+     [(eq? #f (sel res))
+      ;; Have other result, need to apply `f-scrape` to get this result
+      (define R (f-scrape w))
+      (and R
+           (hash-set! c w (inj R))
+           R)]
+     [else
+      (sel res)])]
+   [else
+    ;; Just lookup, don't bother with the cache
+    (scrape-word w)]))
+
+(define (scrape-word/cache w)
+  (scrape/cache 'word w #:cache (*connection*)
+                        #:scrape scrape-word))
+
+(define (scrape-rhyme/cache w)
+  (scrape/cache 'rhyme w #:cache (*connection*)
+                         #:scrape scrape-rhyme))
+
+;; -----------------------------------------------------------------------------
 ;; --- queries
 ;;     These are permitted in online mode
 
@@ -367,7 +411,7 @@
    [(connection? pgc)
     (and (find-word word #:column 'word #:db pgc) #t)]
    [(online-mode? pgc)
-    (and (scrape-word word) #t)]
+    (and (scrape-word/cache word) #t)]
    [else
     (query-error 'word-exists? (format "word '~a'" word))]))
 
@@ -376,7 +420,7 @@
    [(connection? pgc)
     (r-with? w r #:db pgc #:table 'almost_rhyme)]
    [(online-mode? pgc)
-    (almost-rhymes? (scrape-rhyme w) r)]
+    (almost-rhymes? (scrape-rhyme/cache w) r)]
    [else
     (query-error 'almost-rhymes-with? (format "rhymes of '~a'" w))]))
 
@@ -385,7 +429,7 @@
    [(connection? pgc)
     (r-with? w r #:db pgc #:table 'rhyme)]
    [(online-mode? pgc)
-    (rhymes? (scrape-rhyme w) r)]
+    (rhymes? (scrape-rhyme/cache w) r)]
    [else
     (query-error 'rhymes-with? (format "rhymes of '~a'" w))]))
 
@@ -430,7 +474,7 @@
     (db-error 'infer-word-column "Cannot infer column in word database from parameter '~a'" param)]))
 
 (define (online-mode? pgc)
-  (eq? pgc ONLINE))
+  (hash? pgc))
 
 (define (validate-word-column col)
   (cond
@@ -531,11 +575,6 @@
                     #:dbname (*dbname*)
         (lambda () e)))))
 
-;  ;; -- TODO test init prompt for username
-;  ;; -- TODO test init prompt for dbname
-;  ;; -- TODO test init, save preferences
-;  ;; -- TODO test online-only queries
-
   ;; -- find-word
   (with-db-test
     (check-apply* find-word
@@ -610,7 +649,7 @@
   (check-false (online-mode? #t))
   (with-db-test
     (check-false (online-mode? (*connection*))))
-  (parameterize ([*connection* ONLINE])
+  (parameterize ([*connection* (make-hasheq)])
     (check-true (online-mode? (*connection*))))
 
   ;; -- validate-word-column
@@ -878,5 +917,12 @@
   (with-ipoe-db #:commit? #f (lambda ()
     (check-true (rhymes-with? "paper" "draper"))
     (check-true (almost-rhymes-with? "paper" "pager"))))
+
+  ;; -- TODO test cache
+  ;; -- TODO test init prompt for username
+  ;; -- TODO test init prompt for dbname
+  ;; -- TODO test init, save preferences
+  ;; -- TODO test online-only queries
+
 
 )
