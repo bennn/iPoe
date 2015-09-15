@@ -5,6 +5,14 @@
 (provide
   (struct-out rhyme-result)
 
+  almost-rhymes?
+  ;; (-> Rhyme-Result String Boolean)
+  ;; True if the string is one of the Result's almost-rhymes
+
+  rhymes?
+  ;; (-> Rhyme-Result String Boolean)
+  ;; True if the string is one of the Result's rhymes
+
   resolve-rhyme*
   ;; (->* [String (U #f (Listof String)) (U #f (Listof String))] [#:offline? Boolean #:interactive? Boolean] Rhyme-Result)
   ;; Check for additional rhymes and almost rhymes for a word.
@@ -13,6 +21,9 @@
   ;; - if #t, the user is prompted to accept/reject each new rhyme
   ;; - if #f, all new rhymes are saved
 
+  scrape-rhyme
+  ;; (-> String Rhyme-Result)
+  ;; Search online for words that rhyme and almost rhyme with the argument.
 )
 
 (require
@@ -33,22 +44,28 @@
 
 (define REFERENCE "http://rhymebrain.com/en")
 
+(define (almost-rhymes? rr w)
+  (and (member w (rhyme-result-almost-rhyme* rr)) #t))
+
+(define (rhymes? rr w)
+  (and (member w (rhyme-result-rhyme* rr)) #t))
+
 (define (resolve-rhyme* word
                         rhyme*-param
                         almost-rhyme*-param
                         #:offline? [offline? #f]
                         #:interactive? [interactive? #t])
-  (define rr (if offline? (naive-rhyme* word)
-                          (scrape-rhyme* word)))
+  (define rr (if offline? (naive-rhyme word)
+                          (scrape-rhyme word)))
   (define r* (merge word 'rhyme rhyme*-param (rhyme-result-rhyme* rr) #:interactive? interactive?))
   (define a* (merge word 'almost-rhyme almost-rhyme*-param (rhyme-result-almost-rhyme* rr) #:interactive? interactive?))
   (make-rhyme-result r* a*))
 
-(define (naive-rhyme* word)
+(define (naive-rhyme word)
   ;; TODO I'm sure we can do better
   (make-rhyme-result '() '()))
 
-(define (scrape-rhyme* word)
+(define (scrape-rhyme word)
   (define url-str (word->rhyme-url word))
   (define sxml (url->sxml url-str))
   (define all-results ((sxpath `(// div ,(id? "results") *)) sxml))
@@ -139,25 +156,22 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit)
+  (require rackunit ipoe/private/rackunit-abbrevs)
 
-  (define-syntax-rule (check-naive-rhyme* [word == r* a*] ...)
-    (begin (let ([rr (naive-rhyme* word)])
-             (check-equal? (rhyme-result-rhyme* rr) r*)
-             (check-equal? (rhyme-result-almost-rhyme* rr) a*)) ...))
-  (check-naive-rhyme*
-    ["month" == '() '()]
-    ["cat" == '() '()]
-    ["salmon" == '() '()]
-    ["time" == '() '()]
-  )
+  (let ([rr (scrape-rhyme "parent")])
+    (check-true (rhymes? rr "aberrant"))
+    (check-true (almost-rhymes? rr "embarrassed"))
+    (check-false (rhymes? rr "child"))
+    (check-false (almost-rhymes? rr "cat")))
 
-  (define-syntax-rule (check-scrape-rhyme* [word == r* a*] ...)
-    (begin (let ([rr (scrape-rhyme* word)])
-             (check-equal? (rhyme-result-rhyme* rr) r*)
-             (check-equal? (rhyme-result-almost-rhyme* rr) a*)) ...))
-  (check-scrape-rhyme*
-    ["mouse" == '("porterhouse" "slaughterhouse" "clearinghouse" "boardinghouse" "packinghouse" "meetinghouse" "coffeehouse" "summerhouse" "firehouse" "boathouse" "powerhouse" "grouse" "blouse" "spouse" "dowse" "douse" "louse" "rouse" "house")
-                '("mouth" "mows" "south" "cows" "arouse" "bows" "vows" "boughs" "dhows" "hows" "cowers" "louche" "thous" "wows" "chows" "loughs" "pouffe" "taus" "allows" "brows" "browse" "endows" "ploughs" "plows" "avows" "drouth" "carouse" "prows" "scows" "drowse" "haymows" "espouse" "menopause" "windrows" "cornrows" "snowploughs" "hedgerows" "disavows" "cottonmouth" "prognathous" "doubts" "announce" "ounce" "shouts" "mounts" "outs" "bounce" "bouts" "toutes" "pounce" "louts" "routs" "snouts" "touts" "auks" "pouts" "jounce" "pouffes" "amounts" "counts" "renounce" "denounce" "scouts" "droughts" "spouts" "founts" "jousts" "clouts" "flounce" "flouts" "grouts" "trouts" "mahouts" "ousts" "trounce" "drouths" "stouts" "rousts" "accounts" "pronounce" "sprouts" "redoubts" "surmounts" "remounts" "loudmouths" "recounts" "dismounts" "marabouts" "downspouts" "layabouts" "runabouts" "turnabouts" "mangetouts" "discounts" "whereabouts" "thereabouts" "hereabouts" "roundabouts" "cottonmouths" "beansprouts" "gadabouts" "roustabouts" "waterspouts" "mispronounce" "walkabouts")]
+  (check-apply* naive-rhyme
+    ["month" == (make-rhyme-result '() '())]
+    ["cat" == (make-rhyme-result '() '())]
+    ["salmon" == (make-rhyme-result '() '())]
+    ["time" == (make-rhyme-result '() '())])
+
+  (check-apply* scrape-rhyme
+    ["mouse" == (make-rhyme-result '("porterhouse" "slaughterhouse" "clearinghouse" "boardinghouse" "packinghouse" "meetinghouse" "coffeehouse" "summerhouse" "firehouse" "boathouse" "powerhouse" "grouse" "blouse" "spouse" "dowse" "douse" "louse" "rouse" "house")
+                '("mouth" "mows" "south" "cows" "arouse" "bows" "vows" "boughs" "dhows" "hows" "cowers" "louche" "thous" "wows" "chows" "loughs" "pouffe" "taus" "allows" "brows" "browse" "endows" "ploughs" "plows" "avows" "drouth" "carouse" "prows" "scows" "drowse" "haymows" "espouse" "menopause" "windrows" "cornrows" "snowploughs" "hedgerows" "disavows" "cottonmouth" "prognathous" "doubts" "announce" "ounce" "shouts" "mounts" "outs" "bounce" "bouts" "toutes" "pounce" "louts" "routs" "snouts" "touts" "auks" "pouts" "jounce" "pouffes" "amounts" "counts" "renounce" "denounce" "scouts" "droughts" "spouts" "founts" "jousts" "clouts" "flounce" "flouts" "grouts" "trouts" "mahouts" "ousts" "trounce" "drouths" "stouts" "rousts" "accounts" "pronounce" "sprouts" "redoubts" "surmounts" "remounts" "loudmouths" "recounts" "dismounts" "marabouts" "downspouts" "layabouts" "runabouts" "turnabouts" "mangetouts" "discounts" "whereabouts" "thereabouts" "hereabouts" "roundabouts" "cottonmouths" "beansprouts" "gadabouts" "roustabouts" "waterspouts" "mispronounce" "walkabouts"))]
   )
 )
