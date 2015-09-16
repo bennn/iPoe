@@ -92,6 +92,7 @@
     deserialize
     serialize)
   (only-in racket/file
+    file->string
     file->value)
 )
 
@@ -373,6 +374,7 @@
 (define IPOE-CACHE (string-append IPOE-CACHE-DIR "/ipoe.cache"))
 
 ;; Either make an empty hash, or parse an existing hash from a file
+;; TODO add warning if cache is LARGE or VERY-LARGE, assist in DB creation
 (define (read-cache)
   (define cached
     (if (file-exists? IPOE-CACHE)
@@ -380,7 +382,7 @@
         #f))
   (if (hash? cached)
       cached
-      (make-hasheq)))
+      (make-hash)))
 
 ;; Save the dictionary `d` to be loaded later
 (define (write-cache d)
@@ -593,7 +595,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit racket/sequence "rackunit-abbrevs.rkt")
+  (require rackunit racket/sequence ipoe/private/rackunit-abbrevs)
 
   (define o*
     (if (file-exists? IPOE-CONFIG)
@@ -608,9 +610,63 @@
                     #:dbname (*dbname*)
         (lambda () e)))))
 
+  ;; Execute the thunk with the given string as the only config file.
+  (define (with-config thunk #:config str)
+    ;; -- Change to a temp directory, to avoid the local config
+    (parameterize ([current-directory (find-system-path 'temp-dir)])
+      ;; -- Save existing global config, be prepared to restore it
+      (define config-fname*
+        (let-values ([(gc lc) (get-config-filenames)])
+          (list gc lc)))
+      (define old-config-data*
+        (for/list ([fname (in-list config-fname*)])
+          (and (file-exists? fname)
+               (file->string fname))))
+      (define (restore-config)
+        (for/list ([d (in-list old-config-data*)]
+                   [fname (in-list config-fname*)]
+                   #:when d)
+          (with-output-to-file fname #:exists 'replace
+            (lambda () (display d)))))
+      ;; -- Write the new config
+      (when (file-exists? IPOE-CACHE)
+        (delete-file IPOE-CACHE))
+      (with-output-to-file (cadr config-fname*) #:exists 'replace
+        (lambda () (displayln str)))
+      (call-with-exception-handler
+        (lambda (exn)
+          (begin (restore-config) exn))
+        (lambda ()
+          (let ([r (thunk)])
+            (begin (restore-config) r))))))
+
   ;; -- TODO test init prompt for username
   ;; -- TODO test init prompt for dbname
-  ;; -- TODO test init, save preferences
+  ;(with-config #:config "#:user \"ben\""
+  ;  (lambda ()
+  ;    (parameterize ([current-input-port (current-output-port)])
+  ;      ({
+
+  ;; -- with-ipoe-db, online-mode, check that preferences are saved
+  (with-config #:config "#:interactive? #f\n#:online? #t"
+    (lambda ()
+      ;; Remove old cache file
+      (when (file-exists? IPOE-CACHE)
+        (delete-file IPOE-CACHE))
+      ;; Log in to the database, make some queries
+      (with-ipoe-db #:commit? #f
+        (lambda ()
+          (check-true (word-exists? "hello"))
+          (check-false (word-exists? "asjdlviuahnzcijvaeafawjsdzidgw")
+          (check-true (rhymes-with? "cat" "bat")))))
+      ;; Check that cache was created alright
+      (check-true (directory-exists? IPOE-CACHE-DIR))
+      (check-true (file-exists? IPOE-CACHE))
+      (define c (read-cache))
+      (check-true (hash? c))
+      (check-equal? (hash-count c) 2)
+      (check-true (hash-has-key? c "hello"))
+      (check-true (hash-has-key? c "cat"))))
 
   ;; -- find-word
   (with-db-test
@@ -686,7 +742,7 @@
   (check-false (online-mode? #t))
   (with-db-test
     (check-false (online-mode? (*connection*))))
-  (parameterize ([*connection* (make-hasheq)])
+  (parameterize ([*connection* (make-hash)])
     (check-true (online-mode? (*connection*))))
 
   ;; -- validate-word-column
@@ -951,27 +1007,31 @@
     (lambda () (almost-rhymes-with? "yes" "yes")))
 
   ;; Succeeds in online mode (for real words)
-  (with-ipoe-db #:commit? #f (lambda ()
-    (check-true (rhymes-with? "paper" "draper"))
-    (check-true (almost-rhymes-with? "paper" "pager"))))
+  (with-config #:config "#:interactive? #f\n#:online? #t"
+    (lambda ()
+      (with-ipoe-db #:commit? #f (lambda ()
+        (check-true (rhymes-with? "paper" "draper"))
+        (check-true (almost-rhymes-with? "paper" "pager"))))))
 
   ;; -- scrape-word/cache & scrape-rhyme/cache
-  (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
-    ;; --- word
-    (check-true (online-mode? (*connection*)))
-    (check-true (word-exists? "car"))
-    (check-true (word-exists? "car"))
-    ;; Beyond the abstraction barrier...
-    (check-equal? (hash-count (*connection*)) 1)
-    (check-true (word-exists? "rake"))
-    (check-equal? (hash-count (*connection*)) 2)
-    ;; --- rhyme-scheme
-    (check-true (rhymes-with? "car" "far"))
-    (check-true (rhymes-with? "far" "car"))
-    ;; False because we never search for the word
-    (check-false (car (hash-ref (*connection*) "far")))
-    ;; False because we never searched for the rhyme
-    (check-false (cdr (hash-ref (*connection*) "rake")))
-    (check-equal? (hash-count (*connection*)) 3)))
+  (with-config #:config "#:interactive? @#f\n#:online? #t"
+    (lambda ()
+      (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
+        ;; --- word
+        (check-true (online-mode? (*connection*)))
+        (check-true (word-exists? "car"))
+        (check-true (word-exists? "car"))
+        ;; Beyond the abstraction barrier...
+        (check-equal? (hash-count (*connection*)) 1)
+        (check-true (word-exists? "rake"))
+        (check-equal? (hash-count (*connection*)) 2)
+        ;; --- rhyme-scheme
+        (check-true (rhymes-with? "car" "far"))
+        (check-true (rhymes-with? "far" "car"))
+        ;; False because we never search for the word
+        (check-false (car (hash-ref (*connection*) "far")))
+        ;; False because we never searched for the rhyme
+        (check-false (cdr (hash-ref (*connection*) "rake")))
+        (check-equal? (hash-count (*connection*)) 3)))))
 
 )
