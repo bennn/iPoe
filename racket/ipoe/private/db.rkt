@@ -73,7 +73,10 @@
   racket/sequence
   ipoe/private/parameters
   (only-in ipoe/private/ui
-    alert get-user-input read-yes-or-no)
+    alert
+    get-user-input
+    read-yes-or-no
+    read-string)
   (only-in ipoe/private/scrape
     almost-rhymes?
     resolve-syllables
@@ -85,6 +88,11 @@
     scrape-word)
   (only-in ipoe/private/string
     string-empty?)
+  (only-in racket/serialize
+    deserialize
+    serialize)
+  (only-in racket/file
+    file->value)
 )
 
 ;; =============================================================================
@@ -116,12 +124,12 @@
   ;; -- Resolve username and dbname
   (define u (or u-param
                 (and interactive?
-                     (get-user-input string?
+                     (get-user-input read-string
                                      #:prompt USER-PROMPT
                                      #:description USER-DESCRIPTION))))
   (define db (or db-param
                  (and interactive?
-                      (get-user-input string?
+                      (get-user-input read-string
                                       #:prompt DBNAME-PROMPT
                                       #:description DBNAME-DESCRIPTION))))
   (cond
@@ -142,7 +150,7 @@
    [else
     (when interactive?
       (alert "Starting ipoe without a database connection (in online-only mode)"))
-    (*connection* (make-hasheq))])
+    (*connection* (read-cache))])
   ;; -- Return the new connection
   (*connection*))
 
@@ -150,14 +158,17 @@
 (define (db-close #:db [pgc (*connection*)]
                   #:commit? [commit? #t])
   ;;(close-output-port (current-ipoe-log))
-  (when (connection? pgc)
+  (cond
+   [(connection? pgc)
+    ;; -- Close transaction & connection
     (if commit?
       (commit-transaction pgc)
       (rollback-transaction pgc))
-    (disconnect pgc)
-    (*connection* #f)
-    ;;(current-ipoe-log #f)
-    (void)))
+    (disconnect pgc)]
+   [(online-mode? pgc)
+    (write-cache (*connection*))])
+  (*connection* #f)
+  (void))
 
 (define (with-ipoe-db thunk #:user [u #f]
                             #:dbname [db #f]
@@ -355,7 +366,29 @@
     [(vector id word syllables) syllables]))
 
 ;; -----------------------------------------------------------------------------
-;; --- 
+;; --- Caching
+;;     Save word results, so we minimize the number of web queries
+
+(define IPOE-CACHE-DIR "./compiled")
+(define IPOE-CACHE (string-append IPOE-CACHE-DIR "/ipoe.cache"))
+
+;; Either make an empty hash, or parse an existing hash from a file
+(define (read-cache)
+  (define cached
+    (if (file-exists? IPOE-CACHE)
+        (deserialize (file->value IPOE-CACHE))
+        #f))
+  (if (hash? cached)
+      cached
+      (make-hasheq)))
+
+;; Save the dictionary `d` to be loaded later
+(define (write-cache d)
+  (unless (directory-exists? IPOE-CACHE-DIR)
+    (make-directory IPOE-CACHE-DIR))
+  (with-output-to-file IPOE-CACHE #:exists 'replace
+    (lambda ()
+      (write (serialize d)))))
 
 (define (scrape/cache tag w #:cache c
                             #:scrape f-scrape)

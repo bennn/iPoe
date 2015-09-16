@@ -24,7 +24,7 @@
   definition ;; String, a definition of the word
   num-syllables ;; Natural, number of syllables in the word
   src ;; Symbol, describes where this information came from
-) #:transparent )
+) #:prefab ) ;; prefab to easily serialize the db cache
 
 
 (define (scrape-word w)

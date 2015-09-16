@@ -40,7 +40,7 @@
   rhyme*        ; (Listof String)
   almost-rhyme* ; (Listof String)
 ) #:constructor-name make-rhyme-result
-  #:transparent)
+  #:prefab ) ;; prefab to easily serialize the db cache
 
 (define REFERENCE "http://rhymebrain.com/en")
 
