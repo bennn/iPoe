@@ -16,6 +16,11 @@
   ;; True if the line of text looks kind of like a configuration option.
   ;; Used to raise a warning message.
 
+  get-config-filenames
+  ;; (-> (Values Path-String Path-String))
+  ;; Return the names of the global and local config files, respectively
+  ;; For testing only!
+
   options-get
   ;; (-> OptionTbl Symbol Any)
   ;; Return the value associated with the symbol key in the table.
@@ -128,7 +133,8 @@
 (define (options-set-from-file o* fname)
   (with-input-from-file fname
     (lambda ()
-      (for ([ln (in-lines)] [i (in-naturals)])
+      (for ([ln (in-lines)] [i (in-naturals)]
+            #:when (not (string-empty? ln)))
         (define o (option? ln))
         (unless o
           (raise-user-error 'ipoe:config "Error reading configuration file '~a', syntax error on line ~a\n    '~a'" fname i ln))
@@ -251,6 +257,9 @@
     (check-true (options-set opt o3))
     (check-equal? (options-count opt) (+ 2 N))
     (check-equal? (options-get opt 'grammarcheck?) #f))
+
+  ;; -- options-set-from-file TODO
+  ;; TODO handles empty lines?
 
   ;; -- option?
   (check-apply* option?
