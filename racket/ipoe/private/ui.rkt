@@ -27,6 +27,10 @@
   ;; (-> String (U Natural #f))
   ;; Try reading natural number from input, return #f on failure.
 
+  read-string
+  ;; (-> String (U #f String))
+  ;; Identity function, but asserts its argument is a string
+
   read-yes-or-no
   ;; (-> String (U 'Y 'N #f))
   ;; Read a yes-or-no input
@@ -76,6 +80,10 @@
   (define n (string->number str))
   (and n (exact-nonnegative-integer? n) n))
 
+(define (read-string str)
+  (and (string? str)
+       str))
+
 (define (read-yes-or-no str)
   (case (string-downcase str)
    [("y" "yes" "yolo") 'Y]
@@ -85,43 +93,50 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit)
+  (require rackunit ipoe/private/rackunit-abbrevs)
 
-  (define-syntax-rule (check-fun f [str expect] ...)
-    (begin (check-equal? (f str) expect) ...))
+  (check-false* read-natural
+    ["hello"]
+    ["o"]
+    ["(-> a b)"]
+    ["'1"]
+    ["'(1 2 3)"]
+    ["-1"]
+    ["1/2"])
+  (check-apply* read-natural
+    ["1351"           == 1351]
+    ["0"              == 0]
+    ["1"              == 1]
+    ["83423113513513" == 83423113513513])
 
-  (check-fun read-natural
-    ["hello"    #f]
-    ["o"        #f]
-    ["(-> a b)" #f]
-    ["'1"       #f]
-    ["'(1 2 3)" #f]
-    ["-1"       #f]
-    ["1/2"      #f]
-    ;; --
-    ["1351"           1351]
-    ["0"              0]
-    ["1"              1]
-    ["83423113513513" 83423113513513]
-  )
+  (check-false* read-string
+   [1]
+   ['asdf])
 
-  (check-fun read-yes-or-no
-    ["hello"    #f]
-    ["" #f]
-    ["word" #f]
-    ["yes please" #f]
-    ["never" #f]
-    ["no no no" #f]
+  (check-apply* read-string
+   ["yes" == "yes"]
+   ["A" == "A"]
+   ["" == ""])
+
+  (check-false* read-yes-or-no
+    ["hello"]
+    [""]
+    ["word"]
+    ["yes please"]
+    ["never"]
+    ["no no no"])
+
+  (check-apply* read-yes-or-no
     ;; --
-    ["y" 'Y]
-    ["Y" 'Y]
-    ["yes" 'Y]
-    ["yEs" 'Y]
-    ["yolo" 'Y]
+    ["y" == 'Y]
+    ["Y" == 'Y]
+    ["yes" == 'Y]
+    ["yEs" == 'Y]
+    ["yolo" == 'Y]
     ;; --
-    ["n" 'N]
-    ["no" 'N]
-    ["NO" 'N]
+    ["n" == 'N]
+    ["no" == 'N]
+    ["NO" == 'N]
   )
 )
 
