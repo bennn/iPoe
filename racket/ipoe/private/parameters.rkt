@@ -49,6 +49,13 @@
   ;; (->* [Symbol Any] [#:location (U 'local 'global)] Boolean)
   ;; Write the `#:Symbol Any` pair to a configuration file.
   ;; By default, saves to the global config.
+
+  with-config
+  ;; (-> (-> Any) #:config String Any)
+  ;; For testing,
+  ;; Execute the thunk where the #:config argument is the only
+  ;;  configuration file, no matter the filesystems global or local config.
+
 )
 
 (require
@@ -56,6 +63,7 @@
   ipoe/private/ui
   (only-in racket/set mutable-set set-member? set-add!)
   (for-syntax racket/base syntax/parse racket/syntax)
+  (only-in racket/file file->string)
 )
 
 ;; =============================================================================
@@ -207,6 +215,34 @@
   (with-output-to-file fname #:exists 'append
     (lambda () (printf "#:~a ~s\n" k v))))
 
+;; Execute the thunk with the given string as the only config file.
+(define (with-config thunk #:config str)
+  ;; -- Change to a temp directory, to avoid the local config
+  (parameterize ([current-directory (find-system-path 'temp-dir)])
+    ;; -- Save existing global config, be prepared to restore it
+    (define config-fname*
+      (let-values ([(gc lc) (get-config-filenames)])
+        (list gc lc)))
+    (define old-config-data*
+      (for/list ([fname (in-list config-fname*)])
+        (and (file-exists? fname)
+             (file->string fname))))
+    (define (restore-config)
+      (for/list ([d (in-list old-config-data*)]
+                 [fname (in-list config-fname*)]
+                 #:when d)
+        (with-output-to-file fname #:exists 'replace
+          (lambda () (display d)))))
+    ;; -- Write the new config
+    (with-output-to-file (cadr config-fname*) #:exists 'replace
+      (lambda () (displayln str)))
+    (call-with-exception-handler
+      (lambda (exn)
+        (begin (restore-config) exn))
+      (lambda ()
+        (let ([r (thunk)])
+          (begin (restore-config) r))))))
+
 ;; =============================================================================
 
 (module+ test
@@ -215,6 +251,26 @@
     ipoe/private/rackunit-abbrevs
     (only-in racket/list last)
     (only-in racket/file file->lines))
+
+  ;; -- almost-option
+  (check-true* almost-option?
+   ["#:key val"]
+   ["key #: val"]
+   ["#:key #:val"]
+   ["   #:key    val:#   "]
+   ["#:#:"]
+   ["keyval#:"])
+
+  (check-false* almost-option?
+   ["key val"]
+   ["# : key val"]
+   [""]
+   ["key val:#"])
+
+  ;; -- get-config-filenames
+  (let-values ([(f1 f2) (get-config-filenames)])
+    (check-true (path-string? f1))
+    (check-true (path-string? f2)))
 
   ;; -- options-init
   (let ([o* (options-init)])
@@ -258,7 +314,7 @@
     (check-equal? (options-count opt) (+ 2 N))
     (check-equal? (options-get opt 'grammarcheck?) #f))
 
-  ;; -- options-set-from-file TODO
+  ;; -- options-set-from-file
   ;; TODO handles empty lines?
 
   ;; -- option?
