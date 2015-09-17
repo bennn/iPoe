@@ -85,7 +85,8 @@
     rhyme-result-almost-rhyme*
     rhymes?
     scrape-rhyme
-    scrape-word)
+    scrape-word
+    word-result-num-syllables) ;; ick, could also make a scrape-syllables
   (only-in ipoe/private/string
     string-empty?)
   (only-in racket/serialize
@@ -353,18 +354,35 @@
   (word->r* word #:db pgc #:table 'almost_rhyme))
 
 (define (word->r* word #:db pgc #:table loc)
-  (define wid (word->id word #:db pgc))
-  (unless wid (db-error loc "Cannot find ~a for unknown word '~a'" loc word))
-  (define rid* (find-r wid #:db pgc #:table loc))
-  (sequence-map (lambda (wid rid) (id->word rid #:db pgc)) rid*))
+  (cond
+   [(connection? pgc)
+    (define wid (word->id word #:db pgc))
+    (unless wid (db-error loc "Cannot find ~a for unknown word '~a'" loc word))
+    (define rid* (find-r wid #:db pgc #:table loc))
+    (sequence-map (lambda (wid rid) (id->word rid #:db pgc)) rid*)]
+   [(online-mode? pgc)
+    (define rr (scrape-rhyme/cache word))
+    (case loc
+     [(almost_rhyme)
+       (rhyme-result-almost-rhyme* rr)]
+     [(rhyme)
+      (rhyme-result-rhyme* rr)])]
+   [else
+    (query-error loc (format "~a of ~a" loc word))]))
 
 (define (word->rhyme* word #:db [pgc (*connection*)])
   (word->r* word #:db pgc #:table 'rhyme))
 
 (define (word->syllables word #:db [pgc (*connection*)])
-  (match (find-word word #:db pgc #:column 'word)
-    [#f #f]
-    [(vector id word syllables) syllables]))
+  (cond
+   [(connection? pgc)
+    (match (find-word word #:db pgc #:column 'word)
+      [#f #f]
+      [(vector id word syllables) syllables])]
+   [(online-mode? pgc)
+    (word-result-num-syllables (scrape-word/cache word))]
+   [else
+    (query-error 'word->syllables (format "syllables of '~a'" word))]))
 
 ;; -----------------------------------------------------------------------------
 ;; --- Caching

@@ -187,7 +187,6 @@
                         (lambda ()
           ;; -- Check for new words, optionally.
           (when (and (*online?*) (ipoe-db-connected?))
-            (printf "CHCEK NEW WORDS\n")
             (add-word* (check-new-words stanza*)
                          #:interactive? (*interactive?*)))
           ;; -- Check spelling, optionally (and someday, check grammar)

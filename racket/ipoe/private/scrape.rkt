@@ -14,6 +14,10 @@
   rhymes?
   almost-rhymes?
   scrape-rhyme
+  ;; --
+  word-result
+  word-result?
+  word-result-num-syllables
 )
 
 (require
