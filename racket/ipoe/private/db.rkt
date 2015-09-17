@@ -92,7 +92,6 @@
     deserialize
     serialize)
   (only-in racket/file
-    file->string
     file->value)
 )
 
@@ -610,35 +609,13 @@
                     #:dbname (*dbname*)
         (lambda () e)))))
 
-  ;; Execute the thunk with the given string as the only config file.
-  (define (with-config thunk #:config str)
-    ;; -- Change to a temp directory, to avoid the local config
-    (parameterize ([current-directory (find-system-path 'temp-dir)])
-      ;; -- Save existing global config, be prepared to restore it
-      (define config-fname*
-        (let-values ([(gc lc) (get-config-filenames)])
-          (list gc lc)))
-      (define old-config-data*
-        (for/list ([fname (in-list config-fname*)])
-          (and (file-exists? fname)
-               (file->string fname))))
-      (define (restore-config)
-        (for/list ([d (in-list old-config-data*)]
-                   [fname (in-list config-fname*)]
-                   #:when d)
-          (with-output-to-file fname #:exists 'replace
-            (lambda () (display d)))))
-      ;; -- Write the new config
-      (when (file-exists? IPOE-CACHE)
-        (delete-file IPOE-CACHE))
-      (with-output-to-file (cadr config-fname*) #:exists 'replace
-        (lambda () (displayln str)))
-      (call-with-exception-handler
-        (lambda (exn)
-          (begin (restore-config) exn))
-        (lambda ()
-          (let ([r (thunk)])
-            (begin (restore-config) r))))))
+  ;; Clear the cache first, then do the rest of the user's expression
+  (define-syntax-rule (with-config/cache kw val e)
+    (with-config kw val
+      (lambda ()
+        (when (file-exists? IPOE-CACHE)
+          (delete-file IPOE-CACHE))
+        e)))
 
   ;; -- TODO test init prompt for username
   ;; -- TODO test init prompt for dbname
@@ -646,11 +623,8 @@
   ;;     Could not see the prompt, but did see a printf inside the DB context
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
-  (with-config #:config "#:interactive? #f\n#:online? #t"
-    (lambda ()
-      ;; Remove old cache file
-      (when (file-exists? IPOE-CACHE)
-        (delete-file IPOE-CACHE))
+  (with-config/cache #:config "#:interactive? #f\n#:online? #t"
+    (begin
       ;; Log in to the database, make some queries
       (with-ipoe-db #:commit? #f
         (lambda ()
@@ -1005,31 +979,29 @@
     (lambda () (almost-rhymes-with? "yes" "yes")))
 
   ;; Succeeds in online mode (for real words)
-  (with-config #:config "#:interactive? #f\n#:online? #t"
-    (lambda ()
-      (with-ipoe-db #:commit? #f (lambda ()
-        (check-true (rhymes-with? "paper" "draper"))
-        (check-true (almost-rhymes-with? "paper" "pager"))))))
+  (with-config/cache #:config "#:interactive? #f\n#:online? #t"
+    (with-ipoe-db #:commit? #f (lambda ()
+      (check-true (rhymes-with? "paper" "draper"))
+      (check-true (almost-rhymes-with? "paper" "pager")))))
 
   ;; -- scrape-word/cache & scrape-rhyme/cache
-  (with-config #:config "#:interactive? @#f\n#:online? #t"
-    (lambda ()
-      (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
-        ;; --- word
-        (check-true (online-mode? (*connection*)))
-        (check-true (word-exists? "car"))
-        (check-true (word-exists? "car"))
-        ;; Beyond the abstraction barrier...
-        (check-equal? (hash-count (*connection*)) 1)
-        (check-true (word-exists? "rake"))
-        (check-equal? (hash-count (*connection*)) 2)
-        ;; --- rhyme-scheme
-        (check-true (rhymes-with? "car" "far"))
-        (check-true (rhymes-with? "far" "car"))
-        ;; False because we never search for the word
-        (check-false (car (hash-ref (*connection*) "far")))
-        ;; False because we never searched for the rhyme
-        (check-false (cdr (hash-ref (*connection*) "rake")))
-        (check-equal? (hash-count (*connection*)) 3)))))
+  (with-config/cache #:config "#:interactive? @#f\n#:online? #t"
+    (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
+      ;; --- word
+      (check-true (online-mode? (*connection*)))
+      (check-true (word-exists? "car"))
+      (check-true (word-exists? "car"))
+      ;; Beyond the abstraction barrier...
+      (check-equal? (hash-count (*connection*)) 1)
+      (check-true (word-exists? "rake"))
+      (check-equal? (hash-count (*connection*)) 2)
+      ;; --- rhyme-scheme
+      (check-true (rhymes-with? "car" "far"))
+      (check-true (rhymes-with? "far" "car"))
+      ;; False because we never search for the word
+      (check-false (car (hash-ref (*connection*) "far")))
+      ;; False because we never searched for the rhyme
+      (check-false (cdr (hash-ref (*connection*) "rake")))
+      (check-equal? (hash-count (*connection*)) 3))))
 
 )
