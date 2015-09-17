@@ -33,7 +33,7 @@
   ipoe/private/parameters
   racket/match
   (only-in racket/sequence sequence->list)
-  (only-in ipoe/private/db add-word* with-ipoe-db)
+  (only-in ipoe/private/db add-word* with-ipoe-db ipoe-db-connected?)
 )
 
 ;; =============================================================================
@@ -132,7 +132,7 @@
 ;; (: read-keyword-value (-> Input-Port (-> Any Boolean) #:kw Symbol Any))
 (define (read-keyword-value in p? #:kw sym #:src err-loc)
   (when (eof-object? in)
-    (user-error err-loc (format "Unmatched keyword '~a'" sym)))
+    (user-error err-loc (format "Unmatched keyword '~a', expected to read another value" sym)))
   (define raw (read in))
   (if (p? raw)
       raw
@@ -154,7 +154,7 @@
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
       (define configuring? (box #t))
-      (define option* (#,options-init))
+      (define option* (options-init))
       ;; TODO process the file as a stream, do not build list of lines
       ;; TODO stop abusing that poor #:when clause
       ;;      (it's abused for now because we need to keep the first non-configure line)
@@ -166,35 +166,38 @@
                                [(string-empty? raw-line)
                                 ;; Ignore blank lines while configuring
                                 #f]
-                               [(#,option? raw-line)
+                               [(option? raw-line)
                                 => (lambda (opt)
                                 ;; Got an option, add to param. hash
-                                (#,options-set option* opt)
+                                (options-set option* opt)
                                 #f)]
                                [else
                                 ;; Non-blank, non-option => done configuring!
-                                (when (#,almost-option? raw-line)
-                                  (#,alert (format "Treating line '~a' as part of the poem text." raw-line)))
+                                (when (almost-option? raw-line)
+                                  (alert (format "Treating line '~a' as part of the poem text." raw-line)))
                                 (set-box! configuring? #f)
                                 #t])))
           raw-line))
       ;; 2015-08-27: If we need punctuation some day, get it from line*
       (define stanza* (sequence->list (to-stanza* line*)))
-      (#,parameterize-from-hash option* (lambda ()
-        (#,with-ipoe-db (lambda ()
+      (parameterize-from-hash option* (lambda ()
+        (with-ipoe-db #:user (*user*)
+                      #:dbname (*dbname*)
+                      #:interactive? (*interactive?*)
+                        (lambda ()
           ;; -- Check for new words, optionally.
-          (when (#,*online?*)
-            (#,add-word* (#,check-new-words stanza*)
-                         #:interactive? (#,*interactive?*)))
+          (when (and (*online?*) (ipoe-db-connected?))
+            (printf "CHCEK NEW WORDS\n")
+            (add-word* (check-new-words stanza*)
+                         #:interactive? (*interactive?*)))
           ;; -- Check spelling, optionally (and someday, check grammar)
-          (when (#,*spellcheck?*)
-            (#,check-spelling line*))
-          ;; -- Check rhyme scheme
+          (when (*spellcheck?*)
+            (check-spelling line*))
+          ;; -- Check rhyme scheme. TODO poetic license option/param
           (let ([rs '#,rs])
             (when (not (null? rs))
-              (#,assert-success #:src '#,name
-                (#,check-rhyme-scheme stanza* #:rhyme-scheme rs))))
-          ;(#,check-rhyme stanza*) ;; TODO poetic license option/param
+              (assert-success #:src '#,name
+                (check-rhyme-scheme stanza* #:rhyme-scheme rs))))
           ;; -- Check extra validator
           (define extra? (#,check-extra stanza*))
           (cond
