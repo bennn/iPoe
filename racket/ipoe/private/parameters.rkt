@@ -216,7 +216,7 @@
     (lambda () (printf "#:~a ~s\n" k v))))
 
 ;; Execute the thunk with the given string as the only config file.
-(define (with-config thunk #:config str)
+(define (with-config thunk #:local [local #f] #:global [global #f])
   ;; -- Change to a temp directory, to avoid the local config
   (parameterize ([current-directory (find-system-path 'temp-dir)])
     ;; -- Save existing global config, be prepared to restore it
@@ -234,8 +234,12 @@
         (with-output-to-file fname #:exists 'replace
           (lambda () (display d)))))
     ;; -- Write the new config
-    (with-output-to-file (cadr config-fname*) #:exists 'replace
-      (lambda () (displayln str)))
+    (for ([fname (in-list config-fname*)]
+          [new-data (in-list (list global local))])
+      (when new-data
+        (with-output-to-file fname #:exists 'replace
+          (lambda () (displayln new-data)))))
+    ;; -- Call the user's thunk, watch for exceptions
     (call-with-exception-handler
       (lambda (exn)
         (begin (restore-config) exn))
@@ -249,6 +253,7 @@
   (require
     rackunit
     ipoe/private/rackunit-abbrevs
+    (only-in racket/string string-trim)
     (only-in racket/list last)
     (only-in racket/file file->lines))
 
@@ -318,18 +323,23 @@
   ;; TODO handles empty lines?
 
   ;; -- option?
+  (check-false* option?
+   ["key #: val"]
+   ["#:#:"]
+   ["nope"]
+   [""]
+   ["    \t   "]
+   ["viet cong"]
+   ["#w x"]
+   ["a = b"]
+   ["keyval#:"])
   (check-apply* option?
-   ["nope" == #f]
-   ["" == #f]
-   ["    \t   " == #f]
-   ["viet cong" == #f]
-   ["#w x" == #f]
-   ["a = b" == #f]
-   ;; -- valid keys
    ["#:key val" == (option-match 'key 'val)]
    ["   #:mr smith" == (option-match 'mr 'smith)]
    [" #:yes 411" == (option-match 'yes 411)]
-  )
+   ["#:key #:val" == (option-match 'key '#:val)]
+   ["   #:key    val:#   " == (option-match 'key 'val:#)])
+
   ;; -- option?, with custom parser
   (check-equal? (option? "#:xxx yyy" #:parse-value (lambda (x) x))
                 (option-match 'xxx "yyy"))
@@ -358,22 +368,29 @@
     (check-true (*online?*))
     (check-true (<= 0 (*bad-lines-penalty*))))
 
-  ;; -- save-option (TODO tests local options only)
-  (parameterize ([current-directory (find-system-path 'temp-dir)])
-    ;; -- Get contents of old config file
-    (unless (file-exists? IPOE-CONFIG)
-      (with-output-to-file IPOE-CONFIG (lambda () (displayln ""))))
-    (define old-lines (file->lines IPOE-CONFIG))
-    ;; -- Write k/v pair to config file
-    (define key 'hello)
-    (define val 'world)
-    (save-option key val #:location 'local)
-    ;; -- Check new contents against the old
-    (define new-lines (file->lines IPOE-CONFIG))
-    (check-equal? (add1 (length old-lines)) (length new-lines))
-    (for ([o (in-list old-lines)] [n (in-list new-lines)])
-      (check-equal? o n))
-    (define opt (option? (last new-lines)))
-    (check-equal? opt (option-match key val)))
+  ;; -- save-option
+  (with-config #:local ""
+    (lambda ()
+      (define-values [gc lc] (get-config-filenames))
+      ;; -- Write k/v pair to config file
+      (define key 'hello)
+      (define val 'world)
+      (save-option key val #:location 'local)
+      ;; -- Check new contents against the old
+      (define local-data (string-trim (file->string lc)))
+      (check-equal? local-data "#:hello world")
+      (define global-lines (file->lines gc))
+      (check-equal? (options-count (options-init))
+                    (add1 (length global-lines)))))
+
+  (with-config #:global ""
+    (lambda ()
+      (define-values [gc lc] (get-config-filenames))
+      (displayln (file->lines gc))
+      (define key 'hello)
+      (define val 'world)
+      (save-option key val #:location 'global)
+      (check-equal? (string-trim (file->string gc))
+                    (format "#:~a ~a" key val))))
 
 )
