@@ -33,7 +33,13 @@
        #'(module mod-id racket/base
            (provide (rename-out [custom-read read] [custom-read-syntax read-syntax]))
            def-req
-           (require (only-in syntax/strip-context strip-context))
+           (require
+             ipoe/private/parameters
+             ipoe/private/either
+             (only-in ipoe/private/ui alert)
+             (only-in ipoe/private/db with-ipoe-db add-word* ipoe-db-connected?)
+             (only-in ipoe/private/spellcheck check-spelling)
+             (only-in syntax/strip-context strip-context))
            (define (custom-read in) (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)
              (with-syntax ([str (validate in)])
