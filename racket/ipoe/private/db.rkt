@@ -610,8 +610,8 @@
         (lambda () e)))))
 
   ;; Clear the cache first, then do the rest of the user's expression
-  (define-syntax-rule (with-config/cache kw val e)
-    (with-config kw val
+  (define-syntax-rule (with-config/cache [global local] e)
+    (with-config #:gloval global #:local local
       (lambda ()
         (when (file-exists? IPOE-CACHE)
           (delete-file IPOE-CACHE))
@@ -623,7 +623,7 @@
   ;;     Could not see the prompt, but did see a printf inside the DB context
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
-  (with-config/cache #:config "#:interactive? #f\n#:online? #t"
+  (with-config/cache [#f "#:interactive? #f\n#:online? #t"]
     (begin
       ;; Log in to the database, make some queries
       (with-ipoe-db #:commit? #f
@@ -979,13 +979,13 @@
     (lambda () (almost-rhymes-with? "yes" "yes")))
 
   ;; Succeeds in online mode (for real words)
-  (with-config/cache #:config "#:interactive? #f\n#:online? #t"
+  (with-config/cache [#f "#:interactive? #f\n#:online? #t"]
     (with-ipoe-db #:commit? #f (lambda ()
       (check-true (rhymes-with? "paper" "draper"))
       (check-true (almost-rhymes-with? "paper" "pager")))))
 
   ;; -- scrape-word/cache & scrape-rhyme/cache
-  (with-config/cache #:config "#:interactive? @#f\n#:online? #t"
+  (with-config/cache [#f "#:interactive? @#f\n#:online? #t"]
     (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
       ;; --- word
       (check-true (online-mode? (*connection*)))
