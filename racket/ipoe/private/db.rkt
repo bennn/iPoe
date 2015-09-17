@@ -642,10 +642,8 @@
 
   ;; -- TODO test init prompt for username
   ;; -- TODO test init prompt for dbname
-  ;(with-config #:config "#:user \"ben\""
-  ;  (lambda ()
-  ;    (parameterize ([current-input-port (current-output-port)])
-  ;      ({
+  ;;    (Tried on 09-17 with the DB in a thread, did not work out.
+  ;;     Could not see the prompt, but did see a printf inside the DB context
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
   (with-config #:config "#:interactive? #f\n#:online? #t"
