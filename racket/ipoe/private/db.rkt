@@ -92,6 +92,7 @@
     deserialize
     serialize)
   (only-in racket/file
+    file->string
     file->value)
 )
 
@@ -611,7 +612,7 @@
 
   ;; Clear the cache first, then do the rest of the user's expression
   (define-syntax-rule (with-config/cache [global local] e)
-    (with-config #:gloval global #:local local
+    (with-config #:global global #:local local
       (lambda ()
         (when (file-exists? IPOE-CACHE)
           (delete-file IPOE-CACHE))
@@ -619,8 +620,23 @@
 
   ;; -- TODO test init prompt for username
   ;; -- TODO test init prompt for dbname
-  ;;    (Tried on 09-17 with the DB in a thread, did not work out.
-  ;;     Could not see the prompt, but did see a printf inside the DB context
+  ;; (with-config/cache ["#:online? #t\n#:interactive? #t" ""]
+  ;;   (begin
+  ;;     (define-values [in0 out0] (make-pipe))
+  ;;     (define-values [in1 out1] (make-pipe))
+  ;;     (define c (make-custodian))
+  ;;     (parameterize ([current-custodian c])
+  ;;       (define prompt-thread
+  ;;         (parameterize ([current-input-port in1]
+  ;;                        [current-output-port out0])
+  ;;           (thread (lambda () (with-ipoe-db #:commit? #f #:user "any"
+  ;;             (lambda () (displayln "success")))))))
+  ;;       (parameterize ([current-input-port in0]
+  ;;                      [current-output-port out1])
+  ;;         (check-equal? (read-line) DBNAME-PROMPT)
+  ;;         (displayln "anything")
+  ;;         (check-equal? (read-line) "success"))
+  ;;       (thread-wait prompt-thread))))
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
   (with-config/cache [#f "#:interactive? #f\n#:online? #t"]
