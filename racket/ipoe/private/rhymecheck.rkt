@@ -23,6 +23,7 @@
   ipoe/private/db
   ipoe/private/either
   ipoe/private/parse
+  ipoe/private/parameters
   ipoe/private/suggest
   ipoe/private/ui
   ;; --
@@ -278,8 +279,18 @@
 (module+ test
   (require rackunit "rackunit-abbrevs.rkt")
 
+  (define o* (options-init))
+
+  (define-syntax-rule (with-db/test e ...)
+    (parameterize-from-hash o* (lambda ()
+      (with-ipoe-db #:user (*user*)
+                    #:dbname (*dbname*)
+                    #:interactive? #t
+                    #:commit? #f
+        (lambda () e ...)))))
+
   ;; -- check-rhyme-scheme
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
       ['() '()]
       ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
@@ -297,8 +308,7 @@
          ("the" "end"))
        '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
          ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
-         ((L . *) (M . *)))]
-    )
+         ((L . *) (M . *)))])
 
     (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
       ['() '((A))]
@@ -318,7 +328,7 @@
        '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
          ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
          ((L . *) (M . *)))]
-    )))
+    ))
 
   ;; ---------------------------------------------------------------------------
   ;; -- rhyme-scheme?
@@ -539,7 +549,7 @@
     ["blah" "b"])
 
   ;; -- check-stanza*
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (define (test-check-stanza*/pass vm stanza rs)
       (success? (check-stanza* vm stanza rs #:stanza-number 0)))
     (check-true* test-check-stanza*/pass
@@ -563,10 +573,10 @@
       ['((A . "word") (B . "mouse"))
        '(("bird" "house") ("worried" "spouse"))
        '(((A . 1) (B . 1)) ((A . 1) (B . 1)))]
-    )))
+    ))
 
   ;; -- check-syllables
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (define (test-check-syllables/pass stanza syll*)
       (success? (check-syllables stanza syll* #:stanza-number 4 #:line-number 5)))
     (check-true* test-check-syllables/pass
@@ -584,11 +594,10 @@
     (check-exn (regexp "ipoe:check-syllables:internal-error")
       (lambda () (check-syllables '("a" "a") '(*) #:stanza-number 3)))
     (check-exn (regexp "ipoe:check-syllables:internal-error")
-      (lambda () (check-syllables '() '(1 2 3) #:stanza-number 3)))
-    ))
+      (lambda () (check-syllables '() '(1 2 3) #:stanza-number 3))))
 
   ;; -- line->syllables
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-apply* line->syllables
      ["" == 0]
      ["a" == 1]
@@ -597,8 +606,7 @@
      ["volcanic antidisestablishmentarianism you know" == 16]
      ;; -- unknown words have 0 syllables
      ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]
-     ["." == 0]
-  )))
+     ["." == 0]))
 
   ;; -- replace-wildcard-syllables
   (check-apply* replace-wildcard-syllables
@@ -609,7 +617,7 @@
   )
 
   ;; -- rhyme=?
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-true* rhyme=?
      ;; -- rhyme
      ["car" "far"]
@@ -622,8 +630,7 @@
     )
     ;; --
     (check-exn (regexp "ipoe:db")
-      (lambda () (rhyme=? "cat" "blahblahblahblahblah")))
-  ))
+      (lambda () (rhyme=? "cat" "blahblahblahblahblah"))))
 
   ;; -- unify-rhyme-scheme
   (define-syntax-rule (check-unify/pass [vm st rs == vm2] ...)
@@ -631,7 +638,7 @@
       (let ([result (unify-rhyme-scheme vm st rs #:stanza-number 0)])
         (check-pred success? result)
         (check-equal? (success-value result) vm2)) ...))
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (let ([vm1 '((V1 . "val1") (Var2 . "val2") (M . "m"))])
       (check-unify/pass
         ['() '() '() == '()]
@@ -643,16 +650,15 @@
          == '((X . "role"))]
         [vm1 '("car" "file" "scientist") '(* * *)
          == vm1]
-      ))))
+      )))
 
   (define-syntax-rule (check-unify/fail [vm st rs] ...)
     (begin (check-pred failure? (unify-rhyme-scheme vm st rs #:stanza-number 2)) ...))
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-unify/fail
       ['() '("a" "bacon") '(A A)]
       ['() '("harpoon" "moon" "will") '(A B A)]
-      ['((A . "worm")) '("cat" "dog" "rat") '(A B A)]
-    )))
+      ['((A . "worm")) '("cat" "dog" "rat") '(A B A)]))
 
   ;; Invariant: unify-rhyme-scheme expects 2nd and 3rd args to have same length
   (check-exn (regexp "ipoe:.*:internal-error")
@@ -660,9 +666,9 @@
   (check-exn (regexp "ipoe:.*:internal-error")
     (lambda () (unify-rhyme-scheme '() '("hello") '() #:stanza-number 2)))
 
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     ;; Nothing rhymes with a fake word
     (check-exn (regexp "ipoe:db")
-      (lambda () (unify-rhyme-scheme '() '("asdgwrfscbad" "hello" "bye") '(A A A) #:stanza-number 81)))))
+      (lambda () (unify-rhyme-scheme '() '("asdgwrfscbad" "hello" "bye") '(A A A) #:stanza-number 81))))
 
 )

@@ -225,7 +225,7 @@
   (with-ipoe-db #:commit? #f
     (lambda ()
       (check-apply* (lambda (text) (check-new-words (sequence->list (to-stanza* (to-line* text)))))
-        ["wait for the never1zd0neverland" == '("never1zd0neverland")]
+        ["wait for the blada;dasdf" == '()]
         ["asoivnawetga vjifanspetaw" == '()]
       )))
 
