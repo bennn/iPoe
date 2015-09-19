@@ -13,12 +13,17 @@
   ;; (check-apply* f [arg* ... == res] ...)
   ;; Desugar into `check-equal?` matching `f arg* ...` against `res`
 
+  check-print
+  ;; (check-print f str)
+  ;; Run the thunk `f` and assert that it prints output matching `str` to
+  ;;  the current output port.
 )
 
 ;; -----------------------------------------------------------------------------
 
 (require
   rackunit
+  (only-in racket/port port->string)
   (for-syntax racket/base syntax/parse)
 )
 
@@ -44,6 +49,13 @@
     [(_ f [arg* ... != res] ...)
      (syntax/loc stx (begin (check-not-equal? (f arg* ...) res) ...))]
     [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
+
+(define (check-print f str)
+  (define-values [in out] (make-pipe))
+  (parameterize ([current-output-port out])
+    (f)
+    (close-output-port out))
+  (check-equal? (port->string in) str))
 
 ;; =============================================================================
 
@@ -125,5 +137,21 @@
   ;  [1 != 2]
   ;  [2 == 2]
   ;  [3 != 0])
+
+  ;; -- check-print
+  (let ([msg ""])
+    (check-print
+      (lambda () (display msg))
+      msg))
+
+  (let ([msg "hello world"])
+    (check-print
+      (lambda () (display msg))
+      msg))
+
+  (let ([msg 7])
+    (check-print
+      (lambda () (displayln msg))
+      (format "~a\n" msg)))
 
 )
