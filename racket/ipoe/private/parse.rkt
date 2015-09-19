@@ -120,11 +120,15 @@
 ;; (: digit3->word* (-> Natural (Listof String)))
 (define (digit3->word* d3)
   (define rest (digit2->word* (modulo d3 100)))
-  (if (< 99 d3)
-      (cons (digit->word (quotient d3 100))
-            (cons "hundred"
-                  rest))
-      rest))
+  (cond
+   [(= 100 d3)
+    '("one" "hundred")]
+   [(< 99 d3)
+    (cons (digit->word (quotient d3 100))
+          (cons "hundred"
+                rest))]
+   [else
+    rest]))
 
 ;; (: digit2->word* (-> Natural (Listof String)))
 (define (digit2->word* n)
@@ -258,6 +262,14 @@
     [16 == '("sixteen")]
     [-1 == '("negative" "one")]
     [123 == '("one" "hundred" "twenty" "three")]
+    [22 == '("twenty" "two")]
+    [14 == '("fourteen")]
+    [50 == '("fifty")]
+    [98 == '("ninety" "eight")]
+    [100 == '("one" "hundred")]
+    [120 == '("one" "hundred" "twenty")]
+    [1002 == '("one" "thousand" "two")]
+    [1323 == '("one" "thousand" "three" "hundred" "twenty" "three")]
     [8675309 == '("eight" "million" "six" "hundred" "seventy" "five" "thousand" "three" "hundred" "nine")])
 
   ;; --- Doesn't support words over 1 quadrillion
@@ -287,6 +299,7 @@
     [999 == '("nine" "hundred" "ninety" "nine")]
     [21 == '("twenty" "one")]
     [19 == '("nineteen")]
+    [100 == '("one" "hundred")]
     [123 == '("one" "hundred" "twenty" "three")]
     [666 == '("six" "hundred" "sixty" "six")])
 
