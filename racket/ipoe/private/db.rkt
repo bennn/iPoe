@@ -119,17 +119,25 @@
 
 ;; -----------------------------------------------------------------------------
 
+;; Boxes detect if user has saved DB preferences during this execution.
+;; Saves us from re-compiling the options (and re-reading the poem)
+;; or passing flags back up to the caller's stack frame to bind *user*
+(define adhoc-user (box #f))
+(define adhoc-dbname (box #f))
+
 ;; Open a database connection & set parameters
 (define (db-init #:user [u-param #f]
                  #:dbname [db-param #f]
                  #:interactive? [interactive? #f])
   ;; -- Resolve username and dbname
   (define u (or u-param
+                (unbox adhoc-user)
                 (and interactive?
                      (get-user-input read-string
                                      #:prompt USER-PROMPT
                                      #:description USER-DESCRIPTION))))
   (define db (or db-param
+                 (unbox adhoc-dbname)
                  (and interactive?
                       (get-user-input read-string
                                       #:prompt DBNAME-PROMPT
@@ -141,13 +149,19 @@
     ;;(current-ipoe-log (open-output-file DB-LOG #:exists? 'error))
     (start-transaction (*connection*))
     ;; -- Ask whether to save current user & db for future sessions
-    (when (or (not u-param) (not db-param))
+    (define got-new-user? (and (not u-param) (not (unbox adhoc-user))))
+    (define got-new-dbname? (and (not db-param) (not (unbox adhoc-dbname))))
+    (when (or got-new-user? got-new-dbname?)
       (case (get-user-input read-yes-or-no
                             #:prompt "Save current database preferences? (Y/N)")
        [(Y)
         ;; Write the previously unset values to the global config
-        (when (not  u-param)  (save-option 'user u))
-        (when (not db-param)  (save-option 'dbname db))]
+        (when got-new-user?
+          (set-box! adhoc-user u)
+          (save-option 'user u))
+        (when got-new-dbname?
+          (set-box! adhoc-dbname db)
+          (save-option 'dbname db))]
        [(N) (void)]))]
    [else
     (when interactive?
@@ -615,6 +629,7 @@
 (module+ test
   (require rackunit racket/sequence ipoe/private/rackunit-abbrevs)
 
+  ;; TODO Warn & ignore local config
   (define o*
     (if (file-exists? IPOE-CONFIG)
         (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
@@ -623,9 +638,17 @@
   (define-syntax-rule (with-db-test e)
     (parameterize-from-hash o* (lambda ()
       (with-ipoe-db #:commit? #f
-                    #:interactive? #f
+                    #:interactive? #t
                     #:user (*user*)
                     #:dbname (*dbname*)
+        (lambda () e)))))
+
+  (define-syntax-rule (with-online-test e)
+    (parameterize-from-hash o* (lambda ()
+      (with-ipoe-db #:commit? #f
+                    #:interactive? #f
+                    #:user #f
+                    #:dbname #f
         (lambda () e)))))
 
   ;; Clear the cache first, then do the rest of the user's expression
@@ -657,11 +680,12 @@
   ;;       (thread-wait prompt-thread))))
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
-  (with-config/cache [#f "#:interactive? #f\n#:online? #t"]
+  (with-config/cache [#f #f]
     (begin
       ;; Log in to the database, make some queries
-      (with-ipoe-db #:commit? #f
-        (lambda ()
+      ;; Use `with-ipoe-db` to test config/cache
+      (with-online-test
+        (begin
           (check-true (word-exists? "hello"))
           (check-false (word-exists? "asjdlviuahnzcijvaeafawjsdzidgw")
           (check-true (rhymes-with? "cat" "bat")))))
@@ -689,7 +713,7 @@
   ;; --- online-mode
   (check-exn (regexp "ipoe:db:find-word")
              (lambda ()
-               (with-ipoe-db #:commit? #f (lambda () (find-word "apple")))))
+               (with-online-test (find-word "apple"))))
 
   ;; -- syllables->word*
   (define-syntax-rule (check-syllables->word* [syllables word-expected*] ...)
@@ -708,20 +732,20 @@
    (check-exn (regexp "ipoe:db:syllables->word*")
      (lambda () (syllables->word* 3)))
    (check-exn (regexp "ipoe:db:syllables->word*")
-     (lambda () (with-ipoe-db #:commit? #f (lambda () (syllables->word* 3)))))
+     (lambda () (with-online-test (syllables->word* 3))))
 
   ;; -- id->word
-  (define-syntax-rule (check-id-word-bijection [w ...])
+  (define-syntax-rule (check-id<=>word [w ...])
     ;; Spot-check id->word = word->id
     (with-db-test
       (begin (check-equal? (id->word (word->id w)) w) ...)))
-  (check-id-word-bijection
+  (check-id<=>word
    ["yes" "under" "africa" "polymorphism" "a" "heating"])
 
   ;; -- ipoe-db-connected?
   (check-false (ipoe-db-connected?))
-  (with-ipoe-db #:commit? #f
-    (lambda () (check-false (ipoe-db-connected?))))
+  (with-online-test
+    (check-false (ipoe-db-connected?)))
   (with-db-test
     (check-true (ipoe-db-connected?)))
 
@@ -748,7 +772,7 @@
   (check-false (online-mode? #t))
   (with-db-test
     (check-false (online-mode? (*connection*))))
-  (parameterize ([*connection* (make-hash)])
+  (with-online-test
     (check-true (online-mode? (*connection*))))
 
   ;; -- validate-word-column
@@ -810,11 +834,8 @@
         ["balloon" != 3]
         ["hour" != 2])))
 
-  (check-exn (regexp "ipoe:db:find-word")
+  (check-exn (regexp "ipoe:db:word->syllables")
     (lambda () (word->syllables "yes")))
-  (check-exn (regexp "ipoe:db:find-word")
-    (lambda ()
-      (with-ipoe-db #:commit? #f (lambda () (word->syllables "yes")))))
 
   ;; -- add-word/unsafe
   (let ([new-word "ycvgpadfwd"])
@@ -859,7 +880,9 @@
         (for ([a (in-list a*)])
           (check-true (word-exists? a)))
         ;; -- add word
-        (add-word/unsafe new-word 5 r* a*) ;; Should trigger a printout
+        (check-print
+          (lambda () (add-word/unsafe new-word 5 r* a*))
+          (format "[WARNING ipoe:db:rhyme] : Could not find ID for word '~a'\n" (car r*)))
         (check-true (word-exists? new-word))
         ;; -- should have no rhymes
         (check-equal? (sequence->list (word->rhyme* new-word)) '()))))
@@ -883,7 +906,7 @@
   (let ([new-word "asdhvuianjsdkvasd"])
     (check-false (add-word new-word))
     (check-false
-      (with-ipoe-db #:commit? #f (lambda () (add-word new-word)))))
+      (with-online-test (add-word new-word))))
 
 
   ;; -- add-word* (when offline?, never fails)
@@ -906,13 +929,18 @@
   ;; -- add-rhyme / add-almost-rhyme
   (with-db-test
     ;; Doesn't commit for unknown rhymes/almost
-    (let ([word "word"]
-          [unknown "aiopsuvhz"])
+    (let* ([word "word"]
+           [unknown "aiopsuvhz"]
+           [warn-str (format " : Could not find ID for word '~a'\n" unknown)])
       (check-true (word-exists? word))
       (check-false (word-exists? unknown))
-      (add-rhyme word unknown)
+      (check-print
+        (lambda () (add-rhyme word unknown))
+        (string-append "[WARNING ipoe:db:rhyme]" warn-str))
       (check-false (word-exists? unknown))
-      (add-almost-rhyme word unknown)
+      (check-print
+        (lambda () (add-almost-rhyme word unknown))
+        (string-append "[WARNING ipoe:db:almost_rhyme]" warn-str))
       (check-false (word-exists? unknown))))
 
   (with-db-test
@@ -1013,29 +1041,30 @@
     (lambda () (almost-rhymes-with? "yes" "yes")))
 
   ;; Succeeds in online mode (for real words)
-  (with-config/cache [#f "#:interactive? #f\n#:online? #t"]
-    (with-ipoe-db #:commit? #f (lambda ()
+  (with-online-test
+    (begin
       (check-true (rhymes-with? "paper" "draper"))
-      (check-true (almost-rhymes-with? "paper" "pager")))))
+      (check-true (almost-rhymes-with? "paper" "pager"))))
 
   ;; -- scrape-word/cache & scrape-rhyme/cache
-  (with-config/cache [#f "#:interactive? @#f\n#:online? #t"]
-    (with-ipoe-db #:commit? #f #:user #f #:dbname #f (lambda ()
-      ;; --- word
-      (check-true (online-mode? (*connection*)))
-      (check-true (word-exists? "car"))
-      (check-true (word-exists? "car"))
-      ;; Beyond the abstraction barrier...
-      (check-equal? (hash-count (*connection*)) 1)
-      (check-true (word-exists? "rake"))
-      (check-equal? (hash-count (*connection*)) 2)
-      ;; --- rhyme-scheme
-      (check-true (rhymes-with? "car" "far"))
-      (check-true (rhymes-with? "far" "car"))
-      ;; False because we never search for the word
-      (check-false (car (hash-ref (*connection*) "far")))
-      ;; False because we never searched for the rhyme
-      (check-false (cdr (hash-ref (*connection*) "rake")))
-      (check-equal? (hash-count (*connection*)) 3))))
+  (with-config/cache [#f #f]
+    (with-online-test
+      (begin
+        ;; --- word
+        (check-true (online-mode? (*connection*)))
+        (check-true (word-exists? "car"))
+        (check-true (word-exists? "car"))
+        ;; Beyond the abstraction barrier...
+        (check-equal? (hash-count (*connection*)) 1)
+        (check-true (word-exists? "rake"))
+        (check-equal? (hash-count (*connection*)) 2)
+        ;; --- rhyme-scheme
+        (check-true (rhymes-with? "car" "far"))
+        (check-true (rhymes-with? "far" "car"))
+        ;; False because we never search for the word
+        (check-false (car (hash-ref (*connection*) "far")))
+        ;; False because we never searched for the rhyme
+        (check-false (cdr (hash-ref (*connection*) "rake")))
+        (check-equal? (hash-count (*connection*)) 3))))
 
 )
