@@ -234,6 +234,8 @@
 (module+ test
   (require
     rackunit
+    ipoe/private/rackunit-abbrevs
+    (only-in racket/port with-input-from-string)
     (only-in racket/string string-split)
   )
 
@@ -252,41 +254,46 @@
                 (void))
 
   ;; Always an exception if first arg is non-false
-  (let ([src 'cdtest])
-    (check-exn (regexp (symbol->string src))
+  (let* ([src 'cdtest]
+         [src-str (symbol->string src)])
+    (check-exn (regexp src-str)
                (lambda () (check-duplicate #t #:new-val 'any #:src src #:msg 'any)))
-    (check-exn (regexp (symbol->string src))
+    (check-exn (regexp src-str)
                (lambda () (check-duplicate 'A #:new-val 'any #:src src #:msg 'any)))
-    (check-exn (regexp (symbol->string src))
+    (check-exn (regexp src-str)
                (lambda () (check-duplicate "hi" #:new-val 'any #:src src #:msg 'any))))
 
   ;; -- input->poem-spec
   (define (test-input->poem-spec str)
-    (define p (open-input-string str))
-    (define r (input->poem-spec p))
-    (close-input-port p)
-    r)
-  (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A)) #;syllables 10")
-                (poem-spec 'couplet '(((A . 10) (A . 10))) #f #f))
-  (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A))")
-                (poem-spec 'couplet '((A A)) #f #f))
-  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:name yes")
-                (poem-spec 'yes '((A) (B) (C)) #f #f))
-  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:descr \"a short description\" #:name yes")
-                (poem-spec 'yes '((A) (B) (C)) "a short description" #f))
-  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:description \"yo lo\" #:name yes")
-                (poem-spec 'yes '((A) (B) (C)) "yo lo" #f))
-  ;; It's okay to leave out the keywords
-  (check-equal? (test-input->poem-spec "name (((Schema . 42)))")
-                (poem-spec 'name '(((Schema . 42))) #f #f))
-  (check-equal? (test-input->poem-spec "name  10 (((Schema . 42)))")
-                (poem-spec 'name '(((Schema . 42))) #f #f))
-  (check-equal? (test-input->poem-spec "name  10 (((Schema . 42) *))")
-                (poem-spec 'name '(((Schema . 42) (* . 10))) #f #f))
-  (check-equal? (test-input->poem-spec "name  \"aha\" (((Schema . 42) *))")
-                (poem-spec 'name '(((Schema . 42) *)) "aha" #f))
- ;; --- with #:extra-validator
-  (let* ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")]
+    (with-input-from-string str
+      (lambda () (input->poem-spec (current-input-port)))))
+
+  (check-apply* test-input->poem-spec
+   ["#:name couplet #:rhyme-scheme ((A A)) #;syllables 10"
+    == (poem-spec 'couplet '(((A . 10) (A . 10))) #f #f)]
+   ["#:name couplet #:rhyme-scheme ((A A))"
+    == (poem-spec 'couplet '((A A)) #f #f)]
+   ["#:rhyme-scheme ((A) (B) (C)) #:name yes"
+    == (poem-spec 'yes '((A) (B) (C)) #f #f)]
+   ["#:rhyme-scheme ((A) (B) (C)) #:descr \"a short description\" #:name yes"
+    == (poem-spec 'yes '((A) (B) (C)) "a short description" #f)]
+   ["#:rhyme-scheme ((A) (B) (C)) #:description \"yo lo\" #:name yes"
+    == (poem-spec 'yes '((A) (B) (C)) "yo lo" #f)]
+   ;; It's okay to leave out the keywords
+   ["name (((Schema . 42)))"
+    == (poem-spec 'name '(((Schema . 42))) #f #f)]
+   ["name  10 (((Schema . 42)))"
+    == (poem-spec 'name '(((Schema . 42))) #f #f)]
+   ["name  10 (((Schema . 42) *))"
+    == (poem-spec 'name '(((Schema . 42) (* . 10))) #f #f)]
+   ["name  \"aha\" (((Schema . 42) *))"
+    == (poem-spec 'name '(((Schema . 42) *)) "aha" #f)])
+
+   ;; -- input->poem-spec, with #:extra-validator
+  (let* ([ps (test-input->poem-spec (string-append
+                                     "#:name has-extra "
+                                     "#:rhyme-scheme ((1 2 3) (A B (C . 3))) "
+                                     "#:extra-validator (lambda (x) #t)"))]
          [ev (eval-extra-validator ps)])
     (check-true (poem-spec? ps))
     (check-equal? (poem-spec-name ps) 'has-extra)
@@ -307,23 +314,24 @@
     (check-exn src-regexp
                (lambda () (read-keyword-value eof boolean? #:kw 'yolo #:src src)))
     (define (test-read-keyword-value str p?)
-      (define port (open-input-string str))
-      (define res  (read-keyword-value port p? #:kw 'test-kw #:src src))
-      (close-input-port port)
-      res)
-    ;; If value matches predicate, pass
-    (check-equal? (test-read-keyword-value "hello" symbol?)
-                  'hello)
-    (check-equal? (test-read-keyword-value "1" integer?)
-                  1)
-    ;; If value doesn't match predicate, fail
+      (with-input-from-string str
+        (lambda ()
+          (read-keyword-value (current-input-port) p? #:kw 'test-kw #:src src))))
+
+    ;; --- If value matches predicate, pass
+    (check-apply* test-read-keyword-value
+      ["hello" symbol? == 'hello]
+      ["(())" list? == '(())]
+      ["1" integer? == 1])
+
+    ;; -- If value doesn't match predicate, fail
     (check-exn src-regexp
                (lambda () (test-read-keyword-value "42" string?)))
     (check-exn src-regexp
                (lambda () (test-read-keyword-value "42" symbol?))))
 
   ;; -- poem-spec->validator
-  (define-syntax-rule (make-validator spec)
+  (define (make-validator spec)
     (parameterize ([current-namespace (make-base-namespace)])
       (eval #`(begin #,validator-requires #,(poem-spec->validator spec)) (current-namespace))))
 
@@ -342,43 +350,80 @@
 
   ;; --- Testing options
   (let* ([free-validator (make-validator (poem-spec 'free '() #f #f))]
-         [fake-options "#:one option\n   #:another option\n\n\n#:third  thing    \nsome text\n\nmore text\n#:not anoption\n"]
-         [real-options "#:online? #f\n#:interactive? #f\n#:spellcheck? #f\n#:poetic-license 9001\n\nThings are good these days.\n"]
-         [runon-options "#:online? #t #:interactive? #f\n\nyoooolo\n"])
+         [fake-options (string-append
+                         "#:one option\n"
+                         "#:another option\n\n\n"
+                         "#:third  thing    \n"
+                         "some text\n\nmore text\n"
+                         "#:not anoption\n")]
+         [real-options (string-append
+                         "#:online? #f\n"
+                         "#:interactive? #f\n"
+                         "#:spellcheck? #f\n"
+                         "#:poetic-license 9001\n\n"
+                         "Things are good these days.\n")]
+         [runon-options (string-append
+                          "#:spellcheck? #f\n"
+                          "#:yes #t #:no #f\n\n"
+                          "yoooolo\n")])
     (define (test-free str)
       (define port (open-input-string str))
-      (define res (parameterize ([*interactive?* #f])
-        (free-validator port)))
+      (define res
+        (parameterize ([*interactive?* #f])
+          (free-validator port)))
       (close-input-port port)
       res)
     ;; --- Test for unknown / invalid options (they do nothing)
-    (let ([fake-res (test-free fake-options)])
-      (check-equal? (car fake-res)
-                    '("some text" "" "more text" "#:not anoption"))
-      (check-equal? (sort (hash->list (cdr fake-res)) symbol<? #:key car)
-                    '((another . option) (one . option) (third . thing))))
+    (let ([fake-res (check-print
+                      (list #rx"^Unknown key"
+                            #rx"^Unknown key"
+                            #rx"^Unknown key"
+                            #rx"Mispelled word")
+                      (lambda () (test-free fake-options)))])
+        (check-equal? (car fake-res)
+                      '("some text" "" "more text" "#:not anoption"))
+        (let* ([H (cdr fake-res)]
+               [get (lambda (k) (hash-ref H k (lambda () #f)))])
+          (check-apply* get
+            ['one == 'option]
+            ['another == 'option]
+            ['third == 'thing])))
     ;; --- Test for known options (run-time config should change)
-    (let ([real-res (test-free real-options)])
+    (let* ([real-res (test-free real-options)]
+           [H (cdr real-res)]
+           [get (lambda (k) (hash-ref H k (lambda () #f)))])
       (check-equal? (car real-res) '("Things are good these days."))
-      (check-equal? (options-get (cdr real-res) 'online?) #f)
-      (check-equal? (options-get (cdr real-res) 'interactive?) #f)
-      (check-equal? (options-get (cdr real-res) 'spellcheck?) #f)
-      (check-equal? (options-get (cdr real-res) 'poetic-license) 9001))
+      (check-apply* get
+       ['online? == #f]
+       ['interactive? == #f]
+       ['spellcheck? == #f]
+       ['poetic-license == 9001]))
     ;; -- Test options on one line
-    (let ([runon-res (test-free runon-options)])
-      (check-equal? (car runon-res) '("#:online? #t #:interactive? #f" "" "yoooolo"))
-      (check-equal? (cdr runon-res) (options-init))))
+    (let* ([runon-res (check-print
+                        (list #rx"as part of the poem text.$")
+                        (lambda () (test-free runon-options)))]
+           [str (car runon-res)]
+           [H (cdr runon-res)]
+           [get (lambda (k) (hash-ref H k (lambda () #f)))])
+      (check-equal? str '("#:yes #t #:no #f" "" "yoooolo"))
+      (check-apply* get
+       ['spellcheck? == #f]
+       ['yes == #f]
+       ['no == #f])))
 
   ;; -- validator?
-  (check-false (validator? '#f))
-  (check-false (validator? #f))
-  (check-false (validator? ''(1 2 3)))
-  (check-false (validator? '(+ 1 1)))
-  (check-false (validator? "hello"))
+  (check-false* validator?
+   ['#f]
+   [#f]
+   [''(1 2 3)]
+   ['(+ 1 1)]
+   ["hello"])
 
-  (check-pred validator? '(lambda (x) #t))
-  (check-pred validator? '(lambda (x) #f))
-  (check-pred validator? '(lambda (x) (< 5 (length x))))
+  (check-true* (lambda (v) (and (validator? v) #t))
+   ['(lambda (x) #t)]
+   ['(lambda (x) #f)]
+   ['(lambda (x) (< 5 (length x)))])
+
   ;; --- test a "good" validator function
   ;;     2015-08-19: removed contract checks
   (let* ([v-stx (validator? '(lambda (x) (null? x)))]
