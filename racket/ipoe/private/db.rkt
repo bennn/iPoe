@@ -128,22 +128,25 @@
 ;; Open a database connection & set parameters
 (define (db-init #:user [u-param #f]
                  #:dbname [db-param #f]
+                 #:online? [online? #f] ;; Added late, should maybe redesign with this first
                  #:interactive? [interactive? #f])
   ;; -- Resolve username and dbname
   (define u (or u-param
                 (unbox adhoc-user)
                 (and interactive?
+                     (not online?)
                      (get-user-input read-string
                                      #:prompt USER-PROMPT
                                      #:description USER-DESCRIPTION))))
   (define db (or db-param
                  (unbox adhoc-dbname)
                  (and interactive?
+                      (not online?)
                       (get-user-input read-string
                                       #:prompt DBNAME-PROMPT
                                       #:description DBNAME-DESCRIPTION))))
   (cond
-   [(and u db (not (or (string-empty? u) (string-empty? db))))
+   [(and (not online?) u db (not (or (string-empty? u) (string-empty? db))))
     ;; -- Have all parameters, try connecting to the database
     (*connection* (postgresql-connect #:user u #:database db))
     ;;(current-ipoe-log (open-output-file DB-LOG #:exists? 'error))
@@ -189,9 +192,10 @@
 (define (with-ipoe-db thunk #:user [u #f]
                             #:dbname [db #f]
                             #:commit? [commit? #t]
+                            #:online? [o #f]
                             #:interactive? [i #f])
   ;; Open a database connection
-  (let* ([pgc (db-init #:user u #:dbname db #:interactive? i)])
+  (let* ([pgc (db-init #:user u #:dbname db #:online? o #:interactive? i)])
     (call-with-exception-handler
       ;; On error, close the DB connection
       (lambda (exn)
@@ -256,7 +260,7 @@
     (duplicate-word-error (format "Cannot add word '~a', already in database" word))]
    [else
     (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:offline? offline?))
-    (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with explicit #:syllables argument." word))
+    (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with an explicit #:syllables argument." word))
     (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param #:interactive? interactive? #:offline? offline?))
     (define rhyme* (rhyme-result-rhyme* rr))
     (define almost-rhyme* (rhyme-result-almost-rhyme* rr))
@@ -646,9 +650,8 @@
   (define-syntax-rule (with-online-test e)
     (parameterize-from-hash o* (lambda ()
       (with-ipoe-db #:commit? #f
+                    #:online? #t
                     #:interactive? #f
-                    #:user #f
-                    #:dbname #f
         (lambda () e)))))
 
   ;; Clear the cache first, then do the rest of the user's expression
@@ -710,10 +713,6 @@
   ;; --- without a DB, should get a "useful" error message
   (check-exn (regexp "ipoe:db:find-word")
              (lambda () (find-word "yolo")))
-  ;; --- online-mode
-  (check-exn (regexp "ipoe:db:find-word")
-             (lambda ()
-               (with-online-test (find-word "apple"))))
 
   ;; -- syllables->word*
   (define-syntax-rule (check-syllables->word* [syllables word-expected*] ...)
@@ -809,10 +808,8 @@
        ["yolo" != 1]
        ["demon" != 12])))
 
-   (check-exn (regexp "ipoe:db:find-word")
-     (lambda () (word->id "sea")))
-   (check-exn (regexp "ipoe:db:find-word")
-     (lambda () (with-ipoe-db #:commit? #f (lambda () (word->id "car")))))
+  (check-exn (regexp "ipoe:db:find-word")
+    (lambda () (word->id "sea")))
 
   ;; -- word->syllables
   (with-db-test
@@ -881,8 +878,8 @@
           (check-true (word-exists? a)))
         ;; -- add word
         (check-print
-          (lambda () (add-word/unsafe new-word 5 r* a*))
-          (format "[WARNING ipoe:db:rhyme] : Could not find ID for word '~a'\n" (car r*)))
+          (format "[WARNING ipoe:db:rhyme] : Could not find ID for word '~a'\n" (car r*))
+          (lambda () (add-word/unsafe new-word 5 r* a*)))
         (check-true (word-exists? new-word))
         ;; -- should have no rhymes
         (check-equal? (sequence->list (word->rhyme* new-word)) '()))))
@@ -935,12 +932,12 @@
       (check-true (word-exists? word))
       (check-false (word-exists? unknown))
       (check-print
-        (lambda () (add-rhyme word unknown))
-        (string-append "[WARNING ipoe:db:rhyme]" warn-str))
+        (string-append "[WARNING ipoe:db:rhyme]" warn-str)
+        (lambda () (add-rhyme word unknown)))
       (check-false (word-exists? unknown))
       (check-print
-        (lambda () (add-almost-rhyme word unknown))
-        (string-append "[WARNING ipoe:db:almost_rhyme]" warn-str))
+        (string-append "[WARNING ipoe:db:almost_rhyme]" warn-str)
+        (lambda () (add-almost-rhyme word unknown)))
       (check-false (word-exists? unknown))))
 
   (with-db-test
@@ -964,10 +961,7 @@
          [v "avhoiuswvp"])
      ;; Fails when disconnected from DB
      (check-exn (regexp "ipoe:db:find-word")
-       (lambda () (add-rhyme w v)))
-     (check-exn (regexp "ipoe:db:find-word")
-       (lambda ()
-         (with-ipoe-db #:commit? #f (lambda () (add-rhyme w v))))))
+       (lambda () (add-rhyme w v))))
 
   ;; -- (assert-)rhyme-table?
   (check-true* rhyme-table?
