@@ -183,7 +183,7 @@
   ;; -- check for unknown keys
   (for ([k (in-hash-keys o*)])
     (unless (set-member? ALL-PARAMETERS k)
-      (alert (format "Unknown key '~a'\n" k))))
+      (alert (format "Unknown key '~a'" k))))
   ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
     [*user*  (hash-ref o* user *user*)]
@@ -359,11 +359,12 @@
     (check-true (< init-count (options-count opt)))
     (check-true (*online?*))
     (check-true (<= 0 (*bad-lines-penalty*)))
-    (parameterize-from-hash opt (lambda ()
-      ;; -- mid-test
-      (check-false (*online?*))
-      (check-true (negative? (*bad-lines-penalty*)))
-      ))
+    (check-print
+      "Unknown key 'not'\n"
+      (lambda () (parameterize-from-hash opt (lambda ()
+        ;; -- mid-test
+        (check-false (*online?*))
+        (check-true (negative? (*bad-lines-penalty*)))))))
     ;; -- post-test
     (check-true (*online?*))
     (check-true (<= 0 (*bad-lines-penalty*))))
@@ -386,7 +387,6 @@
   (with-config #:global ""
     (lambda ()
       (define-values [gc lc] (get-config-filenames))
-      (displayln (file->lines gc))
       (define key 'hello)
       (define val 'world)
       (save-option key val #:location 'global)
