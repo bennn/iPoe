@@ -155,8 +155,12 @@
   (hash-ref o* k (lambda ()
                    (raise-user-error 'option-get (format "Unbound option ~e" k)))))
 
+;; For testing
+(define (options-new)
+  (make-hasheq))
+
 (define (options-init)
-  (define o* (make-hasheq))
+  (define o* (options-new))
   (define-values [global-config local-config] (get-config-filenames))
   (when (file-exists? global-config)
     (options-set-from-file o* global-config))
@@ -166,6 +170,7 @@
 
 ;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
 ;; Ignore any extra whitespace before/after "#:KEY" or "VAL"
+;; And there are no spaces allowed in keys or values
 (define option-regexp #px"^[\\s]*#:([\\S]+)[\\s]+([\\S]+)[\\s]*$")
 
 ;; (: option? (->* [String] [#:parse-value (-> String Any)] Option))
@@ -320,7 +325,55 @@
     (check-equal? (options-get opt 'grammarcheck?) #f))
 
   ;; -- options-set-from-file
-  ;; TODO handles empty lines?
+  (define (gen-tmpfile fname)
+    (define s (symbol->string (gensym)))
+    (define full-path
+      (string-append (path->string (find-system-path 'temp-dir))
+                     "/"
+                     (or fname s)))
+    (if (file-exists? full-path)
+        (gen-tmpfile (string-append fname s))
+        full-path))
+
+  (define-syntax-rule (refresh-file f str ...)
+    (with-output-to-file f #:exists 'replace
+      (lambda () (displayln str) ...)))
+
+  (let ([fname (gen-tmpfile "ipoe.parameters.test")])
+    (define-syntax-rule (test-from-file [str ...] count [kv ...])
+      (let* ([o* (options-new)]
+             [get (lambda (k) (hash-ref o* k (lambda () #f)))])
+        (refresh-file fname str ...)
+        (options-set-from-file o* fname)
+        (check-equal? (options-count o*) count)
+        (check-apply* get
+          kv ...)))
+    ;; --- blank config
+    (test-from-file [""] 0 [['any == #f] ['keys == #f]])
+    ;; -- normal config
+    (test-from-file
+      ["#:a a"
+       "#:b b"]
+      2
+      [['a == 'a]
+       ['b == 'b]
+       ['c == #f]])
+    ;; --- extra newlines
+    (test-from-file
+      ["#:first-option \"and-value\""
+       ""
+       "#:second 001/2"
+       "#:third #t"]
+      3
+      [['first-option == "and-value"]
+       ['second == 1/2]
+       ['third ==  #t]])
+    ;; --- error
+    (check-exn (regexp "ipoe:config")
+      (lambda () (test-from-file ["gibberish"] 0 [])))
+    ;; --- whitespace in value
+    (check-exn (regexp "Error reading configuration")
+      (lambda () (test-from-file ["#:opt \"some value\""] 0 []))))
 
   ;; -- option?
   (check-false* option?
