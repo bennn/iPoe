@@ -50,7 +50,7 @@
      (syntax/loc stx (begin (check-not-equal? (f arg* ...) res) ...))]
     [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
 
-(define (check-print f str)
+(define (check-print str f)
   (define-values [in out] (make-pipe))
   (parameterize ([current-output-port out])
     (f)
@@ -141,17 +141,17 @@
   ;; -- check-print
   (let ([msg ""])
     (check-print
-      (lambda () (display msg))
-      msg))
+      msg
+      (lambda () (display msg))))
 
   (let ([msg "hello world"])
     (check-print
-      (lambda () (display msg))
-      msg))
+      msg
+      (lambda () (display msg))))
 
   (let ([msg 7])
     (check-print
-      (lambda () (displayln msg))
-      (format "~a\n" msg)))
+      (format "~a\n" msg)
+      (lambda () (displayln msg))))
 
 )
