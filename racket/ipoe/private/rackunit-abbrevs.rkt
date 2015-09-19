@@ -23,7 +23,7 @@
 
 (require
   rackunit
-  (only-in racket/port port->string)
+  (only-in racket/port port->string port->lines)
   (for-syntax racket/base syntax/parse)
 )
 
@@ -50,12 +50,27 @@
      (syntax/loc stx (begin (check-not-equal? (f arg* ...) res) ...))]
     [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
 
-(define (check-print str f)
+(define (check-print spec f)
   (define-values [in out] (make-pipe))
-  (parameterize ([current-output-port out])
-    (f)
-    (close-output-port out))
-  (check-equal? (port->string in) str))
+  (define res
+    (parameterize ([current-output-port out])
+      (let ([tmp (f)])
+        (close-output-port out)
+        tmp)))
+  (cond
+   [(string? spec)
+    (check-equal? (port->string in) spec)
+    res]
+   [(list? spec)
+    (define ln* (port->lines in))
+    (check-equal? (length ln*) (length spec))
+    (for ([r (in-list spec)]
+          [s (in-list ln*)])
+      (check-true (regexp-match? r s)))
+    res]
+   [else
+    (error 'ipoe:check-print "Cannot understand spec '~a'\n" spec)]))
+
 
 ;; =============================================================================
 
@@ -140,18 +155,30 @@
 
   ;; -- check-print
   (let ([msg ""])
-    (check-print
-      msg
-      (lambda () (display msg))))
+    (check-equal?
+      (check-print
+        msg
+        (lambda () (display msg)))
+      (void)))
 
   (let ([msg "hello world"])
-    (check-print
-      msg
-      (lambda () (display msg))))
+    (check-equal?
+      (check-print
+        msg
+        (lambda () (display msg)))
+      (void)))
 
   (let ([msg 7])
+    (check-equal?
+      (check-print
+        (format "~a\n" msg)
+        (lambda () (displayln msg) 3))
+      3))
+
+  (let ([r1 "^0"] [r2 "^1"] [r3 "^2"])
     (check-print
-      (format "~a\n" msg)
-      (lambda () (displayln msg))))
+      (list r1 r2 r3)
+      (lambda ()
+        (for ([i (in-range 3)]) (printf "~a ~a\n" i (gensym))))))
 
 )
