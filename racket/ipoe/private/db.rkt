@@ -128,7 +128,7 @@
 ;; Open a database connection & set parameters
 (define (db-init #:user [u-param #f]
                  #:dbname [db-param #f]
-                 #:online? [online? #f] ;; Added late, should maybe redesign with this first
+                 #:online? [online? #f] ;; 2015-09-19: should maybe redesign
                  #:interactive? [interactive? #f])
   ;; -- Resolve username and dbname
   (define u (or u-param
@@ -229,7 +229,8 @@
 
 (define-syntax-rule (db-warning loc msg arg* ...)
   ;; Alternatively, pipe these to a logfile
-  (displayln (format "[WARNING ipoe:db:~a] : ~a" loc (format msg arg* ...))))
+  (when (*verbose*)
+    (displayln (format "[WARNING ipoe:db:~a] : ~a" loc (format msg arg* ...)))))
 
 (define-syntax-rule (duplicate-word-error w)
   ;; Should never happen, so raise an error
@@ -256,14 +257,16 @@
   (cond
    [(online-mode? pgc)
     (when interactive?
-      (alert (format "Cannot add word '~a', currently in online-only mode")))
+      (alert (format "Cannot add word '~a', currently in online-only mode" word)))
     #f]
    [(not (connection? pgc))
     (when interactive?
-      (alert (format "Cannot add word '~a', not connected to a database.")))
+      (alert (format "Cannot add word '~a', not connected to a database." word)))
     #f]
    [(word-exists? word #:db pgc)
-    (duplicate-word-error (format "Cannot add word '~a', already in database" word))]
+    (when interactive?
+      (alert (format "Word '~a' is already in the database" word)))
+    #f]
    [else
     (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:offline? offline?))
     (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with an explicit #:syllables argument." word))
