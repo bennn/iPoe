@@ -35,13 +35,13 @@
   ;; -- repl
   (command-line
    #:argv arg*
-   #:once-each
-    [("-c" "--commit") "Commit to database" (commit? #t)]
-    [("-o" "--output") o-p "Save interactions to file" (output-file o-p)]
+   ;#:once-each
+   ; [("-c" "--commit") "Commit to database" (commit? #f)]
+   ; [("-o" "--output") o-p "Save interactions to file" (output-file o-p)]
    #:args ()
    (begin
      (printf "Initializing DB connection & starting REPL ...\n")
-     (with-ipoe-db #:commit? (commit?)
+     (with-ipoe-db #:commit? #f ;;(commit?)
        (lambda ()
          (let loop ()
            (display "ipoe> ")
