@@ -580,7 +580,7 @@
 ;; =============================================================================
 
 (module+ main
-  (require racket/cmdline xrepl racket/string)
+  (require racket/cmdline racket/string)
   ;; -- parameters
   (define commit? (make-parameter #f))
   (define output-file (make-parameter #f))
@@ -609,6 +609,13 @@
                  (? exit?)
                  (and (? list?) (? (lambda (x) (exit? (car x))))))
              (printf "Goodbye\n")]
+            ['help
+             (displayln "Available commands:")
+             (for ([cmd (in-list '(id->word rhymes-with syllables->word*
+                                   word-exists? word->syllables word->rhyme*
+                                   word->almost-rhyme*))])
+               (printf "- ~a\n" cmd))
+             (loop)]
             [(list 'id->word (? natural? n))
              (displayln (id->word n))
              (loop)]
