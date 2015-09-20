@@ -38,7 +38,7 @@
                  #:when (not (word-exists? w)))
         (define suggestions (suggest-spelling w #:limit 7))
         (define suggest-str (if (null? suggestions) "" (format " Maybe you meant '~a'?" (car suggestions))))
-        (alert (format "Mispelled word '~a' on line '~a'.~a" w line-num suggest-str))
+        (alert (format "Misspelled word '~a' on line '~a'.~a" w line-num suggest-str))
         (cons w suggestions))))
   (if (null? (car misspelled*))
       (success 'check-spelling #t)
@@ -47,7 +47,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit "rackunit-abbrevs.rkt")
+  (require rackunit ipoe/private/rackunit-abbrevs)
 
   ;; -- check-spelling
   (with-ipoe-db #:commit? #f (lambda ()
@@ -59,7 +59,11 @@
           [bad2 "uhnojfyondvwhbonvwf"]
           [bad3 "hjvndkwcxs"]
           [bad4 "xz"])
-      (check-apply* check-spelling
+      (check-apply* (lambda (w*)
+                      (check-print
+                        (for/list ([w (in-list w*)])
+                          #rx"^Misspelled word")
+                        (lambda () (check-spelling w*))))
         [(list bad1) == (failure 'check-spelling (list (list bad1)))]
         [(list bad1 bad2 bad3) == (failure 'check-spelling (list (list bad1) (list bad2) (list bad3)))]
         [(list bad4) == (failure 'check-spelling (list (list bad4 "be" "of" "to" "a" "in" "I" "it")))]

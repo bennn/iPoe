@@ -322,7 +322,7 @@
       ['(("never" "land")) '((* 2))]
       ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
        '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
-      ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
+      ['(("once" "upon" "a" "time" "aye" "long" "slime" "ago")
          ("in" "a" "land" "full" "of" "snow")
          ("the" "end"))
        '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
@@ -604,9 +604,13 @@
      ["yes yes yes" == 3]
      ["hello, world!" == 3]
      ["volcanic antidisestablishmentarianism you know" == 16]
+     ["." == 0])
+    (check-apply* (lambda (ln)
+                    (check-print (for/list ([i (in-range 2)])
+                                   #rx"^Could not determine syllables")
+                                 (lambda () (line->syllables ln))))
      ;; -- unknown words have 0 syllables
-     ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]
-     ["." == 0]))
+     ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]))
 
   ;; -- replace-wildcard-syllables
   (check-apply* replace-wildcard-syllables
