@@ -138,7 +138,7 @@
    [else
     (define r (modulo n 10))
     (cons (vector-ref digit2-cache (- (quotient n 10) 2))
-          (if (zero? r) '() (list (digit->word (modulo n 10)))))]))
+          (if (zero? r) '() (list (digit->word r))))]))
 
 ;; (: digit->word (-> Natural String))
 (define (digit->word n)
