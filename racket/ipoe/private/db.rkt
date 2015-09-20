@@ -148,7 +148,11 @@
   (cond
    [(and (not online?) u db (not (or (string-empty? u) (string-empty? db))))
     ;; -- Have all parameters, try connecting to the database
-    (*connection* (postgresql-connect #:user u #:database db))
+    (*connection*
+      (let ([on-err (lambda (e)
+                      (raise-user-error (format "Failed to connect to database '~a' as user '~a'. Shutting down." db u)))])
+        (with-handlers ([exn:fail:sql? on-err])
+          (postgresql-connect #:user u #:database db))))
     ;;(current-ipoe-log (open-output-file DB-LOG #:exists? 'error))
     (start-transaction (*connection*))
     ;; -- Ask whether to save current user & db for future sessions
@@ -698,6 +702,12 @@
   ;;         (displayln "anything")
   ;;         (check-equal? (read-line) "success"))
   ;;       (thread-wait prompt-thread))))
+
+  ;; -- with-ipoe-db, invalid user
+  (check-exn #rx"^Failed to connect"
+    (lambda ()
+      (with-ipoe-db #:user "ANONSTEIN" #:dbname "MISSING-TABLE"
+        (lambda () (void)))))
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
   (with-config/cache [#f #f]
