@@ -10,6 +10,8 @@
   "deduplicate.rkt"
   (only-in racket/format ~r))
 
+;; =============================================================================
+
 ;; Convert a number N to a filename `N.sql`,
 ;; padded with 0 if `N` has fewer than 4 digits.
 ;; (: number->filename (-> Natural Path-String))
@@ -50,6 +52,8 @@
               (set-box! loop? #t))))
         (deduplicate outfile #:filter but-last)
         (when (unbox loop?) (loop (add1 index)))))))
+
+;; =============================================================================
 
 (module+ main
   (require racket/cmdline)

@@ -3,6 +3,10 @@ ipoe
 
 Library & languages.
 
+(2015-09-19) This badly needs an update
+
+
+
 #lang s-exp ipoe
 ----------------
 Module reader for definining poetic structure.

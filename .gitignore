@@ -2,9 +2,11 @@
 *\.swp
 *~
 \#*
+\.\#*
 
 # compiled files
 *.pyc
+compiled
 
 # database
 *.db
