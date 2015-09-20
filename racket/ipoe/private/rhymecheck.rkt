@@ -1,13 +1,12 @@
 #lang racket/base
 
-;; 
-
-;; -----------------------------------------------------------------------------
+;; Functions for checking rhyme schemes
 
 (provide
   check-rhyme-scheme
   ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either)
   ;; Check that the input text matches the rhyme scheme
+  ;; Assumes DB context
 
   replace-wildcard-syllables
   ;; (-> RhymeScheme Natural RhymeScheme)
@@ -24,6 +23,7 @@
   ipoe/private/db
   ipoe/private/either
   ipoe/private/parse
+  ipoe/private/parameters
   ipoe/private/suggest
   ipoe/private/ui
   ;; --
@@ -44,9 +44,8 @@
       (success 'type-check (void))
       (failure 'rhyme-scheme (format "Expected a RhymeScheme, got ~a" rs*)))
     (check-num-stanzas stanza* rs*)
-    ;; -- check rhyme
-    (with-ipoe-db (lambda ()
-      (check-stanza* '() stanza* rs* #:stanza-number 0)))))
+    ;; -- check rhyme (requires DB connection)
+    (check-stanza* '() stanza* rs* #:stanza-number 0)))
 
 ;; -----------------------------------------------------------------------------
 ;; -- dynamic typechecking predicates
@@ -205,7 +204,7 @@
   (for/sum ([w (in-list (string->word* line))])
     (or (word->syllables w)
         (begin
-          (alert (format "Warning: could not determine syllables for word '~a'" w))
+          (alert (format "Could not determine syllables for word '~a'" w))
           0))))
 
 (define (replace-wildcard-syllables rs s)
@@ -280,46 +279,56 @@
 (module+ test
   (require rackunit "rackunit-abbrevs.rkt")
 
-  ;; -- check-rhyme-scheme
-  (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
-    ['() '()]
-    ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
-    ['(("anything")) '(((A . *)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
-    ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
-    ['(("cat") ("rat") ("mat") ("sat")) '((1) (1) (1) (1))]
-    ['(("willful and raisin" "under the weather" "jet set go")
-       ("domino effect" "very motivation")
-       ("beside our goal" "the free bird" "gory category"))
-     '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
-    ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
-       ("in" "a" "land" "full" "of" "snow")
-       ("the" "end"))
-     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-       ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
-       ((L . *) (M . *)))]
-  )
+  (define o* (options-init))
 
-  (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
-    ['() '((A))]
-    ['(("never" "land")) '()]
-    ['(("never" "land")) '(())]
-    ['(("never" "land")) '(((X . *)))]
-    ['(("never" "land")) '(((A . *) (A . *)))]
-    ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
-    ['(("never" "land")) '((F U N))]
-    ['(("never" "land")) '(((A . *) (B . 2)))]
-    ['(("never" "land")) '((* 2))]
-    ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
-     '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
-    ['(("once" "upon" "a" "time" "uh" "long" "slime" "ago")
-       ("in" "a" "land" "full" "of" "snow")
-       ("the" "end"))
-     '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-       ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
-       ((L . *) (M . *)))]
-  )
+  (define-syntax-rule (with-db/test e ...)
+    (parameterize-from-hash o* (lambda ()
+      (with-ipoe-db #:user (*user*)
+                    #:dbname (*dbname*)
+                    #:interactive? #t
+                    #:commit? #f
+        (lambda () e ...)))))
+
+  ;; -- check-rhyme-scheme
+  (with-db/test
+    (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
+      ['() '()]
+      ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
+      ['(("anything")) '(((A . *)))]
+      ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
+      ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+      ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
+      ['(("cat") ("rat") ("mat") ("sat")) '((1) (1) (1) (1))]
+      ['(("willful and raisin" "under the weather" "jet set go")
+         ("domino effect" "very motivation")
+         ("beside our goal" "the free bird" "gory category"))
+       '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
+      ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
+         ("in" "a" "land" "full" "of" "snow")
+         ("the" "end"))
+       '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
+         ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
+         ((L . *) (M . *)))])
+
+    (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
+      ['() '((A))]
+      ['(("never" "land")) '()]
+      ['(("never" "land")) '(())]
+      ['(("never" "land")) '(((X . *)))]
+      ['(("never" "land")) '(((A . *) (A . *)))]
+      ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
+      ['(("never" "land")) '((F U N))]
+      ['(("never" "land")) '(((A . *) (B . 2)))]
+      ['(("never" "land")) '((* 2))]
+      ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
+       '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
+      ['(("once" "upon" "a" "time" "aye" "long" "slime" "ago")
+         ("in" "a" "land" "full" "of" "snow")
+         ("the" "end"))
+       '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
+         ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
+         ((L . *) (M . *)))]
+    ))
 
   ;; ---------------------------------------------------------------------------
   ;; -- rhyme-scheme?
@@ -540,7 +549,7 @@
     ["blah" "b"])
 
   ;; -- check-stanza*
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (define (test-check-stanza*/pass vm stanza rs)
       (success? (check-stanza* vm stanza rs #:stanza-number 0)))
     (check-true* test-check-stanza*/pass
@@ -564,10 +573,10 @@
       ['((A . "word") (B . "mouse"))
        '(("bird" "house") ("worried" "spouse"))
        '(((A . 1) (B . 1)) ((A . 1) (B . 1)))]
-    )))
+    ))
 
   ;; -- check-syllables
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (define (test-check-syllables/pass stanza syll*)
       (success? (check-syllables stanza syll* #:stanza-number 4 #:line-number 5)))
     (check-true* test-check-syllables/pass
@@ -585,21 +594,23 @@
     (check-exn (regexp "ipoe:check-syllables:internal-error")
       (lambda () (check-syllables '("a" "a") '(*) #:stanza-number 3)))
     (check-exn (regexp "ipoe:check-syllables:internal-error")
-      (lambda () (check-syllables '() '(1 2 3) #:stanza-number 3)))
-    ))
+      (lambda () (check-syllables '() '(1 2 3) #:stanza-number 3))))
 
   ;; -- line->syllables
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-apply* line->syllables
      ["" == 0]
      ["a" == 1]
      ["yes yes yes" == 3]
      ["hello, world!" == 3]
      ["volcanic antidisestablishmentarianism you know" == 16]
+     ["." == 0])
+    (check-apply* (lambda (ln)
+                    (check-print (for/list ([i (in-range 2)])
+                                   #rx"^Could not determine syllables")
+                                 (lambda () (line->syllables ln))))
      ;; -- unknown words have 0 syllables
-     ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]
-     ["." == 0]
-  )))
+     ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]))
 
   ;; -- replace-wildcard-syllables
   (check-apply* replace-wildcard-syllables
@@ -610,7 +621,7 @@
   )
 
   ;; -- rhyme=?
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-true* rhyme=?
      ;; -- rhyme
      ["car" "far"]
@@ -623,8 +634,7 @@
     )
     ;; --
     (check-exn (regexp "ipoe:db")
-      (lambda () (rhyme=? "cat" "blahblahblahblahblah")))
-  ))
+      (lambda () (rhyme=? "cat" "blahblahblahblahblah"))))
 
   ;; -- unify-rhyme-scheme
   (define-syntax-rule (check-unify/pass [vm st rs == vm2] ...)
@@ -632,7 +642,7 @@
       (let ([result (unify-rhyme-scheme vm st rs #:stanza-number 0)])
         (check-pred success? result)
         (check-equal? (success-value result) vm2)) ...))
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (let ([vm1 '((V1 . "val1") (Var2 . "val2") (M . "m"))])
       (check-unify/pass
         ['() '() '() == '()]
@@ -644,16 +654,15 @@
          == '((X . "role"))]
         [vm1 '("car" "file" "scientist") '(* * *)
          == vm1]
-      ))))
+      )))
 
   (define-syntax-rule (check-unify/fail [vm st rs] ...)
     (begin (check-pred failure? (unify-rhyme-scheme vm st rs #:stanza-number 2)) ...))
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     (check-unify/fail
       ['() '("a" "bacon") '(A A)]
       ['() '("harpoon" "moon" "will") '(A B A)]
-      ['((A . "worm")) '("cat" "dog" "rat") '(A B A)]
-    )))
+      ['((A . "worm")) '("cat" "dog" "rat") '(A B A)]))
 
   ;; Invariant: unify-rhyme-scheme expects 2nd and 3rd args to have same length
   (check-exn (regexp "ipoe:.*:internal-error")
@@ -661,9 +670,9 @@
   (check-exn (regexp "ipoe:.*:internal-error")
     (lambda () (unify-rhyme-scheme '() '("hello") '() #:stanza-number 2)))
 
-  (with-ipoe-db #:commit? #f (lambda ()
+  (with-db/test
     ;; Nothing rhymes with a fake word
     (check-exn (regexp "ipoe:db")
-      (lambda () (unify-rhyme-scheme '() '("asdgwrfscbad" "hello" "bye") '(A A A) #:stanza-number 81)))))
+      (lambda () (unify-rhyme-scheme '() '("asdgwrfscbad" "hello" "bye") '(A A A) #:stanza-number 81))))
 
 )

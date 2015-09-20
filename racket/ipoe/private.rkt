@@ -13,6 +13,10 @@
   ;; (-> Either #:src Symbol Any)
   ;; Raise an exception if the argument is not a `success?`
 
+  check-new-words
+  ;; (-> Poem Either)
+  ;; Search the poem for unknown, valid words
+
   check-rhyme-scheme
   ;; (-> (Sequenceof (Sequenceof String)) #:rhyme-scheme (Listof (Listof Symbol)) #:src Symbol Void)
   ;; Check the rhyme scheme of the stanzas.
@@ -26,6 +30,10 @@
   ;; (-> Either (-> Failure Void) Void)
   ;; Call the thunk if the argument is not a `success?` struct
 
+  parse-word
+  ;; (-> String String)
+  ;; Filter punctuation from a word
+
   replace-wildcard-syllables
   ;; (-> RhymeScheme Natural RhymeScheme)
   ;; Overwrite all wildcard syllables in the rhyme scheme
@@ -34,13 +42,13 @@
   ;; (-> Any Boolean)
   ;; Predicate for rhyme schemes
 
-  parse-word
-  ;; (-> String String)
-  ;; Filter punctuation from a word
-
   string->word*
   ;; (-> String (Listof String))
   ;; Parse a line of text into a list of normalized words.
+
+  string-empty?
+  ;; (-> String Boolean)
+  ;; True if the argument contains only whitepsace
 
   to-line*
   ;; (-> (U Input-Port String (Listof String)) (Listof String))
@@ -61,10 +69,10 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  "private/either.rkt"
-  "private/parse.rkt"
-  "private/rhymecheck.rkt"
-  "private/spellcheck.rkt"
-  "private/ui.rkt"
+  ipoe/private/either
+  ipoe/private/parse
+  ipoe/private/rhymecheck
+  ipoe/private/spellcheck
+  ipoe/private/ui
 )
 

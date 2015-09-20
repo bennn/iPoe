@@ -1,8 +1,18 @@
 #lang racket/base
 
+;; Offer spelling suggestions
+
 (provide
   filter-similar
+  ;; (-> [String (Listof String)] [#:limit Natural] (Listof String))
+  ;; (filter-similar w w* #:limit N)
+  ;; Return a list of at most N words from the list w* that are similar to w.
+  ;; (Similar = Levenshtein distance)
+
   suggest-spelling
+  ;; (->* [String] [#:epsilon Natural #:limit Natural] (Listof String))
+  ;; (suggest-spelling w #:epsilon e #:limit N)
+  ;; Return a list of at most N words that are within `e` Levenshtein distance from `w`.
 )
 
 (require

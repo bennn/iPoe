@@ -30,8 +30,10 @@
 
 (require
   ipoe/private
+  ipoe/private/parameters
   racket/match
   (only-in racket/sequence sequence->list)
+  (only-in ipoe/private/db add-word* with-ipoe-db ipoe-db-connected?)
 )
 
 ;; =============================================================================
@@ -130,7 +132,7 @@
 ;; (: read-keyword-value (-> Input-Port (-> Any Boolean) #:kw Symbol Any))
 (define (read-keyword-value in p? #:kw sym #:src err-loc)
   (when (eof-object? in)
-    (user-error err-loc (format "Unmatched keyword '~a'" sym)))
+    (user-error err-loc (format "Unmatched keyword '~a', expected to read another value" sym)))
   (define raw (read in))
   (if (p? raw)
       raw
@@ -145,32 +147,66 @@
   (define rs (poem-spec-rhyme-scheme ps))
   (define descr (poem-spec-description ps))
   (define ev (poem-spec-extra-validator ps))
-  ;; (: check-rhyme #'(-> Poem Void))
-  (define check-rhyme
-    ;; If rhyme scheme is empty, do not check
-    ;; (Special case for "free verse")
-    (if (null? rs)
-        #'(lambda (stanza*)
-            (void))
-        #`(lambda (stanza*)
-            (assert-success #:src '#,name
-              (check-rhyme-scheme stanza* #:rhyme-scheme '#,rs)))))
   ;; (: check-extra #'(-> Poem Void))
   (define check-extra
     (or (poem-spec-extra-validator ps)
         #'(lambda (x) #t)))
   #`(lambda (in) ;; Input-Port
-    (define line* (to-line* in))
-    (define stanza* (sequence->list (to-stanza* line*)))
-    (#,check-rhyme stanza*)
-    (define extra? (#,check-extra stanza*))
-    (when (not extra?)
-      (define d-str (if #,descr (string-append "\n  " #,descr) ""))
-      (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str)))
-    (when (failure? extra?)
-      (user-error '#,name (failure-reason extra?)))
-    (check-spelling line*)
-    line*))
+      ;; Read & process data from the input in-line.
+      (define configuring? (box #t))
+      (define option* (options-init))
+      ;; TODO process the file as a stream, do not build list of lines
+      ;; TODO stop abusing that poor #:when clause
+      ;;      (it's abused for now because we need to keep the first non-configure line)
+      (define line*
+        (for/list ([raw-line (in-lines in)]
+                   #:when (or (not (unbox configuring?))
+                              ;; Try to read an option
+                              (cond
+                               [(string-empty? raw-line)
+                                ;; Ignore blank lines while configuring
+                                #f]
+                               [(option? raw-line)
+                                => (lambda (opt)
+                                ;; Got an option, add to param. hash
+                                (options-set option* opt)
+                                #f)]
+                               [else
+                                ;; Non-blank, non-option => done configuring!
+                                (when (almost-option? raw-line)
+                                  (alert (format "Treating line '~a' as part of the poem text." raw-line)))
+                                (set-box! configuring? #f)
+                                #t])))
+          raw-line))
+      ;; 2015-08-27: If we need punctuation some day, get it from line*
+      (define stanza* (sequence->list (to-stanza* line*)))
+      (parameterize-from-hash option* (lambda ()
+        (with-ipoe-db #:user (*user*)
+                      #:dbname (*dbname*)
+                      #:interactive? (*interactive?*)
+                        (lambda ()
+          ;; -- Check for new words, optionally.
+          (when (and (*online?*) (ipoe-db-connected?))
+            (add-word* (check-new-words stanza*)
+                         #:interactive? (*interactive?*)))
+          ;; -- Check spelling, optionally (and someday, check grammar)
+          (when (*spellcheck?*)
+            (check-spelling line*))
+          ;; -- Check rhyme scheme. TODO poetic license option/param
+          (let ([rs '#,rs])
+            (when (not (null? rs))
+              (assert-success #:src '#,name
+                (check-rhyme-scheme stanza* #:rhyme-scheme rs))))
+          ;; -- Check extra validator
+          (define extra? (#,check-extra stanza*))
+          (cond
+           [(not extra?)
+            (define d-str (if #,descr (string-append "\n  " #,descr) ""))
+            (user-error '#,name (format "Rhyme scheme OK, but failed extra constraint.~a" d-str))]
+           [(failure? extra?)
+            (user-error '#,name (failure-reason extra?))])
+          ;; -- Done! Return anything needed to make testing easy
+          (cons line* option*)))))))
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
@@ -198,6 +234,8 @@
 (module+ test
   (require
     rackunit
+    ipoe/private/rackunit-abbrevs
+    (only-in racket/port with-input-from-string)
     (only-in racket/string string-split)
   )
 
@@ -216,41 +254,46 @@
                 (void))
 
   ;; Always an exception if first arg is non-false
-  (let ([src 'cdtest])
-    (check-exn (regexp (symbol->string src))
+  (let* ([src 'cdtest]
+         [src-str (symbol->string src)])
+    (check-exn (regexp src-str)
                (lambda () (check-duplicate #t #:new-val 'any #:src src #:msg 'any)))
-    (check-exn (regexp (symbol->string src))
+    (check-exn (regexp src-str)
                (lambda () (check-duplicate 'A #:new-val 'any #:src src #:msg 'any)))
-    (check-exn (regexp (symbol->string src))
+    (check-exn (regexp src-str)
                (lambda () (check-duplicate "hi" #:new-val 'any #:src src #:msg 'any))))
 
   ;; -- input->poem-spec
   (define (test-input->poem-spec str)
-    (define p (open-input-string str))
-    (define r (input->poem-spec p))
-    (close-input-port p)
-    r)
-  (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A)) #;syllables 10")
-                (poem-spec 'couplet '(((A . 10) (A . 10))) #f #f))
-  (check-equal? (test-input->poem-spec "#:name couplet #:rhyme-scheme ((A A))")
-                (poem-spec 'couplet '((A A)) #f #f))
-  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:name yes")
-                (poem-spec 'yes '((A) (B) (C)) #f #f))
-  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:descr \"a short description\" #:name yes")
-                (poem-spec 'yes '((A) (B) (C)) "a short description" #f))
-  (check-equal? (test-input->poem-spec "#:rhyme-scheme ((A) (B) (C)) #:description \"yo lo\" #:name yes")
-                (poem-spec 'yes '((A) (B) (C)) "yo lo" #f))
-  ;; It's okay to leave out the keywords
-  (check-equal? (test-input->poem-spec "name (((Schema . 42)))")
-                (poem-spec 'name '(((Schema . 42))) #f #f))
-  (check-equal? (test-input->poem-spec "name  10 (((Schema . 42)))")
-                (poem-spec 'name '(((Schema . 42))) #f #f))
-  (check-equal? (test-input->poem-spec "name  10 (((Schema . 42) *))")
-                (poem-spec 'name '(((Schema . 42) (* . 10))) #f #f))
-  (check-equal? (test-input->poem-spec "name  \"aha\" (((Schema . 42) *))")
-                (poem-spec 'name '(((Schema . 42) *)) "aha" #f))
- ;; --- with #:extra-validator
-  (let* ([ps (test-input->poem-spec "#:name has-extra #:rhyme-scheme ((1 2 3) (A B (C . 3))) #:extra-validator (lambda (x) #t)")]
+    (with-input-from-string str
+      (lambda () (input->poem-spec (current-input-port)))))
+
+  (check-apply* test-input->poem-spec
+   ["#:name couplet #:rhyme-scheme ((A A)) #;syllables 10"
+    == (poem-spec 'couplet '(((A . 10) (A . 10))) #f #f)]
+   ["#:name couplet #:rhyme-scheme ((A A))"
+    == (poem-spec 'couplet '((A A)) #f #f)]
+   ["#:rhyme-scheme ((A) (B) (C)) #:name yes"
+    == (poem-spec 'yes '((A) (B) (C)) #f #f)]
+   ["#:rhyme-scheme ((A) (B) (C)) #:descr \"a short description\" #:name yes"
+    == (poem-spec 'yes '((A) (B) (C)) "a short description" #f)]
+   ["#:rhyme-scheme ((A) (B) (C)) #:description \"yo lo\" #:name yes"
+    == (poem-spec 'yes '((A) (B) (C)) "yo lo" #f)]
+   ;; It's okay to leave out the keywords
+   ["name (((Schema . 42)))"
+    == (poem-spec 'name '(((Schema . 42))) #f #f)]
+   ["name  10 (((Schema . 42)))"
+    == (poem-spec 'name '(((Schema . 42))) #f #f)]
+   ["name  10 (((Schema . 42) *))"
+    == (poem-spec 'name '(((Schema . 42) (* . 10))) #f #f)]
+   ["name  \"aha\" (((Schema . 42) *))"
+    == (poem-spec 'name '(((Schema . 42) *)) "aha" #f)])
+
+   ;; -- input->poem-spec, with #:extra-validator
+  (let* ([ps (test-input->poem-spec (string-append
+                                     "#:name has-extra "
+                                     "#:rhyme-scheme ((1 2 3) (A B (C . 3))) "
+                                     "#:extra-validator (lambda (x) #t)"))]
          [ev (eval-extra-validator ps)])
     (check-true (poem-spec? ps))
     (check-equal? (poem-spec-name ps) 'has-extra)
@@ -271,46 +314,116 @@
     (check-exn src-regexp
                (lambda () (read-keyword-value eof boolean? #:kw 'yolo #:src src)))
     (define (test-read-keyword-value str p?)
-      (define port (open-input-string str))
-      (define res  (read-keyword-value port p? #:kw 'test-kw #:src src))
-      (close-input-port port)
-      res)
-    ;; If value matches predicate, pass
-    (check-equal? (test-read-keyword-value "hello" symbol?)
-                  'hello)
-    (check-equal? (test-read-keyword-value "1" integer?)
-                  1)
-    ;; If value doesn't match predicate, fail
+      (with-input-from-string str
+        (lambda ()
+          (read-keyword-value (current-input-port) p? #:kw 'test-kw #:src src))))
+
+    ;; --- If value matches predicate, pass
+    (check-apply* test-read-keyword-value
+      ["hello" symbol? == 'hello]
+      ["(())" list? == '(())]
+      ["1" integer? == 1])
+
+    ;; -- If value doesn't match predicate, fail
     (check-exn src-regexp
                (lambda () (test-read-keyword-value "42" string?)))
     (check-exn src-regexp
                (lambda () (test-read-keyword-value "42" symbol?))))
 
   ;; -- poem-spec->validator
-  (let* ([couplet-validator-stx (poem-spec->validator (poem-spec 'couplet '((A A)) #f #f))]
-         [couplet-validator (parameterize ([current-namespace (make-base-namespace)])
-           (eval #`(begin #,validator-requires #,couplet-validator-stx) (current-namespace)))]
+  (define (make-validator spec)
+    (parameterize ([current-namespace (make-base-namespace)])
+      (eval #`(begin #,validator-requires #,(poem-spec->validator spec)) (current-namespace))))
+
+  (let* ([couplet-validator (make-validator (poem-spec 'couplet '((A A)) #f #f))]
          [pass-str "I was born\nhouse was worn\n"]
          [fail-str "roses are red\nviolets are blue\n"])
     (define (test-couplet str)
       (define port (open-input-string str))
-      (define res (couplet-validator port))
+      (define res (parameterize ([*interactive?* #f])
+        (couplet-validator port)))
       (close-input-port port)
       res)
-    (check-equal? (test-couplet pass-str) (string-split pass-str "\n"))
+    (check-equal? (car (test-couplet pass-str)) (string-split pass-str "\n"))
     (check-exn (regexp "ipoe")
                (lambda () (test-couplet fail-str))))
 
-  ;; -- validator?
-  (check-false (validator? '#f))
-  (check-false (validator? #f))
-  (check-false (validator? ''(1 2 3)))
-  (check-false (validator? '(+ 1 1)))
-  (check-false (validator? "hello"))
+  ;; --- Testing options
+  (let* ([free-validator (make-validator (poem-spec 'free '() #f #f))]
+         [fake-options (string-append
+                         "#:one option\n"
+                         "#:another option\n\n\n"
+                         "#:third  thing    \n"
+                         "some text\n\nmore text\n"
+                         "#:not anoption\n")]
+         [real-options (string-append
+                         "#:online? #f\n"
+                         "#:interactive? #f\n"
+                         "#:spellcheck? #f\n"
+                         "#:poetic-license 9001\n\n"
+                         "Things are good these days.\n")]
+         [runon-options (string-append
+                          "#:spellcheck? #f\n"
+                          "#:yes #t #:no #f\n\n"
+                          "yoooolo\n")])
+    (define (test-free str)
+      (define port (open-input-string str))
+      (define res
+        (parameterize ([*interactive?* #f])
+          (free-validator port)))
+      (close-input-port port)
+      res)
+    ;; --- Test for unknown / invalid options (they do nothing)
+    (let ([fake-res (check-print
+                      (list #rx"^Unknown key"
+                            #rx"^Unknown key"
+                            #rx"^Unknown key"
+                            #rx"^Misspelled word")
+                      (lambda () (test-free fake-options)))])
+        (check-equal? (car fake-res)
+                      '("some text" "" "more text" "#:not anoption"))
+        (let* ([H (cdr fake-res)]
+               [get (lambda (k) (hash-ref H k (lambda () #f)))])
+          (check-apply* get
+            ['one == 'option]
+            ['another == 'option]
+            ['third == 'thing])))
+    ;; --- Test for known options (run-time config should change)
+    (let* ([real-res (test-free real-options)]
+           [H (cdr real-res)]
+           [get (lambda (k) (hash-ref H k (lambda () #f)))])
+      (check-equal? (car real-res) '("Things are good these days."))
+      (check-apply* get
+       ['online? == #f]
+       ['interactive? == #f]
+       ['spellcheck? == #f]
+       ['poetic-license == 9001]))
+    ;; -- Test options on one line
+    (let* ([runon-res (check-print
+                        (list #rx"as part of the poem text.$")
+                        (lambda () (test-free runon-options)))]
+           [str (car runon-res)]
+           [H (cdr runon-res)]
+           [get (lambda (k) (hash-ref H k (lambda () #f)))])
+      (check-equal? str '("#:yes #t #:no #f" "" "yoooolo"))
+      (check-apply* get
+       ['spellcheck? == #f]
+       ['yes == #f]
+       ['no == #f])))
 
-  (check-pred validator? '(lambda (x) #t))
-  (check-pred validator? '(lambda (x) #f))
-  (check-pred validator? '(lambda (x) (< 5 (length x))))
+  ;; -- validator?
+  (check-false* validator?
+   ['#f]
+   [#f]
+   [''(1 2 3)]
+   ['(+ 1 1)]
+   ["hello"])
+
+  (check-true* (lambda (v) (and (validator? v) #t))
+   ['(lambda (x) #t)]
+   ['(lambda (x) #f)]
+   ['(lambda (x) (< 5 (length x)))])
+
   ;; --- test a "good" validator function
   ;;     2015-08-19: removed contract checks
   (let* ([v-stx (validator? '(lambda (x) (null? x)))]
@@ -319,6 +432,7 @@
     (check-false (v '(())))
     ; (check-exn exn:fail:contract? (lambda () (v 1)))
   )
+  ;; 2015-08-27: Commented validator tests until we bring back the contracts
   ; ;; --- invalid validator: wrong domain
   ; (check-exn exn:fail:contract?
   ;            (lambda () (validator? '(lambda (x y) x))))

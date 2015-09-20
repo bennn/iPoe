@@ -18,21 +18,24 @@
 
 (require
   "scrape-util.rkt"
+  "scrape-words.rkt"
   ipoe/private/ui
-  (only-in sxml if-car-sxpath)
 )
 
 ;; =============================================================================
-
-(define REFERENCE "http://dictionary.reference.com")
 
 ;; Validate the suggested number of syllables for a word
 (define (resolve-syllables word
                            syllables
                            #:offline? [offline? #f]
                            #:interactive? [interactive? #t])
-  (define ref-syllables (if offline? (naive-syllables word)
-                                     (scrape-syllables word)))
+  (define-values (ref-syllables src)
+    (if offline?
+        (values (naive-syllables word) "our-heuristic")
+        (let ([wr (scrape-word word)])
+          (if (word-result? wr)
+              (values (word-result-num-syllables wr) (word-result-src wr))
+              (values #f #f)))))
   (cond
    [(not syllables)
     ref-syllables]
@@ -42,25 +45,10 @@
    [interactive?
     (get-user-input read-natural
                     #:prompt (format "Please enter the correct number of syllables for '~a'." word)
-                    #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but '~a' says it has ~a syllables." word syllables REFERENCE ref-syllables))]
+                    #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
    [else
-    (printf "WARNING: reference '~a' claims word '~a' has ~a syllables (instead of the given ~a syllables).\n" REFERENCE ref-syllables word syllables)
+    (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables)." src word ref-syllables syllables))
     syllables]))
-
-;; Parse the internet to count syllables for a word.
-;; (: scrape-syllables (-> String (Listof String)))
-(define (scrape-syllables word)
-  (scrape-dictionary.com word))
-
-;; Parse results from dictionary.com
-(define (scrape-dictionary.com word)
-  (define url-str (string-append REFERENCE "/browse/" word))
-  (define sxml (url->sxml url-str))
-  ;; Dictionary.com keeps a syllable-ized version of each word
-  (define data ((if-car-sxpath '(// h1 span @ data-syllable *text*)) sxml))
-  ;; If word is not found, just return #f
-  (and data
-       (add1 (count-chars (lambda (c) (char=? c #\·)) data))))
 
 ;; Naively count syllables (doesn't require an internet connection)
 (define (naive-syllables word)
@@ -103,29 +91,40 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit)
+  (require rackunit ipoe/private/rackunit-abbrevs)
 
-  (define-syntax-rule (check-naive-syllables [word syll] ...)
-    (begin (check-equal? (naive-syllables word) syll) ...))
-  (check-naive-syllables
-    ["foobar" 3]
-    ["" 0]
-    ["eek" 2]
-    ["hour" 2]
-    ["what" 1]
-    ["balloon" 3]
-    ["wombat" 2]
-    ["arcade" 3]
-    ["bat" 1]
-    ["computer" 3])
+  (check-apply* naive-syllables
+    ["foobar" == 3]
+    ["" == 0]
+    ["eek" == 2]
+    ["hour" == 2]
+    ["what" == 1]
+    ["balloon" == 3]
+    ["wombat" == 2]
+    ["arcade" == 3]
+    ["apvuhinjets" == 4]
+    ["bat" == 1]
+    ["computer" == 3])
 
-  (define-syntax-rule (check-dictionary-syllables [word syll] ...)
-    (begin (check-equal? (scrape-dictionary.com word) syll) ...))
-  (check-dictionary-syllables
-    ["hour" 1]
-    ["never" 2]
-    ["mississippi" 4]
-    ["continuity" 5]
-    ["asbferufvzfjuvfds" #f]
+  ;; Should scrape internet for syllables
+  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:offline? #f))
+    ["hour" == 1]
+    ["never" == 2]
+    ["mississippi" == 4]
+    ["continuity" == 5]
+    ["asbferufvzfjuvfds" == #f]
+  )
+
+  ;; Should run a local algorithm (and get the wrong answer for "hour"
+  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:offline? #t))
+    ["hour" == 2]
+  )
+
+  ;; Should trust the user input
+  (check-apply* (lambda (w)
+                  (check-print
+                    (list #rx"^Source")
+                    (lambda () (resolve-syllables w 99 #:interactive? #f #:offline? #t))))
+    ["hour" == 99]
   )
 )

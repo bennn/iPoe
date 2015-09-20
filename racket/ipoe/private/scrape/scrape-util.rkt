@@ -1,8 +1,10 @@
 #lang racket/base
 
+;; Helper functions for scrapers
+
 (provide
   count-chars
-  ;; (-> (-> Char Boolean) String Natural)
+  ;; (-> (U Char (-> Char Boolean)) String Natural)
   ;; Count the number of characters satisfying the predicate
 
   url->html
@@ -41,7 +43,8 @@
 ;; =============================================================================
 
 (define (count-chars f str)
-  (for/sum ([c (in-string str)] #:when (f c)) 1))
+  (define p (if (char? f) (lambda (c) (char=? c f)) f))
+  (for/sum ([c (in-string str)] #:when (p c)) 1))
 
 (define (url->html arg)
   ;; Sure about `get-impure-port`?
@@ -78,3 +81,16 @@
     (and txt (regexp-match pat txt)))
   (filter contains? elem*))
 
+;; =============================================================================
+
+(module+ test
+  (require rackunit ipoe/private/rackunit-abbrevs)
+
+  (check-apply* count-chars
+   [#\4 "42" == 1]
+   [#\a "foo" == 0]
+   [#\x "" == 0]
+   [(lambda (c) (or (eq? c #\c) (eq? c #\d)))
+    "cadddr" == 4]
+  )
+)

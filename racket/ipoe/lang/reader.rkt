@@ -12,12 +12,8 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  ;ipoe/private
   syntax/strip-context
-  ;(only-in racket/splicing splicing-let-syntax)
   racket/splicing
-
-  ;; TODO maybe, the issue's that we use this function at 2 levels
   ipoe/lang/poem-spec
   (only-in racket/syntax format-id)
 )
@@ -37,7 +33,13 @@
        #'(module mod-id racket/base
            (provide (rename-out [custom-read read] [custom-read-syntax read-syntax]))
            def-req
-           (require (only-in syntax/strip-context strip-context))
+           (require
+             ipoe/private/parameters
+             ipoe/private/either
+             (only-in ipoe/private/ui alert)
+             (only-in ipoe/private/db with-ipoe-db add-word* ipoe-db-connected?)
+             (only-in ipoe/private/spellcheck check-spelling)
+             (only-in syntax/strip-context strip-context))
            (define (custom-read in) (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)
              (with-syntax ([str (validate in)])

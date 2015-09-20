@@ -2,7 +2,12 @@
 
 ;; Generic word/line parsing tools
 
+;; (define-type V (U Integer String Symbol Boolean))
 (provide
+  check-new-words
+  ;; (-> Poem Either)
+  ;; Search the poem for unknown, valid words
+
   integer->word*
   ;; (-> Integer String)
   ;; Convert a number to an English word
@@ -12,6 +17,10 @@
   ;; (-> String String)
   ;; Filter unimportant things from some text.
   ;; i.e. Remove punctuation, convert to lowercase.
+
+  string-empty?
+  ;; (-> String Boolean)
+  ;; True if the argument contains only whitespace
 
   string-last
   ;; (-> String (U #f String))
@@ -37,11 +46,22 @@
   (only-in racket/port port->lines)
   (only-in racket/string string-split string-trim)
   (only-in racket/generator in-generator generator yield)
+  (only-in ipoe/private/db word-exists? with-ipoe-db)
+  (only-in ipoe/private/scrape scrape-word)
   ipoe/private/ui
 )
 
 ;; =============================================================================
 ;; TODO library should be lazy enough to handle Dickens
+
+(define (check-new-words p)
+  ;; May eventually want `scrape-word` to return more information
+  (for*/list ([stanza (in-list p)]
+              [line (in-list stanza)]
+              [word (in-list (string->word* line))]
+              #:when (and (not (word-exists? word))
+                          (scrape-word word)))
+    word))
 
 ;; Serves as a map from small naturals to their string representations
 ;; (: digit1-cache (Vectorof String))
@@ -100,11 +120,15 @@
 ;; (: digit3->word* (-> Natural (Listof String)))
 (define (digit3->word* d3)
   (define rest (digit2->word* (modulo d3 100)))
-  (if (< 99 d3)
-      (cons (digit->word (quotient d3 100))
-            (cons "hundred"
-                  rest))
-      rest))
+  (cond
+   [(= 100 d3)
+    '("one" "hundred")]
+   [(< 99 d3)
+    (cons (digit->word (quotient d3 100))
+          (cons "hundred"
+                rest))]
+   [else
+    rest]))
 
 ;; (: digit2->word* (-> Natural (Listof String)))
 (define (digit2->word* n)
@@ -196,7 +220,18 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit "rackunit-abbrevs.rkt")
+  (require
+    rackunit
+    (only-in racket/sequence sequence->list)
+    "rackunit-abbrevs.rkt")
+
+  ;; -- check-new-words
+  (with-ipoe-db #:commit? #f
+    (lambda ()
+      (check-apply* (lambda (text) (check-new-words (sequence->list (to-stanza* (to-line* text)))))
+        ["wait for the blada;dasdf" == '()]
+        ["asoivnawetga vjifanspetaw" == '()]
+      )))
 
   ;; -- string-last
   (check-apply* string-last
@@ -227,6 +262,14 @@
     [16 == '("sixteen")]
     [-1 == '("negative" "one")]
     [123 == '("one" "hundred" "twenty" "three")]
+    [22 == '("twenty" "two")]
+    [14 == '("fourteen")]
+    [50 == '("fifty")]
+    [98 == '("ninety" "eight")]
+    [100 == '("one" "hundred")]
+    [120 == '("one" "hundred" "twenty")]
+    [1002 == '("one" "thousand" "two")]
+    [1323 == '("one" "thousand" "three" "hundred" "twenty" "three")]
     [8675309 == '("eight" "million" "six" "hundred" "seventy" "five" "thousand" "three" "hundred" "nine")])
 
   ;; --- Doesn't support words over 1 quadrillion
@@ -256,6 +299,7 @@
     [999 == '("nine" "hundred" "ninety" "nine")]
     [21 == '("twenty" "one")]
     [19 == '("nineteen")]
+    [100 == '("one" "hundred")]
     [123 == '("one" "hundred" "twenty" "three")]
     [666 == '("six" "hundred" "sixty" "six")])
 
@@ -290,6 +334,7 @@
     ["WHAT IS THIS" == '("what" "is" "this")]
     ["161 things!" == '("one" "hundred" "sixty" "one" "things")]
     ["non-word cruft ... gets filtered !" == '("nonword" "cruft" "gets" "filtered")]
+    ["\t    \t " == '()]
   )
 
   ;; -- to-line*
@@ -304,10 +349,9 @@
 
   ;; -- to-stanza*
   (define-syntax-rule (check-to-stanza* [text stanza*] ...)
-    (begin (check-true
-             (for/and ([stanza-line* (to-stanza* (to-line* text))]
-                       [line* (in-list stanza*)])
-               (equal? stanza-line* line*))) ...))
+    (begin (for ([stanza-line* (to-stanza* (to-line* text))]
+                 [line* (in-list stanza*)])
+             (check-equal? stanza-line* line*)) ...))
   (check-to-stanza*
     ["a\na\na\n\nb\nb\nb\n"
      '(("a" "a" "a") ("b" "b" "b"))]
