@@ -90,6 +90,7 @@
 (define-parameter grammarcheck? #t) ;;bg; How should this work?
 (define-parameter suggest-rhyme? #t) ;; unused
 (define-parameter suggest-spelling? #t) ;; unused
+(define-parameter verbose #f)
 
 ;; -- poetic license / demerits
 (define-parameter poetic-license 0)
