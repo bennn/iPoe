@@ -199,11 +199,13 @@
     (call-with-exception-handler
       ;; On error, close the DB connection
       (lambda (exn)
-        (begin (db-close #:db pgc #:commit? commit?) exn))
+        (db-close #:db pgc #:commit? commit?)
+        exn)
       ;; Execute thunk with parameter set, close DB when finished
       (lambda ()
         (let ([result (thunk)])
-          (begin (db-close #:db pgc #:commit? commit?) result))))))
+          (db-close #:db pgc #:commit? commit?)
+          result)))))
 
 ;; -----------------------------------------------------------------------------
 ;; --- Logfile operations
@@ -406,27 +408,41 @@
 ;; --- Caching
 ;;     Save word results, so we minimize the number of web queries
 
-(define IPOE-CACHE-DIR "./compiled")
-(define IPOE-CACHE (string-append IPOE-CACHE-DIR "/ipoe.cache"))
+(define *ipoe-cache-dir* (make-parameter "./compiled"))
+(define (*ipoe-cache*) (string-append (*ipoe-cache-dir*) "/ipoe.cache"))
+
+;; Keys are strings, cannot use eq?
+(define make-cache make-hash)
 
 ;; Either make an empty hash, or parse an existing hash from a file
 ;; TODO add warning if cache is LARGE or VERY-LARGE, assist in DB creation
 (define (read-cache)
+  (define ipoe-cache (*ipoe-cache*))
   (define cached
-    (if (file-exists? IPOE-CACHE)
-        (deserialize (file->value IPOE-CACHE))
-        #f))
-  (if (hash? cached)
-      cached
-      (make-hash)))
+    (and (file-exists? ipoe-cache)
+         (with-handlers ([exn:fail? (lambda (e)
+             (alert (format "Error reading cache file '~a'" ipoe-cache))
+             #f)])
+           (deserialize (file->value ipoe-cache)))))
+  (cond
+   [(hash? cached)
+    cached]
+   [else
+    (make-cache)]))
 
 ;; Save the dictionary `d` to be loaded later
 (define (write-cache d)
-  (unless (directory-exists? IPOE-CACHE-DIR)
-    (make-directory IPOE-CACHE-DIR))
-  (with-output-to-file IPOE-CACHE #:exists 'replace
-    (lambda ()
-      (write (serialize d)))))
+  (define cache-dir (*ipoe-cache-dir*))
+  (define cache (*ipoe-cache*))
+  (cond
+   [(hash? d)
+    (unless (directory-exists? cache-dir)
+      (make-directory cache-dir))
+    (with-output-to-file cache #:exists 'replace
+      (lambda ()
+        (write (serialize d))))]
+   [else
+    (alert (format "Failed to save malformed cache '~a'" d))]))
 
 (define (scrape/cache tag w #:cache c
                             #:scrape f-scrape)
@@ -658,8 +674,9 @@
   (define-syntax-rule (with-config/cache [global local] e)
     (with-config #:global global #:local local
       (lambda ()
-        (when (file-exists? IPOE-CACHE)
-          (delete-file IPOE-CACHE))
+        (define cache (*ipoe-cache*))
+        (when (file-exists? cache)
+          (delete-file cache))
         e)))
 
   ;; -- TODO test init prompt for username
@@ -693,8 +710,8 @@
           (check-false (word-exists? "asjdlviuahnzcijvaeafawjsdzidgw")
           (check-true (rhymes-with? "cat" "bat")))))
       ;; Check that cache was created alright
-      (check-true (directory-exists? IPOE-CACHE-DIR))
-      (check-true (file-exists? IPOE-CACHE))
+      (check-true (directory-exists? (*ipoe-cache-dir*)))
+      (check-true (file-exists? (*ipoe-cache*)))
       (define c (read-cache))
       (check-true (hash? c))
       (check-equal? (hash-count c) 2)
@@ -728,10 +745,12 @@
           "electroencephalographically" "overindividualistically")]
     [9  '("antimilitaristically")])
 
-   (check-exn (regexp "ipoe:db:syllables->word*")
-     (lambda () (syllables->word* 3)))
-   (check-exn (regexp "ipoe:db:syllables->word*")
-     (lambda () (with-online-test (syllables->word* 3))))
+  (check-exn (regexp "ipoe:db:syllables->word*")
+    (lambda () (syllables->word* 3)))
+  (check-exn (regexp "ipoe:db:syllables->word*")
+    (lambda () (with-online-test
+    (syllables->word* 3)))
+    )
 
   ;; -- id->word
   (define-syntax-rule (check-id<=>word [w ...])
@@ -1039,6 +1058,46 @@
     (begin
       (check-true (rhymes-with? "paper" "draper"))
       (check-true (almost-rhymes-with? "paper" "pager"))))
+
+  ;; -- read-cache
+  (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
+    ;; --- Normal use
+    (let* ([C (make-cache)]
+           [w "yogurt"])
+      (define r (cons (scrape/cache 'word w #:cache C #:scrape scrape-word)
+                      #f))
+      (check-equal? (hash-ref C w (lambda () #f)) r)
+      (write-cache C)
+      (define C+ (read-cache))
+      (check-equal? (hash-ref C+ w (lambda () #f)) r))
+    ;; --- Garbage in the cache file
+    (define-syntax-rule (check-garbage thunk)
+      (let ()
+        (with-output-to-file (*ipoe-cache*) #:exists 'replace
+          thunk)
+        (define C (check-print
+                    (list #rx"^Error reading cache")
+                    read-cache))
+        (check-equal? C (make-cache))))
+    (check-garbage newline)
+    (check-garbage (lambda () (displayln "helloworld")))
+    (check-garbage (lambda () (write 8235)))
+    ;; --- Cache file missing
+    (let ()
+      (delete-file (*ipoe-cache*))
+      (check-equal? (read-cache)
+                    (make-cache))))
+
+  ;; -- write-cache
+  (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
+    (define-syntax-rule (test-bad-write val)
+      (check-equal? (check-print (list #rx"^Failed to save")
+                                 (lambda () (write-cache val)))
+                    (void)))
+    (test-bad-write 'blah)
+    (test-bad-write '())
+    (test-bad-write '(98 2))
+    (test-bad-write "bad"))
 
   ;; -- scrape-word/cache & scrape-rhyme/cache
   (with-config/cache [#f #f]
