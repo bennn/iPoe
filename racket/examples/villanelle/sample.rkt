@@ -1,7 +1,7 @@
 #lang ipoe/villanelle
 
-I shut mine eyes and all the world drops dead;
-I lift mine lid and all is born again.
+I shut my eyes and all the world drops dead;
+I lift my lids and all is born again.
 (I think I made you up inside mine head.)
 
 The star go dancing out in blue and red,
