@@ -378,7 +378,7 @@
                       (list #rx"^Unknown key"
                             #rx"^Unknown key"
                             #rx"^Unknown key"
-                            #rx"Mispelled word")
+                            #rx"^Misspelled word")
                       (lambda () (test-free fake-options)))])
         (check-equal? (car fake-res)
                       '("some text" "" "more text" "#:not anoption"))
