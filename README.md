@@ -1,7 +1,13 @@
-Editor
-======
+iPoe
+====
 
-Main interface to poetry editor.
-For now it'll be Django because that's easy.
+Django version of the interactive poetry editor.
 
-Once the prototype's in place and there's a reasonable database, it should be no problem to migrate to other frameworks.
+Last modified Summer 2014. Status:
+- Basic UI working
+- Many poetic forms enforced
+- NOTHING for syllable and rhyme checking
+- Wrote scrapers to collect words & rhymes as text (not even SQL)
+
+This branch will likely stay dead.
+It was a nice chance to prototype and learn some Django.
