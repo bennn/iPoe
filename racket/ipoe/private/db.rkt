@@ -664,11 +664,12 @@
 
   (define-syntax-rule (with-db-test e)
     (parameterize-from-hash o* (lambda ()
-      (with-ipoe-db #:commit? #f
-                    #:interactive? #t
-                    #:user (*user*)
-                    #:dbname (*dbname*)
-        (lambda () e)))))
+      (parameterize ([*verbose* #t])
+        (with-ipoe-db #:commit? #f
+                      #:interactive? #t
+                      #:user (*user*)
+                      #:dbname (*dbname*)
+          (lambda () e))))))
 
   (define-syntax-rule (with-online-test e)
     (parameterize-from-hash o* (lambda ()
