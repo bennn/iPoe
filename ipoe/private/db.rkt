@@ -32,6 +32,10 @@
   ;; (-> Boolean)
   ;; True if currently connected to a database
 
+  remove-word
+  ;; (->* string? [#:db connection?] boolean?)
+  ;; Delete a word from the database and all its connections to other words.
+
   rhymes-with?
   ;; (->* [string? string?] [#:db connection?] boolean?)
   ;; Calling `(rhymes-with? w r)` returns true if `w` rhymes with `r`.
@@ -367,6 +371,15 @@
   (match (find-word wid #:db pgc #:column 'id)
     [#f #f]
     [(vector id word syllables) word]))
+
+(define (remove-word w #:db [pgc (*connection*)])
+  ;; DANGER ZONE!
+  (assert-connected pgc #:src 'remove-word)
+  (define wid (word->id w))
+  (and wid
+    (query-exec pgc "DELETE FROM word_almost_rhymes WHERE word = $1" wid)
+    (query-exec pgc "DELETE FROM word_rhymes        WHERE word = $1" wid)
+    (query-exec pgc "DELETE FROM word               WHERE id = $1" wid)))
 
 (define (syllables->word* num-syllables #:db [pgc (*connection*)])
   (assert-connected pgc #:src 'syllables->word*)
@@ -921,6 +934,24 @@
      ;; Fails when disconnected from DB
      (check-exn (regexp "ipoe:db:find-word")
        (lambda () (add-rhyme w v))))
+
+  ;; -- remove-word
+  (with-db-test
+    (let ([new-word "coalman"]
+          [new-syll 2]
+          [new-r* '()]
+          [new-a* '()])
+      (unless (word-exists? new-word)
+        (add-word/unsafe new-word new-syll new-r* new-a*))
+      (check-true (and (remove-word new-word) #t))
+      (check-false (word-exists? new-word))))
+
+  ;; -- remove-word, on a fake word
+  (with-db-test
+    (let ([fake-word "asovijwanrsbfhvs"])
+      (check-false (word-exists? fake-word))
+      (check-false (remove-word fake-word))
+      (check-false (word-exists? fake-word))))
 
   ;; -- (assert-)rhyme-table?
   (check-true* rhyme-table?
