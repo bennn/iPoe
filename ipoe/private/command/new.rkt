@@ -15,10 +15,10 @@
 
 (require
   racket/cmdline
+  ipoe/private/command/common
   ipoe/private/db
   ipoe/private/parameters
   (only-in ipoe/private/ui read-natural get-user-input alert)
-  (only-in racket/string string-suffix?)
 )
 
 ;; =============================================================================
@@ -71,26 +71,3 @@
   (get-user-input read-natural
                   #:prompt (format "How many syllables does '~a' have?" w)))
 
-(define (rkt-file? fname)
-  (and (string-suffix? fname ".rkt")
-       (file-exists? fname)))
-
-;; =============================================================================
-
-(module+ test
-  (require
-    rackunit
-    ipoe/private/rackunit-abbrevs)
-
-
-  ;; -- rkt-file?
-  (check-true* (lambda (p) (rkt-file? (path->string (make-resolved-module-path p))))
-    ["./new.rkt"]
-    ["./create.rkt"]
-    ["./../private.rkt"])
-
-  (check-false* rkt-file?
-    ["'a"]
-    ["1251"]
-    ["nope.txt"])
-)
