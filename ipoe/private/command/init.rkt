@@ -50,7 +50,6 @@
 ;; -----------------------------------------------------------------------------
 
 (define U-PROMPT "Enter a username for the new database.")
-(define U-DESCR "This username will be used to connect to the new database.")
 
 ;; Do a fallback search to get a username
 ;; (: get-username (-> (U #f String) (U #f String) String))
@@ -58,33 +57,32 @@
   ;; First, try the commandline or the current user
   (define u-first
     (or u-cmdline
-        (and (eq? 'Y (get-user-input read-yes-or-no
-                                     #:prompt "Create database for current user?"
-                                     #:descr "Answer 'Y' to create a new database owned by the current user. Otherwise, enter 'N'."))
-             (getenv "USER"))))
+        (let ([sys-user (getenv "USER")])
+          (case (get-user-input read-yes-or-no
+                #:prompt (format "Enter 'Y' to create a database owned by user '~a'" sys-user)
+                #:description (format "No user specified on command line. Do you want to create a database for the current system user '~a'?" sys-user))
+           [(Y) sys-user]
+           [else #f]))))
   (param-fallback u-first u-config
                   #:src 'username
-                  #:prompt U-PROMPT
-                  #:descr U-DESCR))
+                  #:prompt U-PROMPT))
 
 (define DB-PROMPT "Enter a name for the new database")
-(define DB-DESCR "iPoe uses a database to save word information across sessions.If you input a string, this script will initialize a database.")
 
 ;; Do a fallback search to get a database name
 ;; (: get-dbname (-> (U #f String) (U #f String) String))
 (define (get-dbname d-cmdline d-config)
   (param-fallback d-cmdline d-config
                   #:src 'database
-                  #:prompt DB-PROMPT
-                  #:descr DB-DESCR))
+                  #:prompt DB-PROMPT))
 
 (define (param-fallback p1 p2 #:src src
                               #:prompt prompt
-                              #:descr descr)
+                              #:descr [descr #f])
   (define p
     (cond
-     [p1    (alert (format "Got ~a from command-line" src)) p1]
-     [p2    (alert (format "Got ~a from config file" src)) p2]
+     [p1    (alert (format "Got ~a '~a' from command-line" src p1)) p1]
+     [p2    (alert (format "Inferred ~a '~a' from config file" src p2)) p2]
      [else  (get-user-input read-sql-id
                             #:prompt prompt
                             #:description descr)]))
@@ -98,7 +96,7 @@
   (alert (format "Checking that user '~a' is recognized by psql ..." user))
   (unless (system (format "psql -U ~a -l > /dev/null 2>&1" user))
     (define cmd (format "createuser -d ~a" user))
-    (init-error "User '~a' does not exist. Run the command '~a' as a superuser to create it and try again." user cmd)))
+    (init-error "User '~a' does not exist. Run the command '~a' as a superuser and try again." user cmd)))
 
 (define DESCRIPTION "DB for the Interactive Poetry Editor (ipoe)")
 (define (psql-create-db user dbname)
