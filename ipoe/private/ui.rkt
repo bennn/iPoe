@@ -90,7 +90,8 @@
 
 (define rSQL #rx"^[a-z_]+[a-z_0-9]*$")
 (define (read-sql-id str)
-  (and (regexp-match? rSQL str)
+  (and (string? str)
+       (regexp-match? rSQL str)
        str))
 
 (define (read-yes-or-no str)
@@ -132,6 +133,7 @@
 
   (check-true* (lambda (w) (string=? (read-sql-id w) w))
    ["a"]
+   ["_"]
    ["b42"]
    ["jake6969brakes"]
    ["hello_world"])
