@@ -31,6 +31,10 @@
   ;; (-> String (U #f String))
   ;; Identity function, but asserts its argument is a string
 
+  read-sql-id
+  ;; (-> String (U #f String))
+  ;; Identity if argument is a SQL identifier
+
   read-yes-or-no
   ;; (-> String (U 'Y 'N #f))
   ;; Read a yes-or-no input
@@ -84,6 +88,11 @@
   (and (string? str)
        str))
 
+(define rSQL #rx"^[a-z_]+[a-z_0-9]*$")
+(define (read-sql-id str)
+  (and (regexp-match? rSQL str)
+       str))
+
 (define (read-yes-or-no str)
   (case (string-downcase str)
    [("y" "yes" "yolo") 'Y]
@@ -113,10 +122,27 @@
    [1]
    ['asdf])
 
-  (check-apply* read-string
-   ["yes" == "yes"]
-   ["A" == "A"]
-   ["" == ""])
+  (check-true* (lambda (w) (string=? (read-string w) w))
+   ["yes"]
+   ["A"]
+   ["$cash$"]
+   ["P@$$-W0RD__"]
+   ["さ"]
+   [""])
+
+  (check-true* (lambda (w) (string=? (read-sql-id w) w))
+   ["a"]
+   ["b42"]
+   ["jake6969brakes"]
+   ["hello_world"])
+
+  (check-false* read-sql-id
+   [""]
+   ["-"] ;; No - allowed
+   ["name$"] ;; No $ allowed
+   ["777_lucky_tables"]  ;; can't start with a number
+   ["WWW"] ;; No caps allowed
+   ["Table 1"]) ;; No spaces, no caps
 
   (check-false* read-yes-or-no
     ["hello"]
