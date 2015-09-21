@@ -23,7 +23,25 @@
   readline/pread
 )
 ;; =============================================================================
-;; === Commands
+
+(define-syntax-rule (arg-error id expected received)
+  (format "~a: expected ~a, got ~a" id expected received))
+
+(define-syntax-rule (query f arg rest)
+  (let-values ([(l s) (parse-db-options rest)])
+    (take l
+      (skip s (f arg)))))
+
+(define-syntax-rule (unknown-word w)
+  (format "Unknown word '~a'" w))
+
+(define-syntax-rule (warning msg arg* ...)
+  (begin
+    (display "Warning: ")
+    (displayln (format msg arg* ...))))
+
+;; -----------------------------------------------------------------------------
+;; --- Commands
 
 ;; Available commands are a SUBSET of the db.rkt interface.
 ;; You can always get more done by directly requiring that file & programming.
@@ -35,9 +53,6 @@
 ) #:transparent
   #:property prop:procedure
   (struct-field-index exec))
-
-(define-syntax-rule (arg-error id expected recieved)
-  (format "~a: expected ~a, got ~a" id expected recieved))
 
 ;; TODO replace symbols with identifiers, in match pattern?
 (define COMMAND* (list
@@ -67,8 +82,7 @@
     'id->word
     (lambda (v)
       (match v
-       [(list 'id->word n)
-        #:when (natural? n)
+       [(list 'id->word (? natural? n))
         (or (id->word n)
             (format "Unbound ID '~a'" n))]
        [(cons 'id->word x)
@@ -83,9 +97,9 @@
        [(list 'rhymes-with? (? string? w1) (? string? w2))
         (cond
          [(not (word-exists? w1))
-          (format "Unknown word '~a'" w1)]
+          (unknown-word w1)]
          [(not (word-exists? w2))
-          (format "Unknown word '~a'" w2)]
+          (unknown-word w2)]
          [else ;; Very important that result is a string; #f is not printed.
           (format "~a" (rhymes-with? w1 w2))])]
        [(cons 'rhymes-with? x)
@@ -93,26 +107,77 @@
        [_ #f]))
      "Test if two words rhyme"
   )
-  ;(command
-  ;  'syllables->word*
-  ;)
-  ;(command
-  ;  'word->almost-rhyme*
-  ;)
-  ;(command
-  ;  'word->id
-  ;)
-  ;(command
-  ;  'word->rhyme*
-  ;)
-  ;(command
-  ;  'word->syllables
-  ;)
-  ;(command
-  ;  'word-exists?
-  ;)
+  (command
+    'syllables->word*
+    (lambda (v)
+      (match v
+       [(cons 'syllables->word* (cons (? natural? n) rest))
+        (query syllables->word* n rest)]
+       [(cons 'syllables->word* rest)
+        (arg-error 'syllables->word* "natural number (+ options)" rest)]
+       [_ #f]))
+    "Return words with the given number of syllables"
+  )
+  (command
+    'word->almost-rhyme*
+    (lambda (v)
+      (match v
+       [(cons 'word->almost-rhyme* (cons (? string? w) rest))
+        (query word->almost-rhyme* w rest)]
+       [(cons 'word->almost-rhyme* rest)
+        (arg-error 'word->almost-rhyme* "string (+ options)" rest)]
+       [_ #f]))
+    "Return words that almost rhyme with the argument"
+  )
+  (command
+    'word->id
+    (lambda (v)
+      (match v
+       [(cons 'word->id (? string? w))
+        (or (word->id w)
+            (unknown-word w))]
+       [(cons 'word->id x)
+        (arg-error 'word->id "string" x)]
+       [_ #f]))
+    "Return the ID associated with a word"
+  )
+  (command
+    'word->rhyme*
+    (lambda (v)
+      (match v
+       [(cons 'word->rhyme* (cons (? string? w) rest))
+        (query word->rhyme* w rest)]
+       [(cons 'word->rhyme* rest)
+        (arg-error 'word->rhyme* "string (+ options)" rest)]
+       [_ #f]))
+    "Return words that rhyme with the argument"
+  )
+  (command
+    'word->syllables
+    (lambda (v)
+      (match v
+       [(list 'word->syllables (? string? w))
+        (or (word->syllables w)
+            (unknown-word w))]
+       [(cons 'word->syllables rest)
+        (arg-error 'word->syllables "string" rest)]
+       [_ #f]))
+    "Return the number of syllables in a word"
+  )
+  (command
+    'word-exists?
+    (lambda (v)
+      (match v
+       [(list 'word-exists? (? string? w))
+        (format "~a" (word-exists? w))]
+       [(cons 'word-exists? rest)
+        (arg-error 'word-exists? "string" rest)]
+       [_ #f]))
+    "Check if a word exists in the database"
+  )
   ;(command
   ;  'define
+  ;  (
   ;)
 ))
 
@@ -129,6 +194,8 @@
 (define *cmd-dbname* (make-parameter #f))
 (define *cmd-user* (make-parameter #f))
 (define *commit?* (make-parameter #f))
+(define *take* (make-parameter 20))
+(define *skip* (make-parameter 0))
 (define *output-file* (make-parameter #f))
 
 (define natural? exact-nonnegative-integer?)
@@ -144,6 +211,8 @@
     [("-c" "--commit") "Commit session to database" (*commit?* #t)]
     [("-d" "--dbname") d-p "Database name" (*cmd-dbname* d-p)]
     [("-o" "--output") o-p "Save interactions to file" (*output-file* o-p)]
+    [("-t" "--take") t-p "Default number of query results to show" (*take* t-p)]
+    [("-s" "--skip") s-p "Default number of query results to skip" (*skip* s-p)]
     [("-u" "--user") u-p "Username for database" (*cmd-user* u-p)]
    #:args ()
    (begin
@@ -193,36 +262,6 @@
       (respond input r)
       (loop)])))
 
-;     [(list 'syllables->word* (? natural? n1) '#:limit (? natural? n2))
-;      (displayln (take n2 (syllables->word* n1)))
-;      (loop)]
-;     [(list 'syllables->word* (? natural? n1) '#:limit (? natural? n2) '#:skip (? natural? n3))
-;      (define s (syllables->word* n1))
-;      (skip n3 s)
-;      (displayln (take n2 s))
-;      (loop)]
-;     [(list 'word->almost-rhyme* (? string? w) '#:limit (? natural? n))
-;      (displayln (take n (word->almost-rhyme* w)))
-;      (loop)]
-;     [(list 'word->almost-rhyme* (? string? w) '#:limit (? natural? n) '#:skip (? natural? n2))
-;      (define s (word->almost-rhyme* w))
-;      (skip n2 s)
-;      (displayln (take n s))
-;      (loop)]
-;     [(list 'word->id (? string? w))
-;      (displayln (word->id w))
-;      (loop)]
-;     [(list 'word->rhyme* (? string? w) '#:limit (? natural? n1))
-;      (displayln (take n1 (word->rhyme* w)))
-;      (loop)]
-;     [(list 'word->rhyme* (? string? w) '#:limit (? natural? n1) '#:skip (? natural? n2))
-;      (define s (word->rhyme* w))
-;      (skip n2 s)
-;      (displayln (take n1 s))
-;      (loop)]
-;     [(list 'word->syllables (? string? w))
-;      (displayln (word->syllables w))
-;      (loop)]
 ;     [(list 'word-exists? (? string? w))
 ;      (displayln (word-exists? w))
 ;      (loop)]
@@ -239,10 +278,34 @@
   (memq s '(help h ? ?? ??? --help -help wtf)))
 
 (define (skip n seq)
-  (for ([x seq] [m (in-range n)]) (void)))
+  (for ([x seq] [m (in-range (or n (*skip*)))]) (void))
+  seq)
 
 (define (take n seq)
-  (for/list ([x seq] [m (in-range n)]) x))
+  (string-join
+    (for/list ([x seq] [m (in-range (or n (*take*)))])
+      (format "~a" x))
+    "\n"
+    #:after-last (if n "" "... (truncated)")))
+
+(define (parse-db-options x*)
+  (let loop ([lim #f]
+             [skp #f]
+             [x*  x*])
+    (match x*
+     [(or '() (cons _ '()))
+      (values lim skp)]
+     [(cons '#:limit (cons (? natural? n) rest))
+      (when lim (warning "Option #:limit set twice, ignoring first binding"))
+      (loop n skp rest)]
+     [(cons '#:skip (cons (? natural? n) rest))
+      (when skp (warning "Option #:skip set twice, ignoring first binding"))
+      (loop lim n rest)]
+     [(cons (or '#:limit '#:skip) (cons x rest))
+      (warning "Ignoring invalid option '~a'" x)
+      (loop lim skp rest)]
+     [(cons _ (cons _ rest))
+      (loop lim skp rest)])))
 
 (define (show-help [v #f])
   (cond
@@ -254,5 +317,8 @@
 ;; =============================================================================
 
 (module+ test
+  (require rackunit ipoe/private/rackunit-abbrevs)
+
+  ;; TODO
 
 )
