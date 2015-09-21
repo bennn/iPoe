@@ -36,6 +36,10 @@
   #:property prop:procedure
   (struct-field-index exec))
 
+(define-syntax-rule (arg-error id expected recieved)
+  (format "~a: expected ~a, got ~a" id expected recieved))
+
+;; TODO replace symbols with identifiers, in match pattern?
 (define COMMAND* (list
   (command
     'exit
@@ -59,12 +63,36 @@
         #f]))
     "Display a generic help message, or give specific information about a command"
   )
-  ;(command
-  ;  'id->word
-  ;)
-  ;(command
-  ;  'rhymes-with?
-  ;)
+  (command
+    'id->word
+    (lambda (v)
+      (match v
+       [(list 'id->word n)
+        #:when (natural? n)
+        (or (id->word n)
+            (format "Unbound ID '~a'" n))]
+       [(cons 'id->word x)
+        (arg-error 'id->word "natural number" x)]
+       [_ #f]))
+    "Return the word associated with a database ID"
+  )
+  (command
+    'rhymes-with?
+    (lambda (v)
+      (match v
+       [(list 'rhymes-with? (? string? w1) (? string? w2))
+        (cond
+         [(not (word-exists? w1))
+          (format "Unknown word '~a'" w1)]
+         [(not (word-exists? w2))
+          (format "Unknown word '~a'" w2)]
+         [else ;; Very important that result is a string; #f is not printed.
+          (format "~a" (rhymes-with? w1 w2))])]
+       [(cons 'rhymes-with? x)
+        (arg-error 'rhymes-with? "2 strings" x)]
+       [_ #f]))
+     "Test if two words rhyme"
+  )
   ;(command
   ;  'syllables->word*
   ;)
@@ -131,22 +159,25 @@
                        #:online? #f
            (lambda ()
              (printf "Connected to database '~a' as user '~a'.\n" d u)
-             (init-repl (*output-file*)))))))))
+             (if (*output-file*)
+                 (call-with-output-file* (*output-file*) #:exists 'replace
+                   init-repl)
+                 (init-repl)))))))))
 
-(define (init-repl output-file)
+(define PROMPT #"ipoe> ")
+
+(define (init-repl [port #f])
   ;; -- Factor all REPL interactions through `respond`
   (define respond
-    (if output-file
-        (call-with-output-file* output-file #:exists 'replace
-          (lambda (port)
-            (lambda (tmp . arg*)
-              (let ([str (apply format tmp arg*)])
-                (displayln str port)
-                (displayln str)
-                (newline)))))
-        (lambda (tmp . arg*)
-          (displayln (apply format tmp arg*))
-          (newline))))
+    (if port
+        (lambda (in out)
+          (display PROMPT port)
+          (displayln in port)
+          (displayln out port)
+          (newline port)
+          (displayln out))
+        (lambda (in out)
+          (displayln out))))
   ;; -- REPL
   (let loop ()
     (define input
@@ -159,15 +190,9 @@
       (printf "Unrecognized command '~a'\n" input)
       (loop)]
      [r
-      (respond r)
+      (respond input r)
       (loop)])))
 
-;     [(list 'id->word (? natural? n))
-;      (displayln (id->word n))
-;      (loop)]
-;     [(list 'rhymes-with? (? string? sym1) (? string? sym2))
-;      (displayln (rhymes-with? sym1 sym2))
-;      (loop)]
 ;     [(list 'syllables->word* (? natural? n1) '#:limit (? natural? n2))
 ;      (displayln (take n2 (syllables->word* n1)))
 ;      (loop)]
