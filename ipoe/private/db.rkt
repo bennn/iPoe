@@ -338,15 +338,16 @@
      [else
       (db-warning loc "Could not find ID for word '~a'" r)])))
 
-;; ONLY for removing 3-character suffixes
-(define-syntax-rule (strip-suffix fname)
-  (substring fname 0 (- (string-length fname) 4)))
+(define-syntax-rule (path->filename p)
+  (let-values (([base name mbd?] (split-path p)))
+    (let ([fname (path->string name)])
+      (substring fname 0 (- (string-length fname) 4)))))
 
 (define (create-ipoe-tables #:db [pgc (*connection*)])
   (assert-connected pgc #:src 'create-tables)
-  (for ([filename (in-list TABLE*)])
-    (alert (format "Creating table '~a' ..." (strip-suffix filename)))
-    (query-exec (file->string filename))))
+  (for ([p (in-list TABLE*)])
+    (alert (format "Creating table '~a' ..." (path->filename p)))
+    (query-exec pgc (file->string (path->string (path->complete-path p))))))
 
 (define (find-word word-property #:db [pgc (*connection*)] #:column [col-param #f])
   (assert-connected pgc #:src 'find-word)

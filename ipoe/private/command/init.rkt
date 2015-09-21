@@ -146,7 +146,6 @@
    [else (void)]))
 
 (define (start-server)
-  (alert "Ensuring psql server is running ...")
   (and (psql-installed?)
        (or (psql-running?)
            ;; Heeeere we go!
@@ -260,8 +259,8 @@
   ;; -- start-server, pass
   (check-true
     (check-print
-      (list #rx"^Ensuring psql"
-            #rx"^Checking"
-            #rx"^Checking")
+      (list
+        #rx"^Checking"
+        #rx"^Checking")
       start-server))
 )
