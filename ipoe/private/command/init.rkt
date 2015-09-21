@@ -24,9 +24,9 @@
   (command-line
    #:argv arg*
    #:once-each
-   [("-u" "--username")
+   [("-u" "--user")
     u-param "Username for new database" (*new-user* u-param)]
-   [("-d" "--database")
+   [("-d" "--dbname")
     d-param "Name of new database" (*new-dbname* d-param)]
    #:args ()
    (and

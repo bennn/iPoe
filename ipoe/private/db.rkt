@@ -50,7 +50,7 @@
   ;; Return a sequence of words with the supplied number of syllables
 
   with-ipoe-db
-  ;; (->* [(-> Any)] [#:commit? Boolean] Any)
+  ;; (->* [(-> Any)] [TODO] Any)
   ;; Execute the thunk in the context of a fresh database connection
 
   word->almost-rhyme*
