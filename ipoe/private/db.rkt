@@ -24,6 +24,10 @@
   ;; Calling `(almost-rhymes-with? w r)` returns true if `w` almost rhymes with `r`.
   ;; Results should be symmetric, but this is not guaranteed.
 
+  create-ipoe-tables
+  ;; (-> boolean?)
+  ;; Create all iPoe tables
+
   id->word
   ;; (->* [natural/c] [#:db connection?] string?)
   ;; Convert a primary key to its matching word string.
@@ -76,6 +80,8 @@
   racket/match
   racket/sequence
   ipoe/private/parameters
+  (only-in ipoe/private/db/migrate
+    TABLE*)
   (only-in ipoe/private/ui
     alert
     get-user-input
@@ -332,7 +338,16 @@
      [else
       (db-warning loc "Could not find ID for word '~a'" r)])))
 
-;; (: find-word (->* [PGC (U String Integer)] [#:column (U 'id 'word 'num_syllables #f)] (U #f (Vector Integer String Integer))))
+;; ONLY for removing 3-character suffixes
+(define-syntax-rule (strip-suffix fname)
+  (substring fname 0 (- (string-length fname) 4)))
+
+(define (create-ipoe-tables #:db [pgc (*connection*)])
+  (assert-connected pgc #:src 'create-tables)
+  (for ([filename (in-list TABLE*)])
+    (alert (format "Creating table '~a' ..." (strip-suffix filename)))
+    (query-exec (file->string filename))))
+
 (define (find-word word-property #:db [pgc (*connection*)] #:column [col-param #f])
   (assert-connected pgc #:src 'find-word)
   (case (or (validate-word-column col-param) (infer-word-column word-property))
