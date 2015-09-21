@@ -5,30 +5,12 @@
 
 (require
   racket/match
+  (prefix-in cmd: ipoe/command)
   (only-in racket/string string-suffix?)
-  (for-syntax racket/base))
+  (for-syntax racket/base)
+)
 
 ;; =============================================================================
-
-(define-syntax (not-implemented stx)
-  (define loc (string->symbol (format "ipoe:~a" (syntax-line stx))))
-  #`(raise-user-error '#,loc "Not implemented"))
-
-;; -----------------------------------------------------------------------------
-
-(define (ipoe-check fname)
-  (not-implemented))
-
-(define (ipoe-init arg*)
-  ;; - Check if postgres is installed
-  ;; - Check for a init files, an existing database
-  ;; - Communicate lots
-  (displayln "TODO"))
-
-(define (ipoe-submit arg*)
-  (not-implemented))
-
-;; -----------------------------------------------------------------------------
 
 (define HELP-STR "HELP MESSAGE")
 
@@ -40,6 +22,9 @@
 
 ;; =============================================================================
 
+;; Wanted aliases:
+;; - show ~ list
+
 (module+ main
   (require racket/cmdline)
   ;; -- parameters?
@@ -49,18 +34,26 @@
    (if (null? ARG*)
        (print-help)
        (match (string->symbol (car ARG*))
-        ;; scrape?
-        ;; query?
-        ;; get-rhymes? (full report?)
-        ;; add-poem
-        ;; help(poem)
-        ;; list poems
-        ['init
-         (ipoe-init (cdr ARG*))]
-        ['submit
-         (ipoe-submit (cdr ARG*))]
-        [rkt #:when (string-suffix? (car ARG*) ".rkt")
-         (ipoe-check rkt)]
+        ;; scrape? get-rhymes? (full report?, repl?)
+        ;; share?
+        ;; edit? audit? or build this into NEW 
+        ['check
+         (cmd:check (cdr ARG*))]
+        [rkt ;; Shortcut for checking, instead of 'racket FILE.rkt'
+         #:when (string-suffix? (car ARG*) ".rkt")
+         (cmd:check ARG*)]
+        ['db
+         (cmd:db (cdr ARG*))]
+        ['help
+         (print-help)]
+        ['init  ;; TODO
+         (cmd:init (cdr ARG*))]
+        ['new
+         (cmd:new (cdr ARG*))]
+        ['remove
+         (cmd:remove (cdr ARG*))]
+        ['show  ;; TODO
+         (cmd:show (cdr ARG*))]
         [k
          (print-unknown k)]))))
 
