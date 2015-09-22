@@ -4,7 +4,7 @@
 
 (provide
   add-word add-word*
-  ;; (->* (string?) (#:db connection? #:syllables (U Natural #f) #:rhymes (U (Listof String) #f) #:almost-rhymes (U (Listof String) #f) #:interactive? boolean? #:offline? boolean?) Void)
+  ;; (->* TODO)
   ;; Add a new word to the database.
   ;; First three optional arguments supply information for the word's syllables, rhymes,
   ;;  and almost-rhymes.
@@ -455,15 +455,17 @@
 ;; -----------------------------------------------------------------------------
 ;; --- add-rhyme
 
-;; Add multiple new rhymes for a word
+;; Add multiple new rhymes for a word (not sure for/and is the right choice)
 (define (add-rhyme* w r* #:db [pgc (*connection*)])
-  (for ([r (in-list r*)])
-    (add-rhyme w r #:db pgc)))
+  (for/list ([r (in-list r*)]
+             #:when (add-rhyme w r #:db pgc))
+    r))
 
 (define (add-rhyme*/id wid r* #:db [pgc (*connection*)])
-  (for ([r (in-list r*)])
-    (define rid (word->id/fail r #:db pgc #:src 'add-rhyme*/id))
-    (add-rhyme/id wid rid #:db pgc)))
+  (for/list ([r (in-list r*)]
+             #:when (let ([rid (word->id/fail r #:db pgc #:src 'add-rhyme*/id)])
+                      (add-rhyme/id wid rid #:db pgc)))
+    r))
 
 ;; Add one new rhyme for a word
 (define (add-rhyme w r #:db [pgc (*connection*)])
@@ -472,8 +474,8 @@
   (add-rhyme/id wid rid #:db pgc))
 
 (define (add-rhyme/id wid rid #:db [pgc (*connection*)])
-  (unless (rhymes-with?/id wid rid #:db pgc)
-    (add-rhyme/unsafe wid rid #:db pgc)))
+  (and (not (rhymes-with?/id wid rid #:db pgc))
+       (add-rhyme/unsafe wid rid #:db pgc)))
 
 (define (add-rhyme/unsafe wid rid #:db [pgc (*connection*)])
   (query-exec pgc
@@ -483,13 +485,15 @@
 ;; --- add-almost-rhyme
 
 (define (add-almost-rhyme* w a* #:db [pgc (*connection*)])
-  (for ([a (in-list a*)])
-    (add-almost-rhyme w a #:db pgc)))
+  (for/list ([a (in-list a*)]
+             #:when (add-almost-rhyme w a #:db pgc))
+    a))
 
 (define (add-almost-rhyme*/id wid a* #:db [pgc (*connection*)])
-  (for ([a (in-list a*)])
-    (define aid (word->id/fail a #:db pgc #:src 'add-almost-rhyme*/id))
-    (add-almost-rhyme/id wid aid #:db pgc)))
+  (for/list ([a (in-list a*)]
+             #:when (let ([aid (word->id/fail a #:db pgc #:src 'add-almost-rhyme*/id)])
+                      (add-almost-rhyme/id wid aid #:db pgc)))
+    a))
 
 (define (add-almost-rhyme w a #:db [pgc (*connection*)])
   (define wid (word->id/fail w #:db pgc #:src 'add-almost-rhyme))
@@ -497,8 +501,8 @@
   (add-almost-rhyme/id wid aid #:db pgc))
 
 (define (add-almost-rhyme/id wid aid #:db [pgc (*connection*)])
-  (unless (almost-rhymes-with?/id wid aid #:db pgc)
-    (add-almost-rhyme/unsafe wid aid #:db pgc)))
+  (and (not (almost-rhymes-with?/id wid aid #:db pgc))
+       (add-almost-rhyme/unsafe wid aid #:db pgc)))
 
 (define (add-almost-rhyme/unsafe wid aid #:db [pgc (*connection*)])
   (query-exec pgc
@@ -512,10 +516,12 @@
 (define (add-word* word*
                    #:db [pgc (*connection*)]
                    #:interactive? [interactive? #f]
-                   #:offline? [offline? #f])
-  (for ([w (in-list word*)])
-    (add-word w #:db pgc #:interactive? interactive? #:offline? offline?)))
+                   #:online? [online? #f])
+  (for/list ([w (in-list word*)]
+             #:when (add-word w #:db pgc #:interactive? interactive? #:online? online?))
+    w))
 
+;; TODO should the output contain more information? rhymes we failed to add?
 ;; Add a new word to the database
 (define (add-word word
                   #:db [pgc (*connection*)]
@@ -523,9 +529,9 @@
                   #:rhymes [rhyme-param '()]
                   #:almost-rhymes [almost-rhyme-param '()]
                   #:interactive? [interactive? #f]
-                  #:offline? [offline? #f])
+                  #:online? [online? #f])
   (when interactive?
-    (alert (format "Adding new word '~a' to the database" word)))
+    (alert (format "Attempting to add new word '~a' to the database" word)))
   (cond
    [(online-mode? pgc)
     (when interactive?
@@ -540,16 +546,16 @@
       (alert (format "Word '~a' is already in the database" word)))
     #f]
    [else
-    (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:offline? offline?))
+    (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:online? online?))
     (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with an explicit #:syllables argument." word))
-    (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param #:interactive? interactive? #:offline? offline?))
-    (define rhyme* (rhyme-result-rhyme* rr))
-    (define almost-rhyme* (rhyme-result-almost-rhyme* rr))
+    (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param #:interactive? interactive? #:online? online?))
+    (define rhyme* (filter word-exists? (rhyme-result-rhyme* rr)))
+    (define almost-rhyme* (filter word-exists? (rhyme-result-almost-rhyme* rr)))
     ;; -- got everything, time to add word
     (define wid (add-word/unsafe word))
-    (add-syllables/id wid syllables #:db pgc)
-    (add-rhyme*/id wid rhyme* #:db pgc)
-    (add-almost-rhyme*/id wid almost-rhyme* #:db pgc)]))
+    (and (add-syllables/id wid syllables #:db pgc)
+         (add-rhyme*/id wid rhyme* #:db pgc)
+         (add-almost-rhyme*/id wid almost-rhyme* #:db pgc))]))
 
 ;; Directly add a word to the database.
 ;; Please call `add-word` instead!
@@ -1186,6 +1192,8 @@
   (let ([r-fun* (list add-rhyme* add-rhyme*/id add-rhyme add-rhyme/id add-rhyme/unsafe)]
         [a-fun* (list add-almost-rhyme* add-almost-rhyme*/id add-almost-rhyme add-almost-rhyme/id add-almost-rhyme/unsafe)])
     (with-db-test
+     (begin
+     ;; -- success
      (let* ([w "asdgadsfa"]
             [wid (add-word/unsafe w)]
             [r1 "gwirfsnwds"]
@@ -1208,237 +1216,262 @@
                [arg1 (in-list arg1*)]
                [arg2 (in-list arg2*)])
            (check-false (q w r))
-           (f arg1 arg2)
-           (check-true (q w r))))))
-    ;; -- add duplicate rhyme TODO
-    ;; (with-db-test
-    ;;  (let* ([w "asdgasdfas"]
-    ;;         [wid (add-word/unsafe w)]
-    ;;         [r "sdgaheudvs"]
-    ;;         [rid (add-word/unsafe r)])
-    ;;    (add-rhyme w r)))
-    ;; -- add-rhyme / almost fails when online or disconnected
-    (let* ([rx #rx"ipoe:db"] ;; Very generic
-           [w "say"]
-           [r "what"]
-           [id 0]
-           [arg1* (list w id w id)]
-           [arg2* (list (list r r) (list r r) r id)])
-      (for ([r-fun (in-list r-fun*)]
-            [a-fun (in-list a-fun*)]
-            [arg1 (in-list arg1*)]
-            [arg2 (in-list arg2*)])
-        (check-exn rx (lambda () (r-fun arg1 arg2)))
-        (check-exn rx (lambda () (with-online-test (r-fun arg1 arg2))))
-        (check-exn rx (lambda () (a-fun arg1 arg2)))
-        (check-exn rx (lambda () (with-online-test (a-fun arg1 arg2)))))))
+           (check-true (and (f arg1 arg2) #t))
+           (check-true (q w r)))))
+     ;; -- add duplicate rhyme, should return #f
+     (let* ([w "asdgasdfas"]
+            [wid (add-word/unsafe w)]
+            [r1 "sdgaheudvs"]
+            [rid1 (add-word/unsafe r1)]
+            [r2 "ujnunheudvs"]
+            [rid2 (add-word/unsafe r2)]
+            [r3 "sdgahggwvs"]
+            [rid3 (add-word/unsafe r3)]
+            [r4 "sdgaasaaavs"]
+            [rid4 (add-word/unsafe r4)])
+       (for ([q? (in-list (list rhymes-with? almost-rhymes-with?))]
+             [f* (in-list (list r-fun* a-fun*))])
+         (for ([f (in-list f*)]
+               [r (in-list (list r1 r2 r3 r4))]
+               [arg1 (in-list (list w wid w wid))]
+               [arg2 (in-list (list (list r1) (list r2) r3 rid4))])
+           (check-false (q? w r))
+           (check-true (and (f arg1 arg2) #t))
+           (check-true (q? w r))
+           (check-true ;; Specifically, the iterators* should be '() and everything else #f
+            (let ([r (f arg1 arg2)])
+              (or (eq? #f r) (null? r)))))))
+     ;; -- add-rhyme / almost fails when online or disconnected
+     (let* ([rx #rx"ipoe:db"] ;; Very generic
+            [w "say"]
+            [r "what"]
+            [id 0]
+            [arg1* (list w id w id)]
+            [arg2* (list (list r r) (list r r) r id)])
+       (for ([r-fun (in-list r-fun*)]
+             [a-fun (in-list a-fun*)]
+             [arg1 (in-list arg1*)]
+             [arg2 (in-list arg2*)])
+         (check-exn rx (lambda () (r-fun arg1 arg2)))
+         (check-exn rx (lambda () (with-online-test (r-fun arg1 arg2))))
+         (check-exn rx (lambda () (a-fun arg1 arg2)))
+         (check-exn rx (lambda () (with-online-test (a-fun arg1 arg2)))))))
+     ))
+
+  ;; -- add-(almost-)rhyme*, one in the sequence fails (should return the successful ones
+  (with-db-test
+   (let* ([w "asasdfa"]
+          [wid (add-word/unsafe w)]
+          [r1 "avhirgvbf"]
+          [rid1 (add-word/unsafe r1)]
+          [r2 "vvvvvvgvbf"]
+          [rid2 (add-word/unsafe r2)]
+          [r3 "bbbbbbbb"]
+          [rid3 (add-word/unsafe r3)]
+          [r4 "uwhuegwe"]
+          [rid4 (add-word/unsafe r4)])
+     (let ([arg (list r1 r1 r2)]
+           [res (list r1 r2)])
+       (for ([f (in-list (list add-rhyme* add-almost-rhyme*))])
+         (check-equal? (f w arg) res)))
+     (let ([arg (list r4 r4 r3)]
+           [res (list r4 r3)])
+       (for ([f (in-list (list add-rhyme*/id add-almost-rhyme*/id))])
+         (check-equal? (f wid arg) res)))))
+
 
   ;; -- add-word
-;  ;; -- add-word/unsafe
-;  (let ([new-word "ycvgpadfwd"])
-;    ;; Add a word without rhymes
-;    (with-db-test
-;      (begin
-;        (add-word/unsafe new-word 1 '() '())
-;        ;; New word should be defined
-;        (check-true (word-exists? new-word))
-;        (check-equal? (word->syllables new-word) 1))))
-;
-;  ;; Add a word with known rhymes
-;  (let* ([new-word "nasdofiz"]
-;         [r*   '("yes")]
-;         [a*   '("later")])
-;   (with-db-test
-;     (begin
-;       ;; -- assert rhymes exist
-;       (for ([r (in-list r*)])
-;         (check-true (word-exists? r)))
-;       (for ([a (in-list a*)])
-;         (check-true (word-exists? a)))
-;       ;; -- add word
-;       (add-word/unsafe new-word 11 r* a*)
-;       ;; -- assert word added
-;       (check-true (word-exists? new-word))
-;       (check-equal? (word->syllables new-word) 11)
-;       (check-equal? (id->word (word->id new-word)) new-word)
-;       ;; -- check rhymes
-;       (check-equal? (sequence->list (word->rhyme* new-word)) r*)
-;       (check-equal? (sequence->list (word->almost-rhyme* new-word)) a*))))
-;
-;  ;; Add a word with unknown rhymes
-;  (let* ([new-word "hvzx8da"]
-;         [r* '("asvhcuivhw")]
-;         [a* '()])
-;    (with-db-test
-;      (begin
-;        ;; -- assert rhymes do NOT exist
-;        (for ([r (in-list r*)])
-;          (check-false (word-exists? r)))
-;        (for ([a (in-list a*)])
-;          (check-true (word-exists? a)))
-;        ;; -- add word
-;        (check-print
-;          (format "[WARNING ipoe:db:rhyme] : Could not find ID for word '~a'\n" (car r*))
-;          (lambda () (add-word/unsafe new-word 5 r* a*)))
-;        (check-true (word-exists? new-word))
-;        ;; -- should have no rhymes
-;        (check-equal? (sequence->list (word->rhyme* new-word)) '()))))
-;
-;  ;; -- add-word
-;  (let ([nonsense1 "asdv8uazxcvasd_1"]
-;        [nonsense2 "asdv8uazxcvasd_2"]
-;        [nonsense3 "asdv8uazxcvasd_3"])
-;    (with-db-test
-;      (begin
-;        ;; Fails in online mode, cannot tell number of syllables
-;        (check-exn exn:fail? (lambda () (add-word nonsense1 #:interactive? #f #:offline? #f)))
-;        ;; Succeeds with an explicit number of syllables
-;        (with-output-to-file "/dev/null" #:exists 'append
-;          (lambda ()
-;            (check-true (and (add-word nonsense2 #:syllables 32 #:interactive? #f #:offline? #f) #t))))
-;        ;; Succeeds offline because the naive test never fails
-;        (check-true (and (add-word nonsense3 #:interactive? #f #:offline? #t) #t)))))
-;
-;  ;; --- add-word failures
-;  (let ([new-word "asdhvuianjsdkvasd"])
-;    (check-false (add-word new-word))
-;    (check-false
-;      (with-online-test (add-word new-word))))
-;
-;
-;  ;; -- add-word* (when offline?, never fails)
-;  (with-db-test
-;    (let ([new1 "onething"]
-;          [new2 "anotherthing"])
-;      (with-output-to-file "/dev/null" #:exists 'append
-;        (lambda ()
-;          (check-true (and (add-word* (list new1 new2) #:interactive? #f #:offline? #t) #t))))
-;      (check-true (word-exists? new1))
-;      (check-true (word-exists? new2))))
-;
-;  (let ([w* '("rafflehsnarcuvjawe" "vpoawetz")])
-;    (with-output-to-file "/dev/null" #:exists 'append
-;      (lambda ()
-;        (check-true (and (add-word* w* #:interactive? #f #:offline? #t) #t))))
-;    (with-db-test
-;      (check-false (word-exists? (car w*)))))
-;
-;  ;; -- add-rhyme / add-almost-rhyme
-;  (with-db-test
-;    ;; Doesn't commit for unknown rhymes/almost
-;    (let* ([word "word"]
-;           [unknown "aiopsuvhz"]
-;           [warn-str (format " : Could not find ID for word '~a'\n" unknown)])
-;      (check-true (word-exists? word))
-;      (check-false (word-exists? unknown))
-;      (check-print
-;        (string-append "[WARNING ipoe:db:rhyme]" warn-str)
-;        (lambda () (add-rhyme word unknown)))
-;      (check-false (word-exists? unknown))
-;      (check-print
-;        (string-append "[WARNING ipoe:db:almost_rhyme]" warn-str)
-;        (lambda () (add-almost-rhyme word unknown)))
-;      (check-false (word-exists? unknown))))
-;
-;  (with-db-test
-;    ;; Succeeds for known words, doesn't matter if they actually rhyme
-;    (let ([w "cat"]
-;          [r "dog"])
-;      (check-true (word-exists? w))
-;      (check-true (word-exists? r))
-;      (check-false (rhymes-with? w r))
-;      (check-false (almost-rhymes-with? w r))
-;      ;; --
-;      (add-rhyme w r)
-;      (check-true (rhymes-with? w r))
-;      (check-false (almost-rhymes-with? w r))
-;      ;; --
-;      (add-almost-rhyme w r)
-;      (check-true (rhymes-with? w r))
-;      (check-true (and (almost-rhymes-with? w r) #t))))
-;
-;   (let ([w "asdfasv"]
-;         [v "avhoiuswvp"])
-;     ;; Fails when disconnected from DB
-;     (check-exn (regexp "ipoe:db:find-word")
-;       (lambda () (add-rhyme w v))))
-;
-;  ;; -- remove-word
-;  (with-db-test
-;    (let ([new-word "coalman"]
-;          [new-syll 2]
-;          [new-r* '()]
-;          [new-a* '()])
-;      (unless (word-exists? new-word)
-;        (add-word/unsafe new-word new-syll new-r* new-a*))
-;      (check-true (and (remove-word new-word) #t))
-;      (check-false (word-exists? new-word))))
-;
-;  ;; -- remove-word, on a fake word
-;  (with-db-test
-;    (let ([fake-word "asovijwanrsbfhvs"])
-;      (check-false (word-exists? fake-word))
-;      (check-false (remove-word fake-word))
-;      (check-false (word-exists? fake-word))))
-;  ;; -- read-cache
-;  (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
-;    ;; --- Normal use
-;    (let* ([C (make-cache)]
-;           [w "yogurt"])
-;      (define r (cons (scrape/cache 'word w #:cache C #:scrape scrape-word)
-;                      #f))
-;      (check-equal? (hash-ref C w (lambda () #f)) r)
-;      (write-cache C)
-;      (define C+ (read-cache))
-;      (check-equal? (hash-ref C+ w (lambda () #f)) r))
-;    ;; --- Garbage in the cache file
-;    (define-syntax-rule (check-garbage thunk)
-;      (let ()
-;        (with-output-to-file (*ipoe-cache*) #:exists 'replace
-;          thunk)
-;        (define C (check-print
-;                    (list #rx"^Error reading cache")
-;                    read-cache))
-;        (check-equal? C (make-cache))))
-;    (check-garbage newline)
-;    (check-garbage (lambda () (displayln "helloworld")))
-;    (check-garbage (lambda () (write 8235)))
-;    ;; --- Cache file missing
-;    (let ()
-;      (delete-file (*ipoe-cache*))
-;      (check-equal? (read-cache)
-;                    (make-cache))))
-;
-;  ;; -- write-cache
-;  (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
-;    (define-syntax-rule (test-bad-write val)
-;      (check-equal? (check-print (list #rx"^Failed to save")
-;                                 (lambda () (write-cache val)))
-;                    (void)))
-;    (test-bad-write 'blah)
-;    (test-bad-write '())
-;    (test-bad-write '(98 2))
-;    (test-bad-write "bad"))
-;
-;  ;; -- scrape-word/cache & scrape-rhyme/cache
-;  (with-config/cache [#f #f]
-;    (with-online-test
-;      (begin
-;        ;; --- word
-;        (check-true (online-mode? (*connection*)))
-;        (check-true (word-exists? "car"))
-;        (check-true (word-exists? "car"))
-;        ;; Beyond the abstraction barrier...
-;        (check-equal? (hash-count (*connection*)) 1)
-;        (check-true (word-exists? "rake"))
-;        (check-equal? (hash-count (*connection*)) 2)
-;        ;; --- rhyme-scheme
-;        (check-true (rhymes-with? "car" "far"))
-;        (check-true (rhymes-with? "far" "car"))
-;        ;; False because we never search for the word
-;        (check-false (car (hash-ref (*connection*) "far")))
-;        ;; False because we never searched for the rhyme
-;        (check-false (cdr (hash-ref (*connection*) "rake")))
-;        (check-equal? (hash-count (*connection*)) 3))))
+  ;; -- add-word/unsafe (unsafe to call this without a connection
+  (with-db-test
+   (let ([new-word "ycvgpadfwd"])
+     (check-false (word-exists? new-word))
+     (add-word/unsafe new-word)
+     (check-true (word-exists? new-word))))
+
+
+  ;; Add a word with known syllables + rhymes
+  (let* ([w "nasdofiz"]
+         [s 69]
+         [r   "yesvnagewsdf"]
+         [a   "laterubwfwfe"])
+    ;; Not interactive, Not online
+    (with-db-test
+     (let ([rid (add-word/unsafe r)]
+           [aid (add-word/unsafe a)])
+       (check-print
+        (list #rx"instead of the given 69 syllables\\).$")
+        (lambda () (add-word w
+                             #:syllables s
+                             #:rhymes (list r)
+                             #:almost-rhymes (list a)
+                             #:interactive? #f
+                             #:online? #f)))
+       (check-true (word-exists? w))
+       (check-equal? (word->syllables w) s)
+       (check-equal? (id->word (word->id w)) w)
+       (check-true (rhymes-with? w r))
+       (check-false (rhymes-with? w a))
+       (check-false (almost-rhymes-with? w r))
+       (check-true (almost-rhymes-with? w a))))
+    ;; Not interactive, Online. Should not fail, even though other rhymes do not exist.
+    (with-db-test
+     (let ([rid (add-word/unsafe r)]
+           [aid (add-word/unsafe a)])
+       (add-word w
+                 #:syllables s
+                 #:rhymes (list r)
+                 #:almost-rhymes (list a)
+                 #:interactive? #f
+                 #:online? #t)
+       (check-true (word-exists? w))
+       (check-equal? (word->syllables w) s)
+       (check-equal? (id->word (word->id w)) w)
+       (check-true (rhymes-with? w r))
+       (check-false (rhymes-with? w a))
+       (check-false (almost-rhymes-with? w r))
+       (check-true (almost-rhymes-with? w a))))
+    ;; New word, but unknown rhymes (doesn't matter if online or not)
+    (with-db-test
+     (for* ([online? (in-list (list #t #f))]
+            [r* (in-list (list '() (list r)))])
+       (add-word w
+                 #:syllables s
+                 #:rhymes (list r)
+                 #:almost-rhymes (list a)
+                 #:interactive? #f
+                 #:online? online?)
+       (check-true (word-exists? w))
+       (check-equal? (word->syllables w) s)
+       (check-false (word-exists? r))
+       (check-false (word-exists? a))))
+    ;; Nonsense words, no syllables. Fails in online mode. Offline we ALWAYS guess.
+    (with-db-test
+     (begin
+       (check-exn #rx"add-word"
+                  (lambda () (add-word w
+                                       #:interactive? #f
+                                       #:online? #t)))
+       (add-word w
+                 #:interactive? #f
+                 #:online? #f)
+       (check-true (word-exists? w))
+       (check-true (< 0 (word->syllables w))))))
+
+  ;; --- add-word failures
+  (let ([new-word "asdhvuianjsdkvasd"])
+    ;; Not connected to DB
+    (check-false (add-word new-word))
+    (check-false
+     (check-print
+      (list #rx"^Attempting to add" #rx"^Cannot add word .*? not connected")
+      (lambda () (add-word new-word #:interactive? #t))))
+    ;; Offline
+    (check-false (with-online-test (add-word new-word)))
+    (check-false
+     (check-print
+      (list #rx"^Attempting to add" #rx"^Cannot add word .*? currently in online-only")
+      (lambda () (with-online-test (add-word new-word #:interactive? #t))))))
+
+  ;; TODO add-word*
+
+  ;; ;; -- add-word* (when offline?, never fails)
+  ;; (with-db-test
+  ;;   (let ([new1 "onething"]
+  ;;         [new2 "anotherthing"])
+  ;;     (with-output-to-file "/dev/null" #:exists 'append
+  ;;       (lambda ()
+  ;;         (check-true (and (add-word* (list new1 new2) #:interactive? #f #:offline? #t) #t))))
+  ;;     (check-true (word-exists? new1))
+  ;;     (check-true (word-exists? new2))))
+
+  ;; (let ([w* '("rafflehsnarcuvjawe" "vpoawetz")])
+  ;;   (with-output-to-file "/dev/null" #:exists 'append
+  ;;     (lambda ()
+  ;;       (check-true (and (add-word* w* #:interactive? #f #:offline? #t) #t))))
+  ;;   (with-db-test
+  ;;     (check-false (word-exists? (car w*)))))
+
+  ;; -- remove-word
+  (let ([w "aspdognawv"])
+    ;; Add, then remove
+    (with-db-test
+     (begin
+       (check-false (word-exists? w))
+       (add-word/unsafe w)
+       (check-true (word-exists? w))
+       (remove-word w)
+       (check-false (word-exists? w))))
+    ;; Remove a fake word
+    (with-db-test
+     (begin
+       (check-false (word-exists? w))
+       (check-false (remove-word w))))
+    ;; Disconnected
+    (let ([rx #rx"remove-word"])
+      (check-exn rx (lambda () (remove-word w)))
+      ;; Online-only
+      (check-exn rx (lambda () (with-online-test (remove-word w))))))
+
+  ;; ------------------------------------------------------------------
+  ;; -- read-cache
+  (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
+    ;; --- Normal use
+    (let* ([C (make-cache)]
+           [w "yogurt"])
+      (define r (cons (scrape/cache 'word w #:cache C #:scrape scrape-word)
+                      #f))
+      (check-equal? (hash-ref C w (lambda () #f)) r)
+      (write-cache C)
+      (define C+ (read-cache))
+      (check-equal? (hash-ref C+ w (lambda () #f)) r))
+    ;; --- Garbage in the cache file
+    (define-syntax-rule (check-garbage thunk)
+      (let ()
+        (with-output-to-file (*ipoe-cache*) #:exists 'replace
+                             thunk)
+        (define C (check-print
+                   (list #rx"^Error reading cache")
+                   read-cache))
+        (check-equal? C (make-cache))))
+    (check-garbage newline)
+    (check-garbage (lambda () (displayln "helloworld")))
+    (check-garbage (lambda () (write 8235)))
+    ;; --- Cache file missing
+    (let ()
+      (delete-file (*ipoe-cache*))
+      (check-equal? (read-cache)
+                    (make-cache))))
+
+  ;; -- write-cache
+  (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
+    (define-syntax-rule (test-bad-write val)
+      (check-equal? (check-print (list #rx"^Failed to save")
+                                 (lambda () (write-cache val)))
+                    (void)))
+    (test-bad-write 'blah)
+    (test-bad-write '())
+    (test-bad-write '(98 2))
+    (test-bad-write "bad"))
+
+  ;; -- scrape-word/cache & scrape-rhyme/cache
+  (with-config/cache [#f #f]
+   (with-online-test
+    (begin
+      ;; --- word
+      (check-true (online-mode? (*connection*)))
+      (check-true (word-exists? "car"))
+      (check-true (word-exists? "car"))
+      ;; Beyond the abstraction barrier...
+      (check-equal? (hash-count (*connection*)) 1)
+      (check-true (word-exists? "rake"))
+      (check-equal? (hash-count (*connection*)) 2)
+      ;; --- rhyme-scheme
+      (check-true (rhymes-with? "car" "far"))
+      (check-true (rhymes-with? "far" "car"))
+      ;; False because we never search for the word
+      (check-false (car (hash-ref (*connection*) "far")))
+      ;; False because we never searched for the rhyme
+      (check-false (cdr (hash-ref (*connection*) "rake")))
+      (check-equal? (hash-count (*connection*)) 3))))
 
 )
