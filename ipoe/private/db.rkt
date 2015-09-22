@@ -1183,41 +1183,55 @@
       (lambda () (with-online-test (add-syllables/id wid s)))))
 
   ;; -- add-rhyme, etc
-  (with-db-test
-    (let* ([w "asdgadsfa"]
-           [wid (add-word/unsafe w)]
-           [r1 "gwirfsnwds"]
-           [r2 "gwirfasdxx"]
-           [r3 "gwirxxxxds"]
-           [r4 "apwugwrfswds"]
-           [r5 "xxxxfsnwds"]
-           [rid1 (add-word/unsafe r1)]
-           [rid2 (add-word/unsafe r2)]
-           [rid3 (add-word/unsafe r3)]
-           [rid4 (add-word/unsafe r4)]
-           [rid5 (add-word/unsafe r5)]
-           [r* (list r1 r2 r3 r4 r5)]
-           [arg1* (list w wid w wid wid)]
-           [arg2* (list (list r1) (list r2) r3 rid4 rid5)])
-      (for ([f (in-list (list add-rhyme* add-rhyme*/id
-                              add-rhyme add-rhyme/id add-rhyme/unsafe))]
-            [r (in-list r*)]
+  (let ([r-fun* (list add-rhyme* add-rhyme*/id add-rhyme add-rhyme/id add-rhyme/unsafe)]
+        [a-fun* (list add-almost-rhyme* add-almost-rhyme*/id add-almost-rhyme add-almost-rhyme/id add-almost-rhyme/unsafe)])
+    (with-db-test
+     (let* ([w "asdgadsfa"]
+            [wid (add-word/unsafe w)]
+            [r1 "gwirfsnwds"]
+            [r2 "gwirfasdxx"]
+            [r3 "gwirxxxxds"]
+            [r4 "apwugwrfswds"]
+            [r5 "xxxxfsnwds"]
+            [rid1 (add-word/unsafe r1)]
+            [rid2 (add-word/unsafe r2)]
+            [rid3 (add-word/unsafe r3)]
+            [rid4 (add-word/unsafe r4)]
+            [rid5 (add-word/unsafe r5)]
+            [r* (list r1 r2 r3 r4 r5)]
+            [arg1* (list w wid w wid wid)]
+            [arg2* (list (list r1) (list r2) r3 rid4 rid5)])
+       (for ([q (in-list (list rhymes-with? almost-rhymes-with?))]
+             [f* (in-list (list r-fun* a-fun*))])
+         (for ([f (in-list f*)]
+               [r (in-list r*)]
+               [arg1 (in-list arg1*)]
+               [arg2 (in-list arg2*)])
+           (check-false (q w r))
+           (f arg1 arg2)
+           (check-true (q w r))))))
+    ;; -- add duplicate rhyme TODO
+    ;; (with-db-test
+    ;;  (let* ([w "asdgasdfas"]
+    ;;         [wid (add-word/unsafe w)]
+    ;;         [r "sdgaheudvs"]
+    ;;         [rid (add-word/unsafe r)])
+    ;;    (add-rhyme w r)))
+    ;; -- add-rhyme / almost fails when online or disconnected
+    (let* ([rx #rx"ipoe:db"] ;; Very generic
+           [w "say"]
+           [r "what"]
+           [id 0]
+           [arg1* (list w id w id)]
+           [arg2* (list (list r r) (list r r) r id)])
+      (for ([r-fun (in-list r-fun*)]
+            [a-fun (in-list a-fun*)]
             [arg1 (in-list arg1*)]
             [arg2 (in-list arg2*)])
-        (check-false (rhymes-with? w r))
-        (f arg1 arg2)
-        (check-true (rhymes-with? w r)))
-      (for ([f (in-list (list add-almost-rhyme* add-almost-rhyme*/id
-                              add-almost-rhyme add-almost-rhyme/id
-                              add-almost-rhyme/unsafe))]
-              [r (in-list r*)]
-              [arg1 (in-list arg1*)]
-              [arg2 (in-list arg2*)])
-          (check-false (almost-rhymes-with? w r))
-          (f arg1 arg2)
-          (check-true (almost-rhymes-with? w r)))))
-
-  ;; TODO unsafe / failure tests for add-rhyme
+        (check-exn rx (lambda () (r-fun arg1 arg2)))
+        (check-exn rx (lambda () (with-online-test (r-fun arg1 arg2))))
+        (check-exn rx (lambda () (a-fun arg1 arg2)))
+        (check-exn rx (lambda () (with-online-test (a-fun arg1 arg2)))))))
 
   ;; -- add-word
 ;  ;; -- add-word/unsafe
