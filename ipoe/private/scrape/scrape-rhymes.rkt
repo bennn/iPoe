@@ -14,9 +14,9 @@
   ;; True if the string is one of the Result's rhymes
 
   resolve-rhyme*
-  ;; (->* [String (U #f (Listof String)) (U #f (Listof String))] [#:offline? Boolean #:interactive? Boolean] Rhyme-Result)
+  ;; (->* [String (U #f (Listof String)) (U #f (Listof String))] [#:online? Boolean #:interactive? Boolean] Rhyme-Result)
   ;; Check for additional rhymes and almost rhymes for a word.
-  ;; Optional argument `#:offline?` decides whether to search the internet.
+  ;; Optional argument `#:online?` decides whether to search the internet.
   ;; Optional argument `#:interactive?` decides which new suggestions are saved.
   ;; - if #t, the user is prompted to accept/reject each new rhyme
   ;; - if #f, all new rhymes are saved
@@ -53,10 +53,11 @@
 (define (resolve-rhyme* word
                         rhyme*-param
                         almost-rhyme*-param
-                        #:offline? [offline? #f]
+                        #:online? [online? #t]
                         #:interactive? [interactive? #t])
-  (define rr (if offline? (naive-rhyme word)
-                          (scrape-rhyme word)))
+  (define rr (if online?
+                 (scrape-rhyme word)
+                 (naive-rhyme word)))
   (define r* (merge word 'rhyme rhyme*-param (rhyme-result-rhyme* rr) #:interactive? interactive?))
   (define a* (merge word 'almost-rhyme almost-rhyme*-param (rhyme-result-almost-rhyme* rr) #:interactive? interactive?))
   (make-rhyme-result r* a*))
@@ -125,7 +126,7 @@
   (require racket/cmdline)
   ;; --
   (define out-file (make-parameter #f))
-  (define offline? (make-parameter #f))
+  (define online? (make-parameter #t))
   (define interac? (make-parameter #t))
   (define u-rhyme  (make-parameter #f))
   ;; --
@@ -133,7 +134,7 @@
    #:program "scrape-syllables"
    #:once-each
    [("-o" "--output") o-param "Filename to save results to" (out-file o-param)]
-   [("-x" "--offline") "When set, run in offline mode" (offline? #t)]
+   [("-x" "--offline") "When set, run in offline mode" (online? #f)]
    [("-n" "--non-interactive") "Always override -s suggestions with trusted source" (interac? #f)]
    #:multi
    [("-r" "--rhymes") r-param "Known rhymes" (u-rhyme (cons r-param (or (u-rhyme) '())))]
@@ -144,7 +145,7 @@
                           (current-output-port)))
      (fprintf out-port "WORD\tRHYMES\tALMOST-RHYMES\n")
      (for ([w (in-list WORDS)])
-       (define rr (resolve-rhyme* w (u-rhyme) #f #:offline? (offline?) #:interactive? (interac?)))
+       (define rr (resolve-rhyme* w (u-rhyme) #f #:online? (online?) #:interactive? (interac?)))
        (fprintf out-port "~a\t~a\t~a\n" w (string-join (rhyme-result-rhyme* rr) ",") (string-join (rhyme-result-almost-rhyme* rr) ",")))
      (define saved-to
        (if (out-file)

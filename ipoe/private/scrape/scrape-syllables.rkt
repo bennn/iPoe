@@ -6,10 +6,10 @@
 
 (provide
   resolve-syllables
-  ;; (->* [String (U Natural #f)] [#:offline? Boolean #:interactive? Boolean] Natural)
+  ;; (->* [String (U Natural #f)] [#:online? Boolean #:interactive? Boolean] Natural)
   ;; Given a word and a suggested number of syllables,
   ;;  double-check against a 'trusted' source.
-  ;; Optional argument `#:offline?` decides whether to query the internet for
+  ;; Optional argument `#:online?` decides whether to query the internet for
   ;;  a reference number of syllables.
   ;; Optional argument `#:interactive?` decides whether to interactively resolve
   ;;  conflicts, or assume the function's argument is correct.
@@ -27,10 +27,10 @@
 ;; Validate the suggested number of syllables for a word
 (define (resolve-syllables word
                            syllables
-                           #:offline? [offline? #f]
+                           #:online? [online? #t]
                            #:interactive? [interactive? #t])
   (define-values (ref-syllables src)
-    (if offline?
+    (if (not online?)
         (values (naive-syllables word) "our-heuristic")
         (let ([wr (scrape-word word)])
           (if (word-result? wr)
@@ -57,11 +57,13 @@
 
 ;; =============================================================================
 
+;; TODO combine the and scrape-rhyme repl. Should just be one scrapers repl
+
 (module+ main
   (require racket/cmdline)
   ;; --
   (define out-file (make-parameter #f))
-  (define offline? (make-parameter #f))
+  (define online? (make-parameter #t))
   (define interac? (make-parameter #t))
   (define u-syll   (make-parameter #f))
   ;; --
@@ -69,7 +71,7 @@
    #:program "scrape-syllables"
    #:once-each
    [("-o" "--output") o-param "Filename to save results to" (out-file o-param)]
-   [("-x" "--offline") "When set, run in offline mode" (offline? #t)]
+   [("-x" "--offline") "When set, run in offline mode" (online? #f)]
    [("-s" "--syllables") s-param "Suggested number of syllables" (u-syll (string->number s-param))]
    [("-n" "--non-interactive") "Always override -s suggestions with trusted source" (interac? #f)]
    #:args WORDS
@@ -79,7 +81,7 @@
                           (current-output-port)))
      (fprintf out-port "WORD\tNUM-SYLLABLES\n")
      (for ([w (in-list WORDS)])
-       (define s (resolve-syllables w (u-syll) #:offline? (offline?) #:interactive? (interac?)))
+       (define s (resolve-syllables w (u-syll) #:online? (online?) #:interactive? (interac?)))
        (fprintf out-port "~a\t~a\n" w s))
      (define saved-to
        (if (out-file)
@@ -107,7 +109,7 @@
     ["computer" == 3])
 
   ;; Should scrape internet for syllables
-  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:offline? #f))
+  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #t))
     ["hour" == 1]
     ["never" == 2]
     ["mississippi" == 4]
@@ -116,7 +118,7 @@
   )
 
   ;; Should run a local algorithm (and get the wrong answer for "hour"
-  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:offline? #t))
+  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #f))
     ["hour" == 2]
   )
 
@@ -124,7 +126,7 @@
   (check-apply* (lambda (w)
                   (check-print
                     (list #rx"^Source")
-                    (lambda () (resolve-syllables w 99 #:interactive? #f #:offline? #t))))
+                    (lambda () (resolve-syllables w 99 #:interactive? #f #:online? #f))))
     ["hour" == 99]
   )
 )
