@@ -2,7 +2,7 @@
 
 ;; Command-line interface to the DB repl
 
-;; TODO it's time to get serious here and break this into helper functions
+;; TODO syllables*, has-syllables?
 
 (provide
   db
@@ -19,7 +19,7 @@
   ipoe/private/ui
   racket/match
   (only-in racket/string string-join string-split)
-  (only-in racket/sequence sequence-tail)
+  (only-in racket/sequence sequence-tail sequence->list sequence-ref)
   readline ;; For a much-improved REPL experience
   readline/pread
 )
@@ -138,7 +138,7 @@
     'word->id
     (lambda (v)
       (match v
-       [(cons 'word->id (? string? w))
+       [(list 'word->id (? string? w))
         (or (word->id w)
             (unknown-word w))]
        [(cons 'word->id x)
@@ -162,16 +162,19 @@
     "Return words that rhyme with the argument"
   )
   (command
-    'word->syllables
+    'word->syllables*
     (lambda (v)
       (match v
-       [(list 'word->syllables (? string? w))
-        (or (word->syllables w)
-            (unknown-word w))]
-       [(cons 'word->syllables rest)
-        (arg-error 'word->syllables "string" rest)]
+       [(cons 'word->syllables* (cons (? string? w) rest))
+        (cond
+         [(not (word-exists? w))
+          (unknown-word w)]
+         [else
+          (query word->syllables* w rest)])]
+       [(cons 'word->syllables* rest)
+        (arg-error 'word->syllables* "string" rest)]
        [_ #f]))
-    "Return the number of syllables in a word"
+    "Return the syllable counts associated with a word"
   )
   (command
     'word-exists?
@@ -288,17 +291,18 @@
 
 (define (skip n seq)
   (for/fold ([s seq])
-            ([i (in-range n)])
+            ([i (in-range (or n 0))])
     (if (sequence-empty? s)
         s
         (sequence-tail s 1))))
 
-(define (take n seq)
+(define (take n-param seq)
+  (define n (or n-param (*take*)))
   (string-join
-    (for/list ([x seq] [m (in-range (or n (*take*)))])
+    (for/list ([x seq] [m (in-range n)])
       (format "~a" x))
     "\n"
-    #:after-last (if (and (not n) (not (sequence-empty? seq)))
+    #:after-last (if (and (not n) (not (sequence-empty? (skip n seq))))
                      "\n... truncated"
                      "")))
 
@@ -373,7 +377,194 @@
     "Warning: FOO BAR BAZ\n"
     (lambda () (warning "~a ~a ~a" 'FOO 'BAR 'BAZ)))
 
-  ;; -- COMMAND TODO
+  ;; -- COMMAND
+  (define-syntax-rule (get-exec sym)
+    (command-exec (find-command sym)))
+
+  (define-syntax-rule (add-word/nothing w)
+     (add-word w #:rhymes '() #:almost-rhymes '() #:online? #f #:interactive? #f))
+
+  (define o*
+    (let-values ([(gc lc) (get-config-filenames)])
+      (if (file-exists? lc)
+          (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
+          (options-init))))
+
+  (define-syntax-rule (with-db-test e)
+    (parameterize-from-hash o* (lambda ()
+      (parameterize ([*verbose* #t])
+        (with-ipoe-db #:commit? #f
+                      #:interactive? #f
+                      #:user (*user*)
+                      #:dbname (*dbname*)
+          (lambda () e))))))
+
+  ;; --- exit
+  (let ([exec (get-exec 'exit)])
+    (check-equal?
+     (exec 'exit)
+     'EXIT)
+    (check-false
+     (exec 'foo)))
+
+  ;; --- help
+  (let ([exec (get-exec 'help)])
+    (check-equal?
+     (exec 'help)
+     HELP-STR)
+    (check-false (exec 'edit)))
+
+  ;; --- id->word
+  (with-db-test
+   (let* ([id 'id->word]
+          [exec (get-exec id)]
+          [w "iabpgasgasd"])
+     (add-word/nothing w)
+     (define wid (word->id w))
+     (check-equal? (exec (list id wid))  w)
+     (remove-word w)
+     (check-regexp-match #rx"^Unbound ID" (exec (list id wid)))
+     (check-regexp-match #rx"^id->word: expected" (exec (list id "foo")))
+     (check-false (exec 'blah))))
+
+  ;; --- rhymes-with?
+  (with-db-test
+   (let* ([exec (get-exec 'rhymes-with?)]
+          [w "ahasdgasdf"]
+          [r "asdgasdga"]
+          [cmd (list 'rhymes-with? w r)])
+     (check-regexp-match #rx"^Unknown word" (exec cmd))
+     (add-word/nothing w)
+     (check-regexp-match #rx"^Unknown word" (exec cmd))
+     (add-word/nothing r)
+     (check-equal? (exec cmd) "#f")
+     (add-rhyme w r)
+     (check-equal? (exec cmd) "#t")
+     ;; --
+     (check-regexp-match #rx"^rhymes-with?" (exec (list 'rhymes-with? "foo")))
+     (check-regexp-match #rx"^rhymes-with?" (exec (list 'rhymes-with? 'blah 'blew)))
+     (check-false (exec 'else))))
+
+  ;; --- syllables->word (relies on naive syllable algorithm)
+  (with-db-test
+   (let* ([id 'syllables->word*]
+          [exec (get-exec id)]
+          [w "eieieieieieieieieeioeieieieieieieieieeioeieieieieieieieieeioeieieieieieieieieeioeieieieieieieieieeio"]
+          [s (string-length w)]
+          [cmd (list 'syllables->word* s)])
+     (check-equal? (exec cmd) "")
+     (add-word/nothing w)
+     (check-equal? (exec cmd) w)
+     ;; --
+     (check-equal? (exec (list id s '#:limit 5)) w)
+     (check-equal? (exec (list id s '#:limit 5 '#:skip 0)) w)
+     (check-equal? (exec (list id s '#:limit 0)) "")
+     (check-equal? (exec (list id s '#:skip 1)) "")
+     (check-equal? (exec (list id s '#:skip 1 '#:limit 4 '#:garbage 'foo)) "")
+     ;; --
+     (check-regexp-match #rx"^syllables->word\\*: expected" (exec (list id 'foo)))
+     (check-false (exec 'blah))))
+
+  ;; --- word->almost-rhyme*
+  (with-db-test
+   (let* ([id 'word->almost-rhyme*]
+          [exec (get-exec id)]
+          [w "aspjngasdfvg"]
+          [a "avsibgawgvs"]
+          [cmd (list id w a)])
+     (check-regexp-match #rx"^Unknown word" (exec cmd))
+     ;; --
+     (add-word/nothing w)
+     (check-equal? (exec cmd) "")
+     (add-word/nothing a)
+     (add-rhyme w a)
+     (check-equal? (exec cmd) "")
+     (add-almost-rhyme w a)
+     (check-equal? (exec cmd) a)
+     ;; --
+     (check-equal? (exec (list id w '#:limit 5)) a)
+     (check-equal? (exec (list id w '#:limit 5 '#:skip 0)) a)
+     (check-equal? (exec (list id w '#:limit 0)) "")
+     (check-equal? (exec (list id w '#:skip 1)) "")
+     (check-equal? (exec (list id w  '#:garbage 'foo '#:skip 0  '#:garbage 'foo '#:limit 4)) a)
+     ;; --
+     (check-regexp-match #rx"^word->almost-rhyme\\*: expected" (exec (list id 'asdfasd)))
+     (check-false (exec 'basdf))))
+
+  ;; --- word->id
+  (with-db-test
+   (let* ([id 'word->id]
+          [exec (get-exec id)]
+          [w "iabpgasgasd"]
+          [cmd (list id w)])
+     (add-word/nothing w)
+     (define wid (word->id w))
+     (check-equal? (exec cmd) wid)
+     (remove-word w)
+     (check-regexp-match #rx"^Unknown word" (exec cmd))
+     (check-regexp-match #rx"^word->id: expected" (exec (list id 236)))
+     (check-false (exec 'blah))))
+
+  ;; --- word->rhyme* (very similar to word->rhyme*)
+  (with-db-test
+   (let* ([id 'word->rhyme*]
+          [exec (get-exec id)]
+          [w "aspjngasdfvg"]
+          [a "avsibgawgvs"]
+          [cmd (list id w a)])
+     (check-regexp-match #rx"^Unknown word" (exec cmd))
+     ;; --
+     (add-word/nothing w)
+     (check-equal? (exec cmd) "")
+     (add-word/nothing a)
+     (add-almost-rhyme w a)
+     (check-equal? (exec cmd) "")
+     (add-rhyme w a)
+     (check-equal? (exec cmd) a)
+     ;; --
+     (check-equal? (exec (list id w '#:limit 5)) a)
+     (check-equal? (exec (list id w '#:limit 5 '#:skip 0)) a)
+     (check-equal? (exec (list id w '#:limit 0)) "")
+     (check-equal? (exec (list id w '#:skip 1)) "")
+     (check-equal? (exec (list id w  '#:garbage 'foo '#:skip 0  '#:garbage 'foo '#:limit 4)) a)
+     ;; --
+     (check-regexp-match #rx"^word->rhyme\\*: expected" (exec (list id 'asdfasd)))
+     (check-false (exec 'basdf))))
+
+  ;; --- word->syllables*
+  (with-db-test
+   (let* ([id 'word->syllables*]
+          [exec (get-exec id)]
+          [w "eieieieieieieieieeioeieieieieieieieieeioeieieieieieieieieeioeieieieieieieieieeioeieieieieieieieieeio"]
+          [s (string-length w)]
+          [r (number->string s)]
+          [cmd (list id w)])
+     (check-regexp-match #rx"^Unknown word" (exec cmd))
+     (add-word/nothing w)
+     (check-equal? (exec cmd) r)
+     ;; --
+     (check-equal? (exec (list id w '#:limit 5)) r)
+     (check-equal? (exec (list id w '#:limit 5 '#:skip 0)) r)
+     (check-equal? (exec (list id w '#:limit 0)) "")
+     (check-equal? (exec (list id w '#:skip 1)) "")
+     (check-equal? (exec (list id w '#:skip 1 '#:limit 4 '#:garbage 'foo)) "")
+     ;; --
+     (check-regexp-match #rx"^word->syllables\\*: expected" (exec (list id 'foo)))
+     (check-false (exec 'blah))))
+
+  ;; --- word->exists?
+  (with-db-test
+   (let* ([id 'word-exists?]
+          [exec (get-exec id)]
+          [w "ahvgiwdvweqwetwetwe"]
+          [cmd (list id w)])
+     (check-equal? (exec cmd) "#f")
+     (add-word/nothing w)
+     (check-equal? (exec cmd) "#t")
+     ;; --
+     (check-regexp-match #rx"^word-exists\\?: expected" (exec (list id 'fasodg)))
+     (check-false (exec 'dasdg))))
+
 
   ;; -- HELP-STR
   (check-equal?
@@ -396,6 +587,12 @@
    [(in-string "asdfA")]
    [(in-naturals)])
 
+  (let ([s (in-range 2)])
+    (check-false (sequence-empty? s))
+    (check-equal?
+     (sequence->list s)
+     '(0 1)))
+
   ;; -- exit?
   (check-true* (lambda (x) (and (exit? x) #t))
    ['exit]
@@ -416,7 +613,7 @@
    ["yolo"])
 
   ;; -- find-command
-  (for ([s (in-list '(exit id->word word->id word->syllables word->rhyme*))])
+  (for ([s (in-list '(exit id->word word->id word->syllables* word->rhyme*))])
     (check-equal?
       (command-id (find-command s))
       s))
@@ -429,8 +626,12 @@
         [n2 (skip 5 (in-range 0 10))])
     (check-equal? n1 n2))
 
+  (for ([n1 (in-range 0 10)]
+        [n2 (skip #f (in-range 0 10))])
+    (check-equal? n1 n2))
+
   (check-true
-    (sequence-empty? (skip 10 (in-range 0 5))))
+   (sequence-empty? (skip 10 (in-range 0 5))))
 
   ;; -- take
   (check-equal?
@@ -449,10 +650,14 @@
     (take 5 '(1 2 3))
     "1\n2\n3")
 
+  (check-equal?
+    (take #f '(1 2 3))
+    "1\n2\n3")
+
   (parameterize ([*take* 2])
     (check-equal?
       (take #f '(1 2 3))
-      "1\n2\n... truncated"))
+      "1\n2"))
 
   ;; -- parse-db-options, lim,skip
   (let*-values ([(l-val s-val) (values 1 2)]
