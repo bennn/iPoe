@@ -677,9 +677,10 @@
 
   ;; TODO Warn & ignore local config
   (define o*
-    (if (file-exists? IPOE-CONFIG)
-        (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
-        (options-init)))
+    (let-values ([(gc lc) (get-config-filenames)])
+      (if (file-exists? lc)
+          (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
+          (options-init))))
 
   (define-syntax-rule (with-db-test e)
     (parameterize-from-hash o* (lambda ()

@@ -7,10 +7,6 @@
 
   ;; -- Option parsing / binding
 
-  IPOE-CONFIG
-  ;; Path-String
-  ;; Expected name of the local / global ipoe configuration file
-
   almost-option?
   ;; (-> String Boolean)
   ;; True if the line of text looks kind of like a configuration option.
