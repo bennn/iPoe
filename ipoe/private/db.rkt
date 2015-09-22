@@ -67,7 +67,7 @@
   ;; (->* [string?] [connection?] (sequence/c string?)
   ;; Return the sequence of words that rhyme with the argument
 
-  word->syllables
+  word->syllables*
   ;; (->* [string?] [#:db connection?] (U #f natural?))
   ;; Get the number of syllables in a word, if it exists
 
@@ -401,16 +401,18 @@
    [else
     (query-error 'word-exists? (format "word '~a'" word))]))
 
-(define (word->syllables word #:db [pgc (*connection*)])
+(define (word->syllables* word #:db [pgc (*connection*)])
   (cond
    [(connection? pgc)
-    (define wid (word->id/fail word #:db pgc #:src 'word->syllables))
-    (query-maybe-value pgc "SELECT syllables FROM word_syllables WHERE word=$1;" wid)]
+    (define wid (word->id/fail word #:db pgc #:src 'word->syllables*))
+    (in-query pgc "SELECT syllables FROM word_syllables WHERE word=$1;" wid)]
    [(online-mode? pgc)
     (let ([r (scrape-word/cache word)])
-      (and r (word-result-num-syllables r)))]
+      (if r
+          (list (word-result-num-syllables r))
+          '()))]
    [else
-    (query-error 'word->syllables (format "syllables of '~a'" word))]))
+    (query-error 'word->syllables* (format "syllables of '~a'" word))]))
 
 (define (word->almost-rhyme* word #:db [pgc (*connection*)])
   (word->r* word #:db pgc #:table 'almost_rhyme))
@@ -1093,23 +1095,36 @@
   (with-online-test
     (check-true (word-exists? "paper")))
 
-  ;; -- word->syllables
+  ;; -- word->syllables*
   (with-db-test
     (let* ([w "jphiwuhwrgw"]
            [wid (add-word/unsafe w)]
-           [s 666])
-      (check-false (word->syllables w))
-      (add-syllables/unsafe wid s)
-      (check-equal? (word->syllables w) s)))
+           [s1 666]
+           [s2 3])
+      (check-equal?
+       (sequence->list (word->syllables* w))
+       '())
+      (add-syllables/unsafe wid s1)
+      (check-equal?
+       (sequence->list (word->syllables* w))
+       (list s1))
+      (add-syllables/unsafe wid s2)
+      (check-equal?
+       (sequence->list (word->syllables* w))
+       (list s1 s2))))
 
-  (check-exn #rx"word->syllables"
-    (lambda () (word->syllables "yolo")))
+  (check-exn #rx"word->syllables*"
+    (lambda () (word->syllables* "yolo")))
 
   (with-online-test
     (begin
-      (check-equal? (word->syllables "hour") 1)
+      (check-equal?
+       (sequence->list (word->syllables* "hour"))
+       (list 1))
       (let ([fake "uuuuuuuuuuuu"])
-        (check-false (word->syllables fake)))))
+        (check-equal?
+         (sequence->list (word->syllables* fake))
+         '()))))
 
   ;; -- word->almost-rhymes* word->rhyme* (secretly tests word->r)
   (with-db-test
@@ -1308,7 +1323,9 @@
                              #:interactive? #f
                              #:online? #f)))
        (check-true (word-exists? w))
-       (check-equal? (word->syllables w) s)
+       (check-equal?
+        (sequence->list (word->syllables* w))
+        (list s))
        (check-equal? (id->word (word->id w)) w)
        (check-true (rhymes-with? w r))
        (check-false (rhymes-with? w a))
@@ -1325,7 +1342,9 @@
                  #:interactive? #f
                  #:online? #t)
        (check-true (word-exists? w))
-       (check-equal? (word->syllables w) s)
+       (check-equal?
+        (sequence->list (word->syllables* w))
+        (list s))
        (check-equal? (id->word (word->id w)) w)
        (check-true (rhymes-with? w r))
        (check-false (rhymes-with? w a))
@@ -1342,7 +1361,9 @@
                  #:interactive? #f
                  #:online? online?)
        (check-true (word-exists? w))
-       (check-equal? (word->syllables w) s)
+       (check-equal?
+        (sequence->list (word->syllables* w))
+        (list s))
        (check-false (word-exists? r))
        (check-false (word-exists? a))))
     ;; Nonsense words, no syllables. Fails in online mode. Offline we ALWAYS guess.
@@ -1356,7 +1377,7 @@
                  #:interactive? #f
                  #:online? #f)
        (check-true (word-exists? w))
-       (check-true (< 0 (word->syllables w))))))
+       (check-true (for/and ([s (word->syllables* w)]) (positive? s))))))
 
   ;; --- add-word failures
   (let ([new-word "asdhvuianjsdkvasd"])
