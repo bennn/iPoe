@@ -1,7 +1,6 @@
 #lang racket/base
 
-;; TBA
-;; Probably a uniform endpoint for
+;; Uniform endpoint for
 ;; - Registering new poem forms
 ;; - Adding word
 
@@ -58,7 +57,8 @@
            [(word-exists? w)
             (alert (format "Word '~a' already exists, not adding (for now you can't update the syllables or rhymes)" w))]
            [(add-word w #:syllables (get-syllables w)
-                        #:interactive? #t)
+                        #:interactive? #t
+                        #:online? (*online?*))
             (alert "Success!")]
            [else
             (alert (format "Failed to add word '~a'" w))]))))))

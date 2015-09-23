@@ -60,6 +60,5 @@
                                    #:almost-rhymes (*almost-rhymes*)
                                    #:interactive? i ;; So silly, have to repeat myself
                                    #:online? o)))))])
-     (if wid
-         (printf "Successfully updated word '~a' (ID = ~a)\n" w wid)
-         (printf "Failed to apply update to word '~a'\n" w)))))
+     (when wid
+         (printf "Successfully updated word '~a' (ID = ~a)\n" w wid)))))

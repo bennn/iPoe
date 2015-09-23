@@ -30,34 +30,23 @@
    #:args (word-or-form)
    (cond
     [(rkt-file? word-or-form)
-     (remove-form word-or-form)]
+     (displayln "REMOVE FORM not implemented")]
     [else
-     (remove-word word-or-form)])))
-
-;; -----------------------------------------------------------------------------
-
-;; Assumes that `fname` is a valid (existing) Racket file
-(define (remove-form fname)
-  (displayln "REMOVE FORM not implemented"))
-
-(define (remove-word w)
-  ;; Init database
-  ;; Check if word exists
-  ;; Interactively add word (get syllables, get rhymes)
-  (parameterize-from-hash (options-init)
-    (lambda ()
-      (with-ipoe-db #:commit? #t
-                    #:user (*user*)
-                    #:dbname (*dbname*)
-                    #:interactive? #t
-        (lambda ()
-          (cond
-           [(not (word-exists? w))
-            (alert (format "Word '~a' does not exist, cannot remove." w))]
-           [(remove-word w)
-            (alert (format "Successfully removed word '~a'" w))]
-           [else
-            (alert (format "Failed to remove word '~a'" w))]))))))
+     (define w word-or-form)
+     (parameterize-from-hash (options-init)
+       (lambda ()
+         (with-ipoe-db #:commit? #t
+                       #:user (*user*)
+                       #:dbname (*dbname*)
+                       #:interactive? #t
+           (lambda ()
+             (cond
+              [(not (word-exists? w))
+               (alert (format "Word '~a' does not exist, cannot remove." w))]
+              [(remove-word w)
+               (alert (format "Successfully removed word '~a'" w))]
+              [else
+               (alert (format "Failed to remove word '~a'" w))])))))])))
 
 ;; -----------------------------------------------------------------------------
 
