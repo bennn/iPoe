@@ -58,7 +58,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   (check-apply* filter-similar
     ["car" '("cat" "boat" "wolf" "march") #:limit 1 == '("cat")]
