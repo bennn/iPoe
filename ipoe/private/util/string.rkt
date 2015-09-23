@@ -14,6 +14,10 @@
   ;; True if the argument is an empty string
   ;; Optional argument #:trim decides whether to ignore whitespace.
 
+  string-normalize-downcase
+  ;; (-> String String)
+  ;; Filter non-alphabetic characters from the string & downcase what's left
+
   string-prefix?
   ;; (-> String String Boolean)
   ;; True if the second argument exactly matches the first characters of
@@ -55,6 +59,12 @@
 (define (string-empty? s #:trim? [trim? #f])
   (let ([s/trim (if trim? (string-trim s) s)])
     (zero? (string-length s/trim))))
+
+(define (string-normalize-downcase str)
+  (define char* (for/list ([c (in-string str)]
+                           #:when (char-alphabetic? c))
+                  (char-downcase c)))
+  (apply string char*))
 
 (define (string-prefix? str prefix)
   (define L1 (string-length str))
@@ -132,6 +142,24 @@
    ["\r"]
    ["\t\t\t"]
    ["    "])
+
+  ;; -- string-normalize-downcase
+  (check-apply* string-normalize-downcase
+    ["a" == "a"]
+    ["" == ""]
+    ["." == ""]
+    ["hello," == "hello"]
+    ["WHAT'S-THIS" == "whatsthis"]
+    ["161" == ""]
+    ["+_d!@#$%^&*(angi)<>?,t." == "dangit"]
+    ["asdf" == "asdf"]
+    ["cat61" == "cat"]
+    ["ARGH"  == "argh"]
+    ["waiT?" == "wait"]
+    ["don't" == "dont"]
+    ["hel,p" == "help"]
+    ["..,." == ""]
+    ["\t    \t " == ""])
 
   ;; -- string-prefix?
   (check-true* string-prefix?
