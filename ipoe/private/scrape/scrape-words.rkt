@@ -14,7 +14,9 @@
   racket/string
   (only-in racket/match match-define)
   (only-in sxml if-car-sxpath)
-  "scrape-util.rkt"
+  ipoe/private/scrape/scrape-util
+  (only-in ipoe/private/util/string
+    string-count-chars)
 )
 
 ;; =============================================================================
@@ -87,7 +89,7 @@
     (lambda (sxml)
       (let ([h1 ((if-car-sxpath '(// h1 span @ data-syllable *text*)) sxml)])
         (and h1
-             (add1 (count-chars #\· h1)))))
+             (add1 (string-count-chars #\· h1)))))
 
     ;; src
     'dictionary.com))
@@ -107,7 +109,7 @@
     ;; sxml->num-syllables
     (lambda (sxml)
      (let ([h2 ((if-car-sxpath `(// div ,(id? "Definition") section h2 *text*)) sxml)])
-       (and h2 (add1 (count-chars #\· h2)))))
+       (and h2 (add1 (string-count-chars #\· h2)))))
 
     ;; src
     'the-free-dictionary))
@@ -153,7 +155,7 @@
     (lambda (sxml)
       (let* ([div ((if-car-sxpath `(// div ,(class? "rtseg"))) sxml)]
              [res ((if-car-sxpath `(// *text*)) div)])
-        (and res (add1 (count-chars #\· res)))))
+        (and res (add1 (string-count-chars #\· res)))))
 
     ;; src
     'american-heritage))
