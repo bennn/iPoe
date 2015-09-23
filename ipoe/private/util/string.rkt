@@ -5,6 +5,10 @@
   ;; (-> String String Boolean)
   ;; True if the second string is contained within the first
 
+  string-count-chars
+  ;; (-> (U Char (-> Char Boolean)) String Natural)
+  ;; Count the number of characters satisfying the predicate
+
   string-empty?
   ;; (-> String Boolean)
   ;; True if the argument is an empty string
@@ -37,6 +41,12 @@
     (for/and ([i (in-range L2)])
       (char=? (string-ref str (+ i start))
               (string-ref sub i)))))
+
+(define (string-count-chars f str)
+  (define p (if (char? f) (lambda (c) (char=? c f)) f))
+  (for/sum ([c (in-string str)]
+            #:when (p c))
+    1))
 
 (define (string-empty? s)
   (zero? (string-length s)))
@@ -82,6 +92,15 @@
    ["racket" "R"]
    ["racket" "kc"]
    ["racket" "racketr"])
+
+  ;; -- string-count-chars
+  (check-apply* string-count-chars
+   [#\4 "42" == 1]
+   [#\a "foo" == 0]
+   [#\x "" == 0]
+   [(lambda (c) (or (eq? c #\c) (eq? c #\d)))
+    "cadddr" == 4]
+  )
 
   ;; -- string-empty?
   (check-true* string-empty?
