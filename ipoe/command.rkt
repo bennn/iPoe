@@ -25,6 +25,9 @@
 
   show
   ;; Display information on installed poem forms
+
+  update
+  ;; Edit information about a word
 )
 
 ;; -----------------------------------------------------------------------------
@@ -36,4 +39,5 @@
   ipoe/private/command/new
   ipoe/private/command/remove
   ipoe/private/command/show
+  ipoe/private/command/update
 )
