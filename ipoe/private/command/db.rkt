@@ -18,8 +18,12 @@
   ipoe/private/parameters
   ipoe/private/ui
   racket/match
+  (only-in ipoe/private/sequence
+    sequence-empty?
+    sequence-skip)
   (only-in racket/string string-join string-split)
-  (only-in racket/sequence sequence-tail sequence->list sequence-ref)
+  (only-in racket/sequence
+    sequence->list)
   readline ;; For a much-improved REPL experience
   readline/pread
 )
@@ -272,12 +276,6 @@
 
 ;; -----------------------------------------------------------------------------
 
-(define (sequence-empty? seq)
-  (for/fold ([e? #t])
-            ([s seq]
-             [i (in-range 1)])
-    #f))
-
 (define (exit? s)
   (memq s '(exit q quit)))
 
@@ -289,13 +287,9 @@
               #:when (eq? sym (command-id c)))
     c))
 
-(define (skip n seq)
-  (for/fold ([s seq])
-            ([i (in-range (or n 0))])
-    (if (sequence-empty? s)
-        s
-        (sequence-tail s 1))))
+(define skip sequence-skip)
 
+;; TODO should move this into ipoe/sequence
 (define (take n-param seq)
   (define n (or n-param (*take*)))
   (string-join
@@ -573,26 +567,6 @@
 
   ;; -- REPL TODO
 
-  ;; -- sequence-empty?
-  (check-true* sequence-empty?
-   ['()]
-   [(in-range 0)]
-   [(in-string "")]
-   [(in-range 2 0)])
-
-  (check-false* sequence-empty?
-   ['(1)]
-   ['(a b c)]
-   [(in-range 3)]
-   [(in-string "asdfA")]
-   [(in-naturals)])
-
-  (let ([s (in-range 2)])
-    (check-false (sequence-empty? s))
-    (check-equal?
-     (sequence->list s)
-     '(0 1)))
-
   ;; -- exit?
   (check-true* (lambda (x) (and (exit? x) #t))
    ['exit]
@@ -620,18 +594,6 @@
 
   (for ([s (in-list '(a blah foo bar))])
     (check-false (find-command s)))
-
-  ;; -- skip
-  (for ([n1 (in-range 5 10)]
-        [n2 (skip 5 (in-range 0 10))])
-    (check-equal? n1 n2))
-
-  (for ([n1 (in-range 0 10)]
-        [n2 (skip #f (in-range 0 10))])
-    (check-equal? n1 n2))
-
-  (check-true
-   (sequence-empty? (skip 10 (in-range 0 5))))
 
   ;; -- take
   (check-equal?
