@@ -47,7 +47,8 @@
                     #:prompt (format "Please enter the correct number of syllables for '~a'." word)
                     #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
    [else
-    (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables)." src word ref-syllables syllables))
+    (when interactive?
+      (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables)." src word ref-syllables syllables)))
     syllables]))
 
 ;; Naively count syllables (doesn't require an internet connection)
@@ -124,9 +125,7 @@
 
   ;; Should trust the user input
   (check-apply* (lambda (w)
-                  (check-print
-                    (list #rx"^Source")
-                    (lambda () (resolve-syllables w 99 #:interactive? #f #:online? #f))))
+                    (resolve-syllables w 99 #:interactive? #f #:online? #f))
     ["hour" == 99]
   )
 )
