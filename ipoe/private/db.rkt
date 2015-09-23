@@ -759,8 +759,14 @@
   (define rr (if online?
                  (scrape-rhyme word)
                  (make-rhyme-result '() '())))
-  (define r* (merge-r word 'rhyme rhyme*-param (rhyme-result-rhyme* rr) #:interactive? interactive?))
-  (define a* (merge-r word 'almost-rhyme almost-rhyme*-param (rhyme-result-almost-rhyme* rr) #:interactive? interactive?))
+  (define r* (merge-r word 'rhyme
+                           rhyme*-param
+                           (filter word-exists? (rhyme-result-rhyme* rr))
+                           #:interactive? interactive?))
+  (define a* (merge-r word 'almost-rhyme
+                           almost-rhyme*-param
+                           (filter word-exists? (rhyme-result-almost-rhyme* rr))
+                           #:interactive? interactive?))
   (make-rhyme-result r* a*))
 
 ;; Merge a user-supplied list of words with a new, reference-supplied list of words
@@ -787,8 +793,6 @@
    [else
     ;; Just accept everything
     (set->list (list->set (append usr* ref*)))]))
-
-
 
 ;; Validate the suggested number of syllables for a word
 (define (resolve-syllables word
@@ -1687,6 +1691,8 @@
 
   ;; ------------------------------------------------------------------
   ;; -- new from scrape/ folder
+
+  ;; -- TODO test resolve, never suggest words not-in-database
 
   ;; Should scrape internet for syllables
   (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #t))
