@@ -42,6 +42,8 @@
 )
 
 (require
+  readline ;; For a much-improved REPL experience
+  readline/pread
 )
 
 ;; =============================================================================
@@ -55,12 +57,11 @@
                         #:description [desc-str #f])
   ;; TODO use something more general/gui-friendly than printf
   (when desc-str (alert desc-str))
-  (define (show-prompt)
+  (define (read/prompt)
     (displayln prompt-str)
-    (display "> ")
-    (flush-output))
-  (show-prompt)
-  (let loop ([response (read-line)])
+    (parameterize ([readline-prompt #"ipoe> "])
+      (read)))
+  (let loop ([response (read/prompt)])
     (or (valid? response)
         (begin
          ;; Optimistically send a help message
@@ -68,8 +69,7 @@
                                  (regexp-match "\\?"  response)))
            (alert desc-str))
          ;; Re-show the prompt and loop
-         (show-prompt)
-         (loop (read-line))))))
+         (loop (read/prompt))))))
 
 (define (internal-error src str)
   (define err-loc (string->symbol (format "ipoe:~a:internal-error" src)))
@@ -81,9 +81,9 @@
 
 ;; -----------------------------------------------------------------------------
 
-(define (read-natural str)
-  (define n (string->number str))
-  (and n (exact-nonnegative-integer? n) n))
+(define (read-natural n)
+  (and (exact-nonnegative-integer? n)
+       n))
 
 (define (read-string str)
   (and (string? str)
@@ -95,16 +95,31 @@
        (regexp-match? rSQL str)
        str))
 
-(define (read-yes-or-no str)
-  (case (string-downcase str)
-   [("y" "yes" "yolo") 'Y]
-   [("n" "no") 'N]
+(define YES* '(Y y yes))
+(define NO*  '(N n no))
+
+(define (read-yes-or-no v)
+  (cond
+   [(symbol? v)
+    (cond
+     [(memq v YES*)
+      'Y]
+     [(memq v NO*)
+      'N]
+     [else #f])]
+   [(string? v)
+    (case (string-downcase v)
+     [("y" "yes" "yolo") 'Y]
+     [("n" "no") 'N]
+     [else #f])]
    [else #f]))
 
 ;; =============================================================================
 
 (module+ test
   (require rackunit ipoe/private/rackunit-abbrevs)
+
+  ;; TODO test interactions
 
   (check-false* read-natural
     ["hello"]
@@ -115,10 +130,10 @@
     ["-1"]
     ["1/2"])
   (check-apply* read-natural
-    ["1351"           == 1351]
-    ["0"              == 0]
-    ["1"              == 1]
-    ["83423113513513" == 83423113513513])
+    [1351           == 1351]
+    [0              == 0]
+    [1              == 1]
+    [83423113513513 == 83423113513513])
 
   (check-false* read-string
    [1]
@@ -156,6 +171,10 @@
     ["no no no"])
 
   (check-apply* read-yes-or-no
+    ['Y == 'Y]
+    ['y == 'Y]
+    ['N == 'N]
+    ['no == 'N]
     ;; --
     ["y" == 'Y]
     ["Y" == 'Y]
