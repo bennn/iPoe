@@ -81,14 +81,13 @@
         (cond
          [(zero? n)
           '()]
-         [(= 100 n)
-          (list "one hundred")]
-         [(< 100 n)
-          (define hd (vector-ref N<20 q))
-          (define tl (digit2->word* r))
-          (list* hd "hundred" tl)]
+         [(< n 100)
+          (digit2->word* r)]
          [else
-          (digit2->word* r)]))
+          (define hd (vector-ref N<20 q))
+          (define tl (let ([tmp (digit2->word* r)])
+                       (if (equal? tmp '("zero")) '() tmp)))
+          (list* hd "hundred" tl)]))
       ;; Don't print a scale for zeros or the last chunk
       (if (or (eq? s 'END) (zero? n))
           n-str*
@@ -118,7 +117,7 @@
   ;; -- integer->word*
   (check-apply* integer->word*
    [10 == '("ten")]
-   [100 == '("one hundred")]
+   [100 == '("one" "hundred")]
    [10000 == '("ten" "thousand")]
    [10000000 == '("ten" "million")]
    [10000000000 == '("ten" "billion")]
@@ -134,27 +133,8 @@
    [14 == '("fourteen")]
    [50 == '("fifty")]
    [98 == '("ninety" "eight")]
+   [-432600 == '("negative" "four" "hundred" "thirty" "two" "thousand" "six" "hundred")]
    [12345 == '("twelve" "thousand" "three" "hundred" "forty" "five")])
-;    [10 == '("ten")]
-;    [10000 == '("ten" "thousand")]
-;    [10000000 == '("ten" "million")]
-;    [10000000000 == '("ten" "billion")]
-;    [10000000000000 == '("ten" "trillion")]
-;    [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
-;    [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
-;    [0 == '("zero")]
-;    [16 == '("sixteen")]
-;    [-1 == '("negative" "one")]
-;    [123 == '("one" "hundred" "twenty" "three")]
-;    [22 == '("twenty" "two")]
-;    [14 == '("fourteen")]
-;    [50 == '("fifty")]
-;    [98 == '("ninety" "eight")]
-;    [100 == '("one" "hundred")]
-;    [120 == '("one" "hundred" "twenty")]
-;    [1002 == '("one" "thousand" "two")]
-;    [1323 == '("one" "thousand" "three" "hundred" "twenty" "three")]
-;    [8675309 == '("eight" "million" "six" "hundred" "seventy" "five" "thousand" "three" "hundred" "nine")])
 
   ;; -- natural->scaled*
   (check-apply* natural->scaled*
