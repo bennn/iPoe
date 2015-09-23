@@ -2,26 +2,19 @@
 
 ;; For validating new words, rhymes, and syllables via the internet.
 
+;; TODO I do not like these struct-out
 (provide
   scrape-word
-  resolve-rhyme*
-  resolve-syllables
   ;; --
-  rhyme-result
-  rhyme-result?
-  rhyme-result-rhyme*
-  rhyme-result-almost-rhyme*
+  (struct-out rhyme-result)
   rhymes?
   almost-rhymes?
   scrape-rhyme
   ;; --
-  word-result
-  word-result?
-  word-result-num-syllables
+  (struct-out word-result)
 )
 
 (require
-  "scrape/scrape-rhymes.rkt"
-  "scrape/scrape-syllables.rkt"
-  "scrape/scrape-words.rkt"
+  ipoe/private/scrape/scrape-rhymes
+  ipoe/private/scrape/scrape-words
 )
