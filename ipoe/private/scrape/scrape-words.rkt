@@ -92,6 +92,8 @@
     ;; src
     'dictionary.com))
 
+;; 2015-09-23: The word 'coalman' doesn't have syllables, but it does
+;;  have a page on this site. Should we accept that?
 (define the-free-dictionary
   (word-scraper
     ;; word->url
@@ -188,6 +190,7 @@
   (check-apply* the-free-dictionary
    ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
    ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
+   ["coalman" == #f]
    [not-a-word == #f]
   )
 
