@@ -1,7 +1,5 @@
 #lang racket/base
 
-;; TODO watch for adding duplicate rhyme / almost-rhyme
-
 (provide
   add-word add-word*
   ;; (->* TODO)
@@ -50,6 +48,9 @@
   syllables->word*
   ;; (->* [natural?] [#:db connection?] (sequence/c string?))
   ;; Return a sequence of words with the supplied number of syllables
+
+  update-word* update-word
+  ;; TODO
 
   with-ipoe-db
   ;; (->* [(-> Any)] [TODO] Any)
@@ -519,9 +520,19 @@
                    #:db [pgc (*connection*)]
                    #:interactive? [interactive? #f]
                    #:online? [online? #f])
-  (for/list ([w (in-list word*)]
-             #:when (add-word w #:db pgc #:interactive? interactive? #:online? online?))
-    w))
+  ;; Do 2 passes, in case some words rhyme with each other.
+  ;; The first pass should not do any rhymes.
+  (define wid*
+    (for ([w (in-list word*)])
+      (add-word w #:db pgc
+                  #:rhymes '()
+                  #:almost-rhymes '()
+                  #:interactive? #f
+                  #:online? #f)))
+  (for/list ([wid (in-list wid*)])
+    (update-word/id wid #:db pgc
+                        #:interactive? interactive?
+                        #:online? online?)))
 
 ;; TODO should the output contain more information? rhymes we failed to add?
 ;; Add a new word to the database
@@ -557,7 +568,8 @@
     (define wid (add-word/unsafe word))
     (and (add-syllables/id wid syllables #:db pgc)
          (add-rhyme*/id wid rhyme* #:db pgc)
-         (add-almost-rhyme*/id wid almost-rhyme* #:db pgc))]))
+         (add-almost-rhyme*/id wid almost-rhyme* #:db pgc)
+         wid)]))
 
 ;; Directly add a word to the database.
 ;; Please call `add-word` instead!
@@ -565,6 +577,71 @@
 (define (add-word/unsafe word #:db [pgc (*connection*)])
   (query-exec pgc "INSERT INTO word (word) VALUES ($1);" word)
   (word->id/fail word #:db pgc #:src 'add-word/unsafe))
+
+;; --- update
+
+(define (update-word* w*
+                      #:db [pgc (*connection*)]
+                      #:interactive? [interactive? #f]
+                      #:online? [online? #f])
+  (for/list ([w (in-list w*)])
+    (update-word w #:db pgc #:interactive? interactive? #:online? online?)))
+
+(define (update-word w
+                     #:db [pgc (*connection*)]
+                     #:syllables [s-param #f]
+                     #:rhymes [r*-param '()]
+                     #:almost-rhymes [a*-param '()]
+                     #:interactive? [interactive? #f]
+                     #:online? [online? #f])
+  (cond
+   [(online-mode? pgc)
+    (when interactive?
+      (alert (format "Cannot update word '~a', currently in online-only mode" w)))
+    #f]
+   [(not (connection? pgc))
+    (when interactive?
+      (alert (format "Cannot update word '~a', not connected to a database." w)))
+    #f]
+   [(word->id w #:db pgc)
+    => (lambda (wid)
+    (define rr (resolve-rhyme* w r*-param a*-param
+                 #:interactive? interactive?
+                 #:online? online?))
+    (update-word/id wid
+                    #:db pgc
+                    #:syllables s-param
+                    #:rhymes (rhyme-result-rhyme* rr)
+                    #:almost-rhymes (rhyme-result-almost-rhyme* rr)
+                    #:interactive? interactive?
+                    #:online? online?))]
+   [else
+    (when interactive?
+      (alert (format "Cannot update word '~a', does not exist in database" w)))
+    #f]))
+
+(define (update-word/id wid
+                        #:db [pgc (*connection*)]
+                        #:syllables [s-param #f]
+                        #:rhymes [r*-param '()]
+                        #:almost-rhymes [a*-param '()]
+                        #:interactive? [interactive? #f]
+                        #:online? [online? #f])
+  ;; -- add syllables, if new
+  (unless (or (not s-param)
+              (has-syllables?/id wid s-param #:db pgc))
+    (add-syllables/id wid s-param))
+  ;; -- resolve/add rhyme + almost
+  (define-values [new-rhyme? new-almost-rhyme?]
+    (values (lambda (r) (and (word-exists? r #:db pgc)
+                             (not (rhymes-with?/id wid r #:db pgc))))
+            (lambda (a) (and (word-exists? a #:db pgc)
+                             (not (almost-rhymes-with?/id wid a #:db pgc))))))
+  (define r* (filter new-rhyme? r*-param))
+  (define a* (filter new-almost-rhyme? a*-param))
+  (and (add-rhyme*/id wid r* #:db pgc)
+       (add-almost-rhyme*/id wid a* #:db pgc)
+       wid))
 
 ;; -----------------------------------------------------------------------------
 ;; --- Danger zone!
@@ -1304,7 +1381,6 @@
      (add-word/unsafe new-word)
      (check-true (word-exists? new-word))))
 
-
   ;; Add a word with known syllables + rhymes
   (let* ([w "nasdofiz"]
          [s 69]
@@ -1314,14 +1390,12 @@
     (with-db-test
      (let ([rid (add-word/unsafe r)]
            [aid (add-word/unsafe a)])
-       (check-print
-        (list #rx"instead of the given 69 syllables\\).$")
-        (lambda () (add-word w
-                             #:syllables s
-                             #:rhymes (list r)
-                             #:almost-rhymes (list a)
-                             #:interactive? #f
-                             #:online? #f)))
+       (add-word w
+                 #:syllables s
+                 #:rhymes (list r)
+                 #:almost-rhymes (list a)
+                 #:interactive? #f
+                 #:online? #f)
        (check-true (word-exists? w))
        (check-equal?
         (sequence->list (word->syllables* w))
@@ -1394,8 +1468,6 @@
       (list #rx"^Attempting to add" #rx"^Cannot add word .*? currently in online-only")
       (lambda () (with-online-test (add-word new-word #:interactive? #t))))))
 
-  ;; TODO add-word*
-
   ;; ;; -- add-word* (when offline?, never fails)
   ;; (with-db-test
   ;;   (let ([new1 "onething"]
@@ -1412,6 +1484,8 @@
   ;;       (check-true (and (add-word* w* #:interactive? #f #:offline? #t) #t))))
   ;;   (with-db-test
   ;;     (check-false (word-exists? (car w*)))))
+
+  ;; -- update-word* TODO
 
   ;; -- remove-word
   (let ([w "aspdognawv"])
