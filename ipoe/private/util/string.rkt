@@ -10,8 +10,9 @@
   ;; Count the number of characters satisfying the predicate
 
   string-empty?
-  ;; (-> String Boolean)
+  ;; (->* [String] [#:trim? Boolean #f] Boolean)
   ;; True if the argument is an empty string
+  ;; Optional argument #:trim decides whether to ignore whitespace.
 
   string-prefix?
   ;; (-> String String Boolean)
@@ -29,7 +30,10 @@
 )
 
 (require
-  (only-in racket/port with-input-from-string)
+  (only-in racket/port
+    with-input-from-string)
+  (only-in racket/string
+    string-trim)
 )
 
 ;; =============================================================================
@@ -48,8 +52,9 @@
             #:when (p c))
     1))
 
-(define (string-empty? s)
-  (zero? (string-length s)))
+(define (string-empty? s #:trim? [trim? #f])
+  (let ([s/trim (if trim? (string-trim s) s)])
+    (zero? (string-length s/trim))))
 
 (define (string-prefix? str prefix)
   (define L1 (string-length str))
@@ -107,11 +112,26 @@
    [""]
    [(string)]
    [(make-string 0)]
-   [(string-append "" "")])
+   [(string-append "" "")]
+   [""]
+   [" " #:trim? #t]
+   ["\t" #:trim? #t]
+   ["\n" #:trim? #t]
+   ["\r" #:trim? #t]
+   ["\t\t\t" #:trim? #t]
+   ["    " #:trim? #t]
+   ["\n\r\t" #:trim? #t])
 
   (check-false* string-empty?
    ["a"]
-   ["b c d"])
+   [" hello "]
+   ["why\nnot\n"]
+   ["\ta\tb"]
+   ["a"]
+   ["b c d"]
+   ["\r"]
+   ["\t\t\t"]
+   ["    "])
 
   ;; -- string-prefix?
   (check-true* string-prefix?
