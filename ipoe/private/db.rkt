@@ -523,7 +523,7 @@
   ;; Do 2 passes, in case some words rhyme with each other.
   ;; The first pass should not do any rhymes.
   (define wid*
-    (for ([w (in-list word*)])
+    (for/list ([w (in-list word*)])
       (add-word w #:db pgc
                   #:rhymes '()
                   #:almost-rhymes '()
@@ -633,10 +633,12 @@
     (add-syllables/id wid s-param))
   ;; -- resolve/add rhyme + almost
   (define-values [new-rhyme? new-almost-rhyme?]
-    (values (lambda (r) (and (word-exists? r #:db pgc)
-                             (not (rhymes-with?/id wid r #:db pgc))))
-            (lambda (a) (and (word-exists? a #:db pgc)
-                             (not (almost-rhymes-with?/id wid a #:db pgc))))))
+    (values (lambda (r)
+              (let ([rid (word->id r #:db pgc)])
+                (and rid (not (rhymes-with?/id wid rid #:db pgc)))))
+            (lambda (a)
+              (let ([aid (word->id a #:db pgc)])
+                (and aid (not (almost-rhymes-with?/id wid aid #:db pgc)))))))
   (define r* (filter new-rhyme? r*-param))
   (define a* (filter new-almost-rhyme? a*-param))
   (and (add-rhyme*/id wid r* #:db pgc)
@@ -1468,24 +1470,68 @@
       (list #rx"^Attempting to add" #rx"^Cannot add word .*? currently in online-only")
       (lambda () (with-online-test (add-word new-word #:interactive? #t))))))
 
-  ;; ;; -- add-word* (when offline?, never fails)
-  ;; (with-db-test
-  ;;   (let ([new1 "onething"]
-  ;;         [new2 "anotherthing"])
-  ;;     (with-output-to-file "/dev/null" #:exists 'append
-  ;;       (lambda ()
-  ;;         (check-true (and (add-word* (list new1 new2) #:interactive? #f #:offline? #t) #t))))
-  ;;     (check-true (word-exists? new1))
-  ;;     (check-true (word-exists? new2))))
-
-  ;; (let ([w* '("rafflehsnarcuvjawe" "vpoawetz")])
-  ;;   (with-output-to-file "/dev/null" #:exists 'append
-  ;;     (lambda ()
-  ;;       (check-true (and (add-word* w* #:interactive? #f #:offline? #t) #t))))
-  ;;   (with-db-test
-  ;;     (check-false (word-exists? (car w*)))))
+  ;; -- add-word*
+  (with-db-test
+    (begin
+      ;; -- add 2 unrelated words, should work fine (just like add-word)
+      (let ([w1 "adsgahdfs"]
+            [w2 "hasgasdfa"])
+        (add-word* (list w1 w2) #:interactive? #f #:online? #f)
+        (check-true (word-exists? w1))
+        (check-true (word-exists? w2))
+        (check-false (rhymes-with? w1 w2))
+        (check-false (almost-rhymes-with? w1 w2)))
+      ;; -- add 2 words that rhyme, should work (defines words, then resolves rhymes)
+      ;; -- TODO not sure how to test this, DB independent
+      ;(let ([w1 "coalman"]
+      ;      [w2 "nobleman"])
+      ;  (add-word* (list w1 w2)
+      ;             #:interactive? #f #:online? #t)
+      ;  (check-true (word-exists? w1))
+      ;  (check-true (word-exists? w2))
+      ;  (check-true (almost-rhymes-with? w1 w2))
+      ;  (check-true (almost-rhymes-with? w2 w1)))
+      ;; -- ditto for almost-rhymes
+      ;(let ([w1 "ghrwuifnjs"]
+      ;      [w2 "apiwurgnapz"])
+      ;  (add-word* (list w1 w2)
+      ;             #:rhymes* (list (list w2) '())
+      ;             #:interactive? #f #:online #f)
+  ))
 
   ;; -- update-word* TODO
+  (with-db-test
+    (let ([w1 "asdgahwrfs"]
+          [w2 "rgefsqedsg"])
+      (add-word/unsafe w1)
+      (add-word/unsafe w2)
+      (check-false (rhymes-with? w1 w2))
+      (check-false (almost-rhymes-with? w1 w1))
+      (check-equal?
+        (sequence->list (word->syllables* w1))
+        '())
+      ;; --
+      (update-word w1 #:syllables 88 #:rhymes (list w2) #:almost-rhymes (list w1) #:interactive? #f #:online? #f)
+      (check-true (rhymes-with? w1 w2))
+      (check-true (almost-rhymes-with? w1 w1))
+      (check-equal?
+        (sequence->list (word->syllables* w1))
+        '(88))))
+
+   ;; -- update word, good old error cases
+   (let ([w "asdhaegdafsdf"])
+     (check-false
+       (check-print
+         (list #rx"online-only mode")
+         (lambda () (with-online-test (update-word w #:interactive? #t)))))
+     (check-false
+       (check-print
+         (list #rx"not connected")
+         (lambda () (update-word w #:interactive? #t))))
+     (check-false
+       (check-print
+         (list #rx"does not exist")
+         (lambda () (with-db-test (update-word w #:interactive? #t))))))
 
   ;; -- remove-word
   (let ([w "aspdognawv"])
