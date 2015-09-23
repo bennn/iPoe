@@ -2,6 +2,10 @@
 
 ;; Functions for checking rhyme schemes
 
+;; TODO poetic license
+;; - allow syllalbe mistakes
+;; - allow almost rhymes
+
 (provide
   check-rhyme-scheme
   ;; (-> (Sequenceof (Listof String)) #:rhyme-scheme RhymeScheme #:src Symbol Either)
@@ -29,6 +33,8 @@
   ;; --
   racket/match
   (only-in racket/string string-join)
+  (only-in ipoe/private/sequence
+    sequence-first)
 )
 
 ;; =============================================================================
@@ -182,7 +188,7 @@
         ;; Ignore wildcards
         (check-syllables st s*
                          #:stanza-number sn #:line-number (add1 ln))]
-       [(line->syllables line)
+       [(line->syllables line) ;; TODO pass actual-syll as goal, unify
         ;; 2015-08-13: Never fails, but that may be a bad idea.
         => (lambda (actual-syll)
         (if (= s actual-syll)
@@ -200,9 +206,11 @@
 ;; NEVER fails, even with unknown words.
 ;; Preconditions:
 ;; - must be called with an active database connection
+;; TODO don't just use the first result from ->syllables*
 (define (line->syllables line)
   (for/sum ([w (in-list (string->word* line))])
-    (or (word->syllables w)
+    (or (and (word-exists? w)
+             (sequence-first (word->syllables* w)))
         (begin
           (alert (format "Could not determine syllables for word '~a'" w))
           0))))
@@ -227,9 +235,10 @@
 ;; (: rhyme=? (-> String String Boolean))
 (define (rhyme=? w1 w2)
   ;; Precondition: must be called with an active database connection
-  (or (string=? w1 w2) ;; TODO rhymes-with? is not necessarily an equivalence
-      (rhymes-with? w1 w2)
-      (almost-rhymes-with? w1 w2)))
+  (rhymes-with? w1 w2))
+
+(define (almost-rhyme=? w1 w2)
+  (almost-rhymes-with? w1 w2))
 
 ;; Unify a stanza of poetry with a rhyme scheme
 ;; (: unify-rhyme-scheme (-> VarMap (Listof String) (Listof Symbol) #:src Symbol #:stanza-number Natural VarMap))
@@ -281,7 +290,7 @@
 
   (define o* (options-init))
 
-  (define-syntax-rule (with-db/test e ...)
+  (define-syntax-rule (with-db-test e ...)
     (parameterize-from-hash o* (lambda ()
       (with-ipoe-db #:user (*user*)
                     #:dbname (*dbname*)
@@ -289,46 +298,114 @@
                     #:commit? #f
         (lambda () e ...)))))
 
-  ;; -- check-rhyme-scheme
-  (with-db/test
-    (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
-      ['() '()]
-      ['(("the quick brown fox" "Jumped over the lazy dog")) '(((A . *) (B . *)))]
-      ['(("anything")) '(((A . *)))]
-      ['(("cat") ("rat") ("mat") ("sat")) '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
-      ['(("cat") ("rat") ("mat") ("sat")) '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
-      ['(("cat") ("rat") ("mat") ("sat")) '((X) (X) (X) (X))]
-      ['(("cat") ("rat") ("mat") ("sat")) '((1) (1) (1) (1))]
-      ['(("willful and raisin" "under the weather" "jet set go")
-         ("domino effect" "very motivation")
-         ("beside our goal" "the free bird" "gory category"))
-       '(((A . 5) (B . 5) (C . 3)) ((D . 5) (E . 6)) ((F . 4) (G . 3) (H . 6)))]
-      ['(("once" "upon" "a" "time" "a" "long" "slime" "ago")
-         ("in" "a" "land" "full" "of" "snow")
-         ("the" "end"))
-       '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-         ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
-         ((L . *) (M . *)))])
+  (define-syntax-rule (add-word/nothing w s)
+     (add-word w #:syllables s
+                 #:rhymes '()
+                 #:almost-rhymes '()
+                 #:online? #f
+                 #:interactive? #f))
 
-    (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
-      ['() '((A))]
-      ['(("never" "land")) '()]
-      ['(("never" "land")) '(())]
-      ['(("never" "land")) '(((X . *)))]
-      ['(("never" "land")) '(((A . *) (A . *)))]
-      ['(("never" "land")) '(((F . *) (U . *) (N . *)))]
-      ['(("never" "land")) '((F U N))]
-      ['(("never" "land")) '(((A . *) (B . 2)))]
-      ['(("never" "land")) '((* 2))]
-      ['(("once" "upon" "a" "time" "a" "long" "hour" "ago"))
+  ;; -- check-rhyme-scheme
+  (define-syntax-rule (sentence w ...)
+    (string-join (list w ...) " "))
+
+  (with-db-test
+    ;; Add a bunch of new words, so tests pass regardless of DB setup
+    (let* ([wA (make-string 10 #\a)]
+           [wB (make-string 10 #\b)]
+           [wC (make-string 10 #\c)]
+           [wD (make-string 10 #\d)]
+           [wE (make-string 10 #\e)]
+           [wF (make-string 10 #\f)]
+           [wG (make-string 10 #\g)]
+           [wH (make-string 10 #\h)]
+           [wI (make-string 10 #\i)]
+           [wJ (make-string 10 #\j)]
+           [wK (make-string 10 #\k)]
+           [wL (make-string 10 #\l)]
+           [w* (list wA wB wC wD wE wF wG wH wI wJ wK wL)])
+      (for ([w (in-list w*)]
+            [s (in-naturals)])
+        (add-word/nothing w s)
+        (add-rhyme w w))
+      (check-true* (lambda (s r) (success? (check-rhyme-scheme s #:rhyme-scheme r)))
+       ['() '()]
+       [`((,(sentence wC) ,(sentence wC wC wC)))
+        '(((A . *) (B . *)))]
+       [`((,(sentence wD wE wF) ,(sentence wC wC wC)))
+        '(((A . *) (B . *)))]
+       [`((,wA))
+        '(((A . *)))]
+       [`((,wC) (,wC) (,wC) (,wC))
+        '(((X . *)) ((X . *)) ((X . *)) ((X . *)))]
+       [`((,wB) (,wB) (,wB) (,wB))
+        '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+       [`((,wB) (,wB) (,wB) (,wB))
+         '((X) (X) (X) (X))]
+       [`((,wF) (,wF) (,wF) (,wF))
+         '((X) (X) (X) (X))]
+       [`((,wB) (,wB) (,wB) (,wB))
+        '((1) (1) (1) (1))]
+       [`((,(sentence wB wB wA) ,(sentence wC wB) ,(sentence wC))
+          (,wD ,wE)
+          (,wF ,wG ,wH))
+        '(((A . 2) (B . 3) (C . 2))
+          ((D . 3) (E . 4))
+          ((F . 5) (G . 6) (H . 7)))]
+       [`((,(sentence wB wA) ,(sentence wB wB) ,(sentence wA wC) ,(sentence wB wD) ,(sentence wA wC) ,wE ,wD ,wF)
+          (,(sentence wD wD wD) ,wC ,wI ,wJ ,wK ,wF)
+          (,wE ,(sentence wA wB wC wD wE)))
+        '(((A . 1) (B . 2) (C . 2) (D . 4) (C . 2) (E . 4) (D . 3) (F . 5))
+          ((G . *) (C . *) (I . *) (J . *) (K . *) (F . *))
+          ((L . *) (M . *)))])
+
+      ;; -- failures
+      (check-true* (lambda (s r) (failure? (check-rhyme-scheme s #:rhyme-scheme r)))
+       [`((,wB) (,wB) (,wB))
+        '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+       [`((,wA) (,wB) (,wB) (,wB))
+        '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+       [`((,wF) (,wF) (,wF) (,wF))
+        '(((X . 1)) ((X . 1)) ((X . 1)) ((X . 1)))]
+      ['()
+       '((A))]
+      [`((,wB ,(sentence wD wE))) '()]
+      [`((,wB ,(sentence wD wE))) '(())]
+      [`((,wB ,(sentence wD wE))) '(((X . *)))]
+      [`((,wB ,(sentence wD wE))) '(((A . *) (A . *)))]
+      [`((,wB ,(sentence wD wE))) '(((F . *) (U . *) (N . *)))]
+      [`((,wB ,(sentence wD wE))) '((F U N))]
+      [`((,wB ,(sentence wD wE))) '(((A . *) (B . 2)))]
+      [`((,wB ,(sentence wD wE))) '((* 2))]
+      [`((,(sentence wB wA) ,wB ,wC ,wD ,wE ,wF ,wG ,wH))
        '(((A . 1) (B . *) (C . *) (D . *) (C . *) (E . *) (D . *) (F . *)))]
-      ['(("once" "upon" "a" "time" "aye" "long" "slime" "ago")
-         ("in" "a" "land" "full" "of" "snow")
-         ("the" "end"))
-       '(((A . 1) (B . 2) (C . 1) (D . 1) (C . 1) (E . 1) (D . 1) (F . 2))
-         ((G . *) (C . 77) (I . *) (J . *) (K . *) (F . *))
-         ((L . *) (M . *)))]
-    ))
+       [`((,(sentence wB wA) ,(sentence wB wB) ,(sentence wA wC) ,(sentence wB wD) ,(sentence wA wC) ,wE ,wD ,wF)
+          (,(sentence wD wD wD) ,wC ,wI ,wJ ,wK ,wF)
+          (,wE ,(sentence wA wB wC wD wE)))
+        '(((A . 1) (B . 2) (C . 2) (D . 4) (C . 2) (E . 4) (D . 3) (F . 5))
+          ((G . *) (C . 8) (I . *) (J . *) (K . *) (F . *))
+          ((L . *) (M . *)))]
+       ;; -- wD vs. 5 syllables
+       [`((,(sentence wB wB wA) ,(sentence wC wB) ,(sentence wC))
+          (,wD ,wE)
+          (,wF ,wG ,wH))
+        '(((A . 2) (B . 3) (C . 2))
+          ((D . 5) (E . 4))
+          ((F . 5) (G . 6) (H . 7)))]
+       ;; -- wD vs. rhyme B
+       [`((,(sentence wB wB wA) ,(sentence wC wB) ,(sentence wC))
+          (,wD ,wE)
+          (,wF ,wG ,wH))
+        '(((A . 2) (B . 3) (C . 2))
+          ((B . 3) (E . 4))
+          ((F . 5) (G . 6) (H . 7)))]
+       ;; -- A vs. 2 syllables
+       [`((,wA ,(sentence wC wB) ,(sentence wC))
+          (,wD ,wE)
+          (,wF ,wG ,wH))
+        '(((A . 2) (B . 3) (C . 2))
+          ((D . 3) (E . 4))
+          ((F . 5) (G . 6) (H . 7)))])))
 
   ;; ---------------------------------------------------------------------------
   ;; -- rhyme-scheme?
@@ -549,68 +626,127 @@
     ["blah" "b"])
 
   ;; -- check-stanza*
-  (with-db/test
-    (define (test-check-stanza*/pass vm stanza rs)
-      (success? (check-stanza* vm stanza rs #:stanza-number 0)))
-    (check-true* test-check-stanza*/pass
-      ['() '() '()]
-      ['() '(("yes")) '(((* . *)))]
-      ['() '(("yes") ("and" "yes")) '(((* . *)) ((* . *) (* . *)))]
-      ['() '(("tomato") ("paste")) '(((* . 3)) ((* . 1)))]
-      ['() '(("pogo" "stripe") ("kite" "sight" "night")) '(((* . 2) (A . 1)) ((B . 1) (B . 1) (B . 1)))]
-      ['() '(("yes I do" "you do not") ("sorrow") ("tomorrow")) '(((* . 3) (* . 3)) ((A . 2)) ((A . 3)))]
-      ['((A . "word") (B . "mouse"))
-       '(("bird" "house") ("furred" "spouse"))
-       '(((A . 1) (B . 1)) ((A . 1) (B . 1)))]
-    )
+  (with-db-test
+    (let ([wA5 "yeysyeysyeyseysy"]
+          [wB8 "asdnandndnanadnnn"])
+      (add-word/nothing wA5 5)
+      (add-word/nothing wB8 8)
+      (add-rhyme wA5 wA5)
+      (add-rhyme wB8 wB8)
+      (define (test-check-stanza*/pass vm stanza rs)
+        (success? (check-stanza* vm stanza rs #:stanza-number 0)))
+      (check-true* test-check-stanza*/pass
+        ['() '() '()]
+        ['()
+         `((,wA5))
+         '(((* . *)))]
+        ['()
+         `((,wA5) (,wA5 ,wB8))
+         '(((* . *)) ((* . *) (* . *)))]
+        ['()
+         `((,wB8) (,(sentence wA5 wA5)))
+         '(((* . 8)) ((* . 10)))]
+        ['()
+         `((,(sentence wA5 wA5) ,(sentence wB8 wA5))
+           (,wB8 ,(sentence wB8 wB8 wB8) ,(sentence wA5 wB8)))
+         '(((* . 10) (A . 13))
+           ((B . 8) (B . 24) (B . 13)))]
+        ['()
+         `((,wB8 ,(sentence wB8 wB8 wB8 wA5))
+           (,wA5)
+           (,(sentence wA5 wA5 wA5)))
+         '(((* . 8) (* . 29))
+           ((A . 5))
+           ((A . 15)))]
+        [`((A . ,wA5) (B . ,wB8))
+         `((,wA5 ,(sentence wA5 wA5 wB8))
+           (,(sentence wB8 wA5) ,(sentence wB8 wB8 wA5 wB8)))
+         '(((A . 5) (B . 18))
+           ((A . 13) (B . 29)))]
+      )
     (define (test-check-stanza*/fail vm stanza rs)
       (failure? (check-stanza* vm stanza rs #:stanza-number 0)))
     (check-true* test-check-stanza*/fail
-      ['() '(("hello" "goodbye")) '(((A . 2) (A . 2)))]
-      ['() '(("tomato") ("paste")) '(((* . 0)) ((* . 1)))]
-      ['() '(("pogo" "stripe") ("kite" "sight" "night")) '(((* . 1) (A . 1)) ((B . 1) (B . 1) (B . 1)))]
-      ['() '(("yes I do" "you do not") ("sorrow") ("tomorrow")) '(((X . 3) (* . 3)) ((A . 2)) ((X . 3)))]
-      ['((A . "word") (B . "mouse"))
-       '(("bird" "house") ("worried" "spouse"))
-       '(((A . 1) (B . 1)) ((A . 1) (B . 1)))]
-    ))
+      ;; -- wrong syllables
+      ['()
+       `((,wA5) (,wA5 ,wB8))
+       '(((* . 2)) ((* . *) (* . *)))]
+      ;; -- wrong num lines
+      ['()
+       `((,(sentence wA5 wA5) ,(sentence wB8 wA5))
+         (,wB8 ,(sentence wB8 wB8 wB8) ,(sentence wA5 wB8)))
+       '(((* . 10) (A . 13))
+         ((B . 8)))]
+      ;; -- wrong rhymes, A=/B
+      [`((A . ,wB8) (B . ,wB8))
+       `((,wA5 ,(sentence wA5 wA5 wB8))
+         (,(sentence wB8 wA5) ,(sentence wB8 wB8 wA5 wB8)))
+       '(((A . 5)  (A . 18))
+         ((A . 13) (A . 29)))]
+      ;; -- wrong syllables, second line
+      [`((A . ,wB8) (B . ,wB8))
+       `((,wA5 ,(sentence wA5 wA5 wB8))
+         (,(sentence wB8 wA5) ,(sentence wB8 wB8 wA5 wB8)))
+       '(((A . 5) (B . 18))
+         ((A . 1) (B . 9)))]
+      ;; -- set varmap A=wB8
+      [`((A . ,wB8) (B . ,wB8))
+       `((,wA5 ,(sentence wA5 wA5 wB8))
+         (,(sentence wB8 wA5) ,(sentence wB8 wB8 wA5 wB8)))
+       '(((A . 5) (B . 18))
+         ((A . 13) (B . 29)))])))
 
   ;; -- check-syllables
-  (with-db/test
-    (define (test-check-syllables/pass stanza syll*)
-      (success? (check-syllables stanza syll* #:stanza-number 4 #:line-number 5)))
-    (check-true* test-check-syllables/pass
-      ['() '()]
-      ['("yes" "yes" "yes.") '(1 1 1)]
-      ['("waffle" "fries" "served" "hourly") '(2 1 * *)]
-    )
-    (define (test-check-syllables/fail stanza syll*)
-      (failure? (check-syllables stanza syll* #:stanza-number 4 #:line-number 5)))
-    (check-true* test-check-syllables/fail
-      ['("apple") '(3)]
-      ['("walnut" "flavored" "goat" "cheese") '(* * * 3)]
-    )
-    ;; -- invariant error
-    (check-exn (regexp "ipoe:check-syllables:internal-error")
-      (lambda () (check-syllables '("a" "a") '(*) #:stanza-number 3)))
-    (check-exn (regexp "ipoe:check-syllables:internal-error")
-      (lambda () (check-syllables '() '(1 2 3) #:stanza-number 3))))
+  (with-db-test
+    (let ([w1 "avnrwfadger"]
+          [w2 "qopadvzsda"]
+          [w3 "avsfojnwger"])
+      (for ([w (in-list (list w1 w2 w3))]
+            [i (in-naturals 1)])
+        (add-word/nothing w i))
+      (define (test-check-syllables/pass stanza syll*)
+        (success? (check-syllables stanza syll* #:stanza-number 4 #:line-number 5)))
+      (check-true* test-check-syllables/pass
+        ['() '()]
+        [(list w1 w1 w1)
+         '(1 1 1)]
+        [(list w2 w1 w1 w3)
+         '(2 1 * *)])
+      (define (test-check-syllables/fail stanza syll*)
+        (failure? (check-syllables stanza syll* #:stanza-number 4 #:line-number 5)))
+      (check-true* test-check-syllables/fail
+        [(list w2)
+         '(3)]
+        [(list w1 w2 w3 w2)
+         '(* * * 3)])
+      ;; -- invariant error
+      (check-exn (regexp "ipoe:check-syllables:internal-error")
+        (lambda () (check-syllables (list w1 w1) '(*) #:stanza-number 3)))
+      (check-exn (regexp "ipoe:check-syllables:internal-error")
+        (lambda () (check-syllables '() '(1 2 3) #:stanza-number 3)))))
 
   ;; -- line->syllables
-  (with-db/test
-    (check-apply* line->syllables
-     ["" == 0]
-     ["a" == 1]
-     ["yes yes yes" == 3]
-     ["hello, world!" == 3]
-     ["volcanic antidisestablishmentarianism you know" == 16]
-     ["." == 0])
-    (check-apply* (lambda (ln)
-                    (check-print (for/list ([i (in-range 2)])
-                                   #rx"^Could not determine syllables")
-                                 (lambda () (line->syllables ln))))
-     ;; -- unknown words have 0 syllables
-     ["madeupwordnotarealword bladlaksdczjiewdscz" == 0]))
+  (with-db-test
+    (let ([w1 "avnrwfadger"]
+          [w2 "qopadvzsda"]
+          [w3 "avsfojnwger"])
+      (for ([w (in-list (list w1 w2 w3))]
+            [i (in-naturals 1)])
+        (add-word/nothing w i))
+      (check-apply* line->syllables
+       ["" == 0]
+       [w1 == 1]
+       [(sentence w1 w1 w1) == 3]
+       [(sentence w1 w2) == 3]
+       [(sentence w3 w3 w1 w2 w2 w1 w3 w3 w3) == (+ 3 3 1 2 2 1 3 3 3)]
+       ["." == 0]
+       [".---.;--?!?!?!?" == 0])
+      (check-apply* (lambda (ln)
+                      (check-print (for/list ([i (in-range 2)])
+                                     #rx"^Could not determine syllables")
+                                   (lambda () (line->syllables ln))))
+       ;; -- unknown words have 0 syllables
+       ["madeupwordnotarealword bladlaksdczjiewdscz" == 0])))
 
   ;; -- replace-wildcard-syllables
   (check-apply* replace-wildcard-syllables
@@ -621,20 +757,28 @@
   )
 
   ;; -- rhyme=?
-  (with-db/test
-    (check-true* rhyme=?
-     ;; -- rhyme
-     ["car" "far"]
-     ;; -- almost-rhyme
-     ["lettuce" "conscientious"]
-    )
-    (check-false* rhyme=?
-     ["cat" "dog"]
-     ["second" "masterpiece"]
-    )
-    ;; --
-    (check-exn (regexp "ipoe:db")
-      (lambda () (rhyme=? "cat" "blahblahblahblahblah"))))
+  (with-db-test
+    (let ([A1 "adsvoasdvnag"]
+          [A2 "asdgawrfscvg"]
+          [A* "agiruwbfae"]
+          [B1 "bsviabaerarh"])
+      (for ([w (in-list (list A1 A2 A* B1))])
+        (add-word/nothing w 1))
+      (add-rhyme A1 A2)
+      (add-almost-rhyme A1 A*)
+      (check-true* rhyme=?
+       ;; -- rhyme
+       [A1 A2])
+      (check-true* almost-rhyme=?
+       ;; -- almost-rhyme
+       [A1 A*])
+      (check-false* rhyme=?
+       [A2 A1]
+       [A1 A*]
+       [A1 B1])
+      ;; --
+      (check-exn (regexp "ipoe:db")
+        (lambda () (rhyme=? A1 "blahblahblahblahblah")))))
 
   ;; -- unify-rhyme-scheme
   (define-syntax-rule (check-unify/pass [vm st rs == vm2] ...)
@@ -642,27 +786,32 @@
       (let ([result (unify-rhyme-scheme vm st rs #:stanza-number 0)])
         (check-pred success? result)
         (check-equal? (success-value result) vm2)) ...))
-  (with-db/test
-    (let ([vm1 '((V1 . "val1") (Var2 . "val2") (M . "m"))])
-      (check-unify/pass
-        ['() '() '() == '()]
-        [vm1 '() '()
-         == vm1]
-        ['() '("cat" "dog" "rat") '(A B A)
-         == '((B . "dog") (A . "cat"))]
-        ['((X . "role")) '("mole" "sole") '(X X)
-         == '((X . "role"))]
-        [vm1 '("car" "file" "scientist") '(* * *)
-         == vm1]
-      )))
-
   (define-syntax-rule (check-unify/fail [vm st rs] ...)
-    (begin (check-pred failure? (unify-rhyme-scheme vm st rs #:stanza-number 2)) ...))
-  (with-db/test
-    (check-unify/fail
-      ['() '("a" "bacon") '(A A)]
-      ['() '("harpoon" "moon" "will") '(A B A)]
-      ['((A . "worm")) '("cat" "dog" "rat") '(A B A)]))
+    (begin (check-pred failure?
+             (unify-rhyme-scheme vm st rs #:stanza-number 2)) ...))
+  (with-db-test
+    (let ([wA "asdgasfewfda"]
+          [wB "gwrfbnadv"]
+          [wC "qvdapiuvb"])
+      (for ([w (in-list (list wA wB wC))])
+        (add-word/nothing w 1)
+        (add-rhyme w w))
+      (let ([vm1 '((V1 . "val1") (Var2 . "val2") (M . "m"))])
+        (check-unify/pass
+          ['() '() '() == '()]
+          [vm1 '() '()
+           == vm1]
+          ['() (list wA wB wA) '(A B A)
+           == `((B . ,wB) (A . ,wA))]
+          [`((X . ,wC)) (list wC wC) '(X X)
+           == `((X . ,wC))]
+          [vm1 (list wC wC wB) '(* * *)
+           == vm1]))
+        ;; --
+        (check-unify/fail
+          ['() (list wA wB) '(A A)]
+          ['() (list wA wA wC) '(A B A)]
+          [`((A . ,wA)) (list wC wB wC) '(A B A)])))
 
   ;; Invariant: unify-rhyme-scheme expects 2nd and 3rd args to have same length
   (check-exn (regexp "ipoe:.*:internal-error")
@@ -670,9 +819,13 @@
   (check-exn (regexp "ipoe:.*:internal-error")
     (lambda () (unify-rhyme-scheme '() '("hello") '() #:stanza-number 2)))
 
-  (with-db/test
+  (with-db-test
     ;; Nothing rhymes with a fake word
     (check-exn (regexp "ipoe:db")
-      (lambda () (unify-rhyme-scheme '() '("asdgwrfscbad" "hello" "bye") '(A A A) #:stanza-number 81))))
+      (lambda ()
+        (unify-rhyme-scheme '()
+          '("asdgwrfscbad" "hello" "bye")
+          '(A A A)
+          #:stanza-number 81))))
 
 )
