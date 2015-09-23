@@ -1,5 +1,8 @@
 #lang racket/base
 
+;; TODO online? and interactive? should be parameters here,
+;;  or just reference the good old parameters.rkt
+
 (provide
   add-word add-word*
   ;; (->* TODO)
@@ -80,34 +83,30 @@
 (require
   db/base
   db/postgresql
-  racket/match
-  racket/sequence
   ipoe/private/parameters
-  (only-in ipoe/private/db/migrate
-    TABLE*)
-  (only-in ipoe/private/ui
-    alert
-    get-user-input
-    read-yes-or-no
-    read-string)
-  (only-in ipoe/private/scrape
-    almost-rhymes?
-    resolve-syllables
-    resolve-rhyme*
-    rhyme-result-rhyme*
-    rhyme-result-almost-rhyme*
-    rhymes?
-    scrape-rhyme
-    scrape-word
-    word-result-num-syllables) ;; ick, could also make a scrape-syllables
+  ipoe/private/scrape
+  ipoe/private/nlp/infer
+  ipoe/private/ui
+  ipoe/private/db/migrate
   (only-in ipoe/private/string
     string-empty?)
+  ;; --
+  racket/match
+  racket/sequence
   (only-in racket/serialize
     deserialize
     serialize)
   (only-in racket/file
     file->string
     file->value)
+  ;; TODO should go in db/resolve.rkt
+  (only-in racket/set
+    list->set
+    set-count
+    set->list
+    in-set
+    set-add
+    set-subtract)
 )
 
 ;; =============================================================================
@@ -749,6 +748,76 @@
   (scrape/cache 'rhyme w #:cache (*connection*)
                          #:scrape scrape-rhyme))
 
+;; -----------------------------------------------------------------------------
+;; -- 2015-09-23 recently acquired from scrape/
+
+(define (resolve-rhyme* word
+                        rhyme*-param
+                        almost-rhyme*-param
+                        #:online? [online? #t]
+                        #:interactive? [interactive? #t])
+  (define rr (if online?
+                 (scrape-rhyme word)
+                 (make-rhyme-result '() '())))
+  (define r* (merge-r word 'rhyme rhyme*-param (rhyme-result-rhyme* rr) #:interactive? interactive?))
+  (define a* (merge-r word 'almost-rhyme almost-rhyme*-param (rhyme-result-almost-rhyme* rr) #:interactive? interactive?))
+  (make-rhyme-result r* a*))
+
+;; Merge a user-supplied list of words with a new, reference-supplied list of words
+;; If interactive?, ask the user to validate all new words
+(define (merge-r word type usr* ref* #:interactive? [interactive? #t])
+  (cond
+   [(not usr*)
+    ref*]
+   [interactive?
+    ;; Ask user about newly-found rhymes
+    (define accepted (list->set usr*))
+    (define new* (set-subtract (list->set ref*) accepted))
+    (cond
+     [new*
+      (alert (format "Found ~a additional words that may ~a with '~a'" (set-count new*) type word))
+      (set->list
+        (for/fold ([acc accepted])
+                  ([new (in-set new*)])
+          (case (get-user-input read-yes-or-no
+                                #:prompt (format "Does '~a' ~a with ~a?" new type word))
+            [(Y) (set-add acc new)]
+            [(N) acc])))]
+     [else accepted])]
+   [else
+    ;; Just accept everything
+    (set->list (list->set (append usr* ref*)))]))
+
+
+
+;; Validate the suggested number of syllables for a word
+(define (resolve-syllables word
+                           syllables
+                           #:online? [online? #t]
+                           #:interactive? [interactive? #t])
+  (define-values (ref-syllables src)
+    (if (not online?)
+        (values (infer-syllables word) "our-heuristic")
+        (let ([wr (scrape-word word)])
+          (if (word-result? wr)
+              (values (word-result-num-syllables wr) (word-result-src wr))
+              (values #f #f)))))
+  (cond
+   [(not syllables)
+    ref-syllables]
+   [(or (not ref-syllables) (= syllables ref-syllables))
+    ;; Good, validated user input against trusted source
+    syllables]
+   [interactive?
+    (get-user-input read-natural
+                    #:prompt (format "Please enter the correct number of syllables for '~a'." word)
+                    #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
+   [else
+    (when interactive?
+      (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables)." src word ref-syllables syllables)))
+    syllables]))
+
+
 ;; =============================================================================
 
 (module+ test
@@ -1066,9 +1135,9 @@
            [wid1 (add-word/unsafe w1)]
            [wid2 (add-word/unsafe w2)]
            [wid3 (add-word/unsafe w3)]
-           [s1 3]
-           [s2 1]
-           [s3 83])
+           [s1  300000]
+           [s2  100000]
+           [s3 8300000])
       (add-syllables/unsafe wid1 s1)
       (for ([wid (in-list (list wid1 wid2 wid3))])
         (add-syllables/unsafe wid s2))
@@ -1616,4 +1685,26 @@
       (check-false (cdr (hash-ref (*connection*) "rake")))
       (check-equal? (hash-count (*connection*)) 3))))
 
+  ;; ------------------------------------------------------------------
+  ;; -- new from scrape/ folder
+
+  ;; Should scrape internet for syllables
+  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #t))
+    ["hour" == 1]
+    ["never" == 2]
+    ["mississippi" == 4]
+    ["continuity" == 5]
+    ["asbferufvzfjuvfds" == #f]
+  )
+
+  ;; Should run a local algorithm (and get the wrong answer for "hour"
+  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #f))
+    ["hour" == 2]
+  )
+
+  ;; Should trust the user input
+  (check-apply* (lambda (w)
+                    (resolve-syllables w 99 #:interactive? #f #:online? #f))
+    ["hour" == 99]
+  )
 )
