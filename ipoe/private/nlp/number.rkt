@@ -3,8 +3,7 @@
 (require racket/contract/base)
 
 ;; (: SCALE (Vectorof String))
-(define SCALE
-  '#(#f "thousand" "million" "billion" "trillion"))
+(define SCALE '#(END "thousand" "million" "billion" "trillion"))
 
 (define UPPER-BOUND (sub1 (expt 10 (* (vector-length SCALE) 3))))
 
@@ -15,6 +14,11 @@
 
 ;; -----------------------------------------------------------------------------
 
+(require
+  (only-in racket/match
+    match-define)
+)
+
 ;; =============================================================================
 
 ;; Serves as a map from small naturals to their string representations
@@ -24,72 +28,78 @@
      "eleven" "twelve" "thirteen" "fourteen" "fifteen" "sixteen" "seventeen"
      "eighteen" "nineteen"))
 
-;; (: TENS<100 (Vectorof String))
-(define TENS<100
+;; (: TENS>10 (Vectorof String))
+(define TENS>10
   '#("twenty" "thirty" "forty" "fifty" "sixty" "seventy" "eighty" "ninety"))
 
-
-;; Convert an integer to an English word
-;; (: integer->word* (-> Integer (Listof String)))
-(define (integer->word* n)
-  (if (negative? n)
-      (cons "negative" (natural->word* (- 0 n)))
-      (natural->word* n)))
-
-;; (: natural->word* (-> Natural (Listof String)))
-(define (natural->word* n [suffix ""])
-  (apply append (for/list ([d3+s (in-list (split-number n))])
-                  (append (digit3->word* (car d3+s))
-                          (if (cdr d3+s) (list (cdr d3+s)) '())))))
-
-;; Divide a number into chunks of at most 3 digits.
-;; Each chunk comes with a descriptor, for example
-;; (split-number 1001) => '((1 . "thousand") (1 . ""))
-;; (: split-number (-> Natural (Listof (Pairof Natural String))))
-(define (split-number n)
-  ;; -- Recurse & build up list of 3-digit chunks
-  (let loop ([d+s* '()] ;; List of 3-digit numbers and suffixes
-             [n n]      ;; Current number. Starts as original, remove 3 digits from right at each iteration.
-             [i 0])     ;; Index, used to choose suffixes
-    (define q (quotient n 1000))
-    (define r (modulo n 1000))
-    (define d+s (cons r (vector-ref SCALE i)))
-    (cond
-     [(= n r)
-      ;; Reached fixpoint, return number with current suffix
-      (cons d+s d+s*)]
-     [else
-      ;; Loop. Ignore the new tuple if it represents a 0.
-      (define new-d+s* (if (zero? r) d+s* (cons d+s d+s*)))
-      (loop new-d+s* q (add1 i))])))
-
-;; Convert a number with fewer than 3 digits to a word
-;; (: digit3->word* (-> Natural (Listof String)))
-(define (digit3->word* d3)
-  (define rest (digit2->word* (modulo d3 100)))
-  (cond
-   [(= 100 d3)
-    '("one" "hundred")]
-   [(< 99 d3)
-    (cons (digit->word (quotient d3 100))
-          (cons "hundred"
-                rest))]
-   [else
-    rest]))
-
-;; (: digit2->word* (-> Natural (Listof String)))
+;; Convert a two-digit number to a list of lowercase words
 (define (digit2->word* n)
   (cond
    [(< n 20)
     (list (vector-ref N<20 n))]
    [else
+    (define q (quotient n 10))
     (define r (modulo n 10))
-    (cons (vector-ref TENS<100 (- (quotient n 10) 2))
-          (if (zero? r) '() (list (digit->word r))))]))
+    (define ten-str (vector-ref TENS>10 (- q 2)))
+    (define one-str (and (not (zero? r)) (vector-ref N<20 r)))
+    (if one-str
+        (list ten-str one-str)
+        (list ten-str))]))
 
-;; (: digit->word (-> Natural String))
-(define (digit->word n)
-  (vector-ref N<20 n))
+;; Split a natural number into 3-digit chunks
+(define (natural->natural* N)
+  (let loop ([acc '()]
+             [n N]  ;; Starts as original & we remove 3 digits each step.
+             [i 0]) ;; Index used to pick a scale
+    (define q (quotient n 1000))
+    (define r (modulo n 1000))
+    (cond
+     [(= n r)
+      ;; Reached fixpoint, stop iteration
+      (cons r acc)]
+     [else
+      ;; Repeat using the quotient
+      (loop (cons r acc) q (add1 i))])))
+
+;; Break a natural into chunks, attach a scale to each chunk
+(define (natural->scaled* n)
+  (define (add-scale n acc+i)
+    (match-define (cons acc i) acc+i)
+    (define s (vector-ref SCALE i))
+    (define n+s (cons n s))
+    (cons (cons n+s acc) (add1 i)))
+  (car (foldr add-scale (cons '() 0) (natural->natural* n))))
+
+(define (integer->word* N)
+  ;; Break N into chunks, convert each chunk+scale to a string
+  (define str*
+    (for/list ([n+s (in-list (natural->scaled* (abs N)))])
+      (match-define (cons n s) n+s)
+      (define q (quotient n 100))
+      (define r (modulo n 100))
+      (define n-str*
+        (cond
+         [(zero? n)
+          '()]
+         [(= 100 n)
+          (list "one hundred")]
+         [(< 100 n)
+          (define hd (vector-ref N<20 q))
+          (define tl (digit2->word* r))
+          (list* hd "hundred" tl)]
+         [else
+          (digit2->word* r)]))
+      ;; Don't print a scale for zeros or the last chunk
+      (if (or (eq? s 'END) (zero? n))
+          n-str*
+          (append n-str* (list s)))))
+  (cond ;; Check for special cases
+   [(zero? N)
+    (list "zero")]
+   [(negative? N)
+    (cons "negative" (apply append str*))]
+   [else
+    (apply append str*)]))
 
 ;; =============================================================================
 
@@ -107,53 +117,71 @@
 
   ;; -- integer->word*
   (check-apply* integer->word*
-    [10 == '("ten")]
-    [10000 == '("ten" "thousand")]
-    [10000000 == '("ten" "million")]
-    [10000000000 == '("ten" "billion")]
-    [10000000000000 == '("ten" "trillion")]
-    [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
-    [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
-    [0 == '("zero")]
-    [16 == '("sixteen")]
-    [-1 == '("negative" "one")]
-    [123 == '("one" "hundred" "twenty" "three")]
-    [22 == '("twenty" "two")]
-    [14 == '("fourteen")]
-    [50 == '("fifty")]
-    [98 == '("ninety" "eight")]
-    [100 == '("one" "hundred")]
-    [120 == '("one" "hundred" "twenty")]
-    [1002 == '("one" "thousand" "two")]
-    [1323 == '("one" "thousand" "three" "hundred" "twenty" "three")]
-    [8675309 == '("eight" "million" "six" "hundred" "seventy" "five" "thousand" "three" "hundred" "nine")])
+   [10 == '("ten")]
+   [100 == '("one hundred")]
+   [10000 == '("ten" "thousand")]
+   [10000000 == '("ten" "million")]
+   [10000000000 == '("ten" "billion")]
+   [10000000000000 == '("ten" "trillion")]
+   [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
+   [0 == '("zero")]
+   [16 == '("sixteen")]
+   [999 == '("nine" "hundred" "ninety" "nine")]
+   [-1 == '("negative" "one")]
+   [22 == '("twenty" "two")]
+   [123 == '("one" "hundred" "twenty" "three")]
+   [22 == '("twenty" "two")]
+   [14 == '("fourteen")]
+   [50 == '("fifty")]
+   [98 == '("ninety" "eight")]
+   [12345 == '("twelve" "thousand" "three" "hundred" "forty" "five")])
+;    [10 == '("ten")]
+;    [10000 == '("ten" "thousand")]
+;    [10000000 == '("ten" "million")]
+;    [10000000000 == '("ten" "billion")]
+;    [10000000000000 == '("ten" "trillion")]
+;    [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
+;    [999000000000000 == '("nine" "hundred" "ninety" "nine" "trillion")]
+;    [0 == '("zero")]
+;    [16 == '("sixteen")]
+;    [-1 == '("negative" "one")]
+;    [123 == '("one" "hundred" "twenty" "three")]
+;    [22 == '("twenty" "two")]
+;    [14 == '("fourteen")]
+;    [50 == '("fifty")]
+;    [98 == '("ninety" "eight")]
+;    [100 == '("one" "hundred")]
+;    [120 == '("one" "hundred" "twenty")]
+;    [1002 == '("one" "thousand" "two")]
+;    [1323 == '("one" "thousand" "three" "hundred" "twenty" "three")]
+;    [8675309 == '("eight" "million" "six" "hundred" "seventy" "five" "thousand" "three" "hundred" "nine")])
 
-  ;; -- natural->word
-  (check-apply* natural->word*
-    [901003004111 == '("nine" "hundred" "one" "billion" "three" "million" "four" "thousand" "one" "hundred" "eleven")]
-    [121314 == '("one" "hundred" "twenty" "one" "thousand" "three" "hundred" "fourteen")]
-    [0 == '("zero")]
-    [860 == '("eight" "hundred" "sixty")]
-    [19 == '("nineteen")])
+  ;; -- natural->scaled*
+  (check-apply* natural->scaled*
+    [3222 == '((3 . "thousand") (222 . END))]
+    [901003004111 == '((901 . "billion") (3 . "million")
+                       (4 . "thousand") (111 . END))]
+    [999 == '((999 . END))]
+    [21 == '((21 . END))]
+    [19 == '((19 . END))]
+    [100 == '((100 . END))]
+    [123 == '((123 . END))]
+    [1234567890 == '((1 . "billion") (234 . "million")
+                     (567 . "thousand") (890 . END))])
 
-  ;; -- split-number
-  (check-apply* split-number
-    [0 == '((0 . #f))]
-    [1 == '((1 . #f))]
-    [22 == '((22 . #f))]
-    [3222 == '((3 . "thousand") (222 . #f))]
-    [1000231 == '((1 . "million") (231 . #f))]
-    [18201661181166 == '((18 . "trillion") (201 . "billion") (661 . "million") (181 . "thousand") (166 . #f))])
-
-  ;; -- digit3->word*
-  (check-apply* digit3->word*
-    [0 == '("zero")]
-    [999 == '("nine" "hundred" "ninety" "nine")]
-    [21 == '("twenty" "one")]
-    [19 == '("nineteen")]
-    [100 == '("one" "hundred")]
-    [123 == '("one" "hundred" "twenty" "three")]
-    [666 == '("six" "hundred" "sixty" "six")])
+  ;; -- natural->natural*
+  (check-apply* natural->natural*
+    [1234567890 == '(1 234 567 890)]
+    [1000000890 == '(1   0   0 890)]
+    [22 == '(22)]
+    [3222 == '(3 222)]
+    [1000231 == '(1 0 231)]
+    [0 == '(0)]
+    [1 == '(1)]
+    [22 == '(22)]
+    [3222 == '(3 222)]
+    [1000231 == '(1 0 231)]
+    [18201661181166 == '(18 201 661 181 166)])
 
   ;; -- digit2->word*
   (check-apply* digit2->word*
@@ -162,18 +190,12 @@
     [71 == '("seventy" "one")]
     [10 == '("ten")]
     [33 == '("thirty" "three")]
-    [40 == '("forty")])
+    [40 == '("forty")]
+    [0 == '("zero")]
+    [2 == '("two")]
+    [14 == '("fourteen")]
+    [50 == '("fifty")]
+    [98 == '("ninety" "eight")]
+    [99 == '("ninety" "nine")])
 
-  ;; -- digit->word
-  (check-apply* digit->word
-    [0 == "zero"]
-    [1 == "one"]
-    [2 == "two"]
-    [3 == "three"]
-    [4 == "four"]
-    [5 == "five"]
-    [6 == "six"]
-    [7 == "seven"]
-    [8 == "eight"]
-    [9 == "nine"])
 )
