@@ -95,7 +95,7 @@
 
 (module+ test
 
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   (check-true
     (and (member "trillion" (integer->word* UPPER-BOUND))

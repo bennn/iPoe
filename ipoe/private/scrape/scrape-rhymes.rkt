@@ -109,7 +109,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   (let ([rr (scrape-rhyme "parent")])
     (check-true (rhymes? rr "aberrant"))

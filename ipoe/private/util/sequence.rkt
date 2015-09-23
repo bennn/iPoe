@@ -48,7 +48,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   ;; -- sequence-empty?
   (check-true* sequence-empty?

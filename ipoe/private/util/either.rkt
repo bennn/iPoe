@@ -89,7 +89,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit "rackunit-abbrevs.rkt")
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   ;; -- either?
   (check-true* either?
