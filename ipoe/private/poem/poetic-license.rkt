@@ -1,6 +1,9 @@
 #lang racket/base
 
 (provide
+  (struct-out quirk)
+  ;; The standard error format
+
   poetic-license-apply
   ;; (-> License (Listof Quirk) License)
   ;; Apply a poetic license to a list of quirks
