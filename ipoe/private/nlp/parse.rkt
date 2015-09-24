@@ -3,8 +3,6 @@
 ;; Generic word/line parsing tools
 ;; Design goal: all functions from this module have type (-> String (U #f Word*))
 
-;; TODO need trim?
-
 ;; The type 'Word' represents normalized strings
 ;; i.e. strings that might possibly be in the word database
 ;;
