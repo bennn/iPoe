@@ -96,14 +96,15 @@
 (define-parameter verbose #f)
 
 ;; -- poetic license / demerits
+;;    A cost of #f is infinite
 (define-parameter poetic-license 0)
-(define-parameter almost-rhyme-penalty 0)
-(define-parameter bad-rhyme-penalty 0)
-(define-parameter bad-word-penalty 0)
-(define-parameter bad-extra-penalty 0)
-(define-parameter bad-syllable-penalty 0)
-(define-parameter bad-stanza-penalty 0)
-(define-parameter bad-lines-penalty 0)
+(define-parameter almost-rhyme-penalty 1)
+(define-parameter bad-extra-penalty 10)
+(define-parameter bad-lines-penalty #f)
+(define-parameter bad-rhyme-penalty 3)
+(define-parameter bad-stanza-penalty #f)
+(define-parameter bad-syllable-penalty 1)
+(define-parameter spelling-error-penalty 0)
 
 ;; -----------------------------------------------------------------------------
 
@@ -212,7 +213,7 @@
     [*poetic-license* (hash-ref o* poetic-license *poetic-license*)]
     [*almost-rhyme-penalty* (hash-ref o* almost-rhyme-penalty *almost-rhyme-penalty*)]
     [*bad-rhyme-penalty* (hash-ref o* bad-rhyme-penalty *bad-rhyme-penalty*)]
-    [*bad-word-penalty* (hash-ref o* bad-word-penalty *bad-word-penalty*)]
+    [*spelling-error-penalty* (hash-ref o* spelling-error-penalty *spelling-error-penalty*)]
     [*bad-extra-penalty* (hash-ref o* bad-extra-penalty *bad-extra-penalty*)]
     [*bad-syllable-penalty* (hash-ref o* bad-syllable-penalty *bad-syllable-penalty*)]
     [*bad-stanza-penalty* (hash-ref o* bad-stanza-penalty *bad-stanza-penalty*)]
