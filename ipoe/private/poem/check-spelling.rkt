@@ -38,53 +38,71 @@
         ""
         (format " Maybe you meant '~a'?" (car suggest*))))
   (quirk (*spelling-error-penalty*)
-         (format "Misspelled word '~a'; position ~a on line ~a of stanza ~a." w w-num l-num s-num suggest-str)))
+         (format "Misspelled word '~a'; position ~a on line ~a of stanza ~a.~a" w w-num l-num s-num suggest-str)))
 
 ;; Note: only gives 1 suggestion (be nicer to display in a dropdown)
 ;; (: check-spelling (-> (Sequenceof Word/Loc) Void))
 (define (check-spelling word/loc*)
   (define seen (mutable-set))
+  (define (known-word? w)
+    (unless (set-member? seen w)
+      (set-add! seen w)
+      (word-exists? w)))
   (for/list ([w/l (in-list word/loc*)]
-             #:when (let ([w (word/loc-word w/l)])
-                      (not (not (set-member? seen w))
-                           (set-add! seen w) ;; Always add to `seen`
-                           (word-exists? w))))
+             #:when (not (known-word? (word/loc-word w/l))))
     (spelling-error w/l)))
 
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require
+    rackunit
+    ipoe/private/rackunit-abbrevs
+    (only-in ipoe/private/db
+      add-word
+      with-ipoe-db)
+    ipoe/private/parameters
+  )
 
-  ;; TODO database-independent tests
+  (define o* (options-init))
+  (define-syntax-rule (with-db-test e)
+    (parameterize-from-hash o*
+      (lambda ()
+        (with-ipoe-db #:user (*user*)
+                      #:dbname (*dbname*)
+                      #:commit? #f
+          (lambda () e)))))
 
-;  (define (check-misspelled w* [len #f])
-;    (check-print
-;      (for/list ([i (in-range (or len (length w*)))])
-;        #rx"^Misspelled word")
-;      (lambda () (check-spelling w*))))
+  (define-syntax-rule (add-word/nothing w)
+    (add-word w #:syllables 1
+                #:rhymes '()
+                #:almost-rhymes '()
+                #:interactive? #f
+                #:online? #f))
 
-;  ;; -- check-spelling
-;  (with-ipoe-db #:commit? #f (lambda ()
-;    (check-true* (lambda line* (success? (check-spelling line*)))
-;      ["yes" "why"]
-;      ["all" "these words are" "spelled correctly! I promise"])
-;
-;    (let ([bad1 "asdvhuhewdv"]
-;          [bad2 "uhnojfyondvwhbonvwf"]
-;          [bad3 "hjvndkwcxs"]
-;          [bad4 "xz"])
-;      (check-apply* check-misspelled
-;        [(list bad1) == (failure 'check-spelling (list (list bad1)))]
-;        [(list bad1 bad2 bad3) == (failure 'check-spelling (list (list bad1) (list bad2) (list bad3)))]
-;        [(list bad4) == (failure 'check-spelling (list (list bad4 "be" "of" "to" "a" "in" "I" "it")))]
-;      ))))
-;
-;  ;; -- check-spelling, remove duplicates
-;  (with-ipoe-db #:commit? #f (lambda ()
-;    (let* ([bw "jipaengva"]
-;           [bw2 (string-append bw " " bw)])
-;      (check-apply* (lambda (w*) (check-misspelled w* 1))
-;       [(list bw2 bw2 bw2) == (failure 'check-spelling (list (list bw)))]))))
+  (define-syntax-rule (check-pass? e)
+    (check-true (null? e)))
+
+  (define-syntax-rule (check-fail? N e)
+    (begin (check-true (list? e))
+           (check-equal? (length e) N)
+           (check-true (for/and ([x (in-list e)]) (quirk? x)))))
+
+  ;; -- check-spelling
+  (with-db-test
+    (let* ([w1 "sadwefscasdweda"]
+           [w1/loc (word/loc w1 0 0 1)]
+           [w2 "oweryqtqrerqere"]
+           [w2/loc (word/loc w2 4 1 9)]
+           [w3 "qeytqueorqerwer"]
+           [w3/loc (word/loc w3 6 6 66)])
+      ;; -- existing words are spelled correctly
+      (check-fail? 1 (check-spelling (list w1/loc)))
+      (add-word/nothing w1)
+      (check-pass? (check-spelling (list w1/loc)))
+      ;; -- returns a list of all misspelled words
+      (check-fail? 2 (check-spelling (list w1/loc w2/loc w3/loc)))
+      ;; -- ignore duplicate errors
+      (check-fail? 1 (check-spelling (list w3/loc w3/loc w3/loc)))))
 
 )
