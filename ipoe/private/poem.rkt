@@ -13,59 +13,52 @@
   ;; (-> Line/Loc String Boolean)
   ;; True if the line contains the word
 
-;  last-word
-;  ;; (-> Line Word)
-;  ;; Return the final word in the line
-;
-;  last-stanza
-;  ;; (-> Poem Stanza)
-;  ;; Return the final stanza in the poem
-;
-;  line
-;  ;; (-> Natural Stanza Line)
-;  ;; Get a line from a stanza.
-;  ;; (Basically, a synonym for `list-ref`)
-;
-;  line=?
-;  ;; (-> Line Line Either)
-;  ;; Succeeds if the two lines contain the same words.
-;  ;; i.e., are equal after removing punctuation.
-;
-;  make-poem
-;  ;; (-> String Poem)
-;  ;; Parse a poem from an input source
-;  ;; TODO add more sources (input-port, path-string)
-;  ;;;; TODO use these function to implement make-poem
-;  ;to-line*
-;  ;;; (-> (U Input-Port String (Listof String)) (Listof String))
-;  ;;; Convert an input source to a list of newline-separated strings
-;  ;to-stanza*
-;  ;;; (-> (Sequenceof String) (Sequenceof (Sequenceof String)))
-;  ;;; Convert a sequence of lines to a sequence of stanzas
-;
-;  poem-count-stanza*
-;  ;; (-> Poem Natural)
-;  ;; Count the number of stanzas in the poem
-;
-;  poem->word/loc*
-;  ;; (-> Poem (Sequenceof Word))
-;  ;; Return a sequence of all words in the poem
-;
-;  stanza
-;  ;; (-> Natural Poem Stanza)
-;  ;; Get a stanza from a poem.
-;
-;  stanza->line*
-;  ;; (-> Stanza (Listof Line))
-;  ;; Get the lines from a stanza
-;
-;  word
-;  ;; (-> Natural Line Word)
-;  ;; Get a word from a line
-;
-;  word=?
-;  ;; (-> Word Word Either)
-;  ;; Success if two words are equal
+  last-word
+  ;; (-> Line Word)
+  ;; Return the final word in the line
+
+  last-stanza
+  ;; (-> Poem Stanza)
+  ;; Return the final stanza in the poem
+
+  line
+  ;; (-> Natural Stanza Line)
+  ;; Get a line from a stanza.
+  ;; (Basically, a synonym for `list-ref`)
+
+  line=?
+  ;; (-> Line Line Either)
+  ;; Succeeds if the two lines contain the same words.
+  ;; i.e., are equal after removing punctuation.
+
+  make-poem
+  ;; (-> String Poem)
+  ;; Parse a poem from an input source
+  ;; TODO add more sources (input-port, path-string)
+
+  poem-count-stanza*
+  ;; (-> Poem Natural)
+  ;; Count the number of stanzas in the poem
+
+  poem->word/loc*
+  ;; (-> Poem (Sequenceof Word))
+  ;; Return a sequence of all words in the poem
+
+  stanza
+  ;; (-> Natural Poem Stanza)
+  ;; Get a stanza from a poem.
+
+  stanza->line*
+  ;; (-> Stanza (Listof Line))
+  ;; Get the lines from a stanza
+
+  word
+  ;; (-> Natural Line Word)
+  ;; Get a word from a line
+
+  word=?
+  ;; (-> Word Word Either)
+  ;; Success if two words are equal
 )
 
 ;; -----------------------------------------------------------------------------
