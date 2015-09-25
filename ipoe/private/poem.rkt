@@ -5,6 +5,11 @@
 ;; TODO standardize #t or #f for success case (plase just remove the #f)
 
 (provide
+  ;(struct-out stanza/loc)
+  ;(struct-out line/loc)
+  (struct-out word/loc)
+  (struct-out poem)
+
   (rename-out [and/no-quirks and] [for/no-quirks for/and])
   ;; The `and` macro, lifted to fail if it gets a quirk? struct
   ;; (and succeed on #f)
@@ -40,6 +45,10 @@
   ;; (-> Poem Natural)
   ;; Count the number of stanzas in the poem
 
+  poem->stanza*
+  ;; (-> Poem (Sequenceof Stanza/Loc))
+  ;; Return all stanzas in a poem
+
   poem->word/loc*
   ;; (-> Poem (Sequenceof Word))
   ;; Return a sequence of all words in the poem
@@ -49,7 +58,7 @@
   ;; Get a stanza from a poem.
 
   stanza->line*
-  ;; (-> Stanza (Listof Line))
+  ;; (-> Stanza (Sequenceof Line))
   ;; Get the lines from a stanza
 
   word
@@ -221,6 +230,11 @@
 (define (poem-count-stanza* P)
   (vector-length (poem-stanza* P)))
 
+(define (poem->stanza* P)
+  (define s* (poem-stanza* P))
+  (for/vector ([i (in-range (vector-length s*))])
+    (stanza/loc (vector-ref s* i) i)))
+
 ;; TODO streaming algorithm
 (define (poem->word/loc* P)
   (define stanza* (poem-stanza* P))
@@ -233,7 +247,7 @@
 (define (stanza s-num s*)
   (stanza/loc (safe-vector-ref s-num s* 'stanza) s-num))
 
-;; (: stanza->line* (-> Stanza/Loc (Listof Line/Loc)))
+;; (: stanza->line* (-> Stanza/Loc (Vectorof Line/Loc)))
 (define (stanza->line* s)
   (match-define (stanza/loc l* s-num) s)
   (for/vector ([l (in-vector l*)]
@@ -412,6 +426,14 @@
   (check-apply* poem-count-stanza*
    [(poem "" #()) == 0]
    [(poem "" #(#(#()) #(#()) #(#("a" "b" "c")))) == 3])
+
+  ;; -- poem->stanza*
+  (check-apply* poem->stanza*
+   [(poem "" #()) == '#()]
+   [(poem "hi" #(#(#("a")) #() #("c")))
+    == (vector (stanza/loc '#(#("a")) 0)
+               (stanza/loc '#() 1)
+               (stanza/loc '#("c") 2))])
 
   ;; -- poem->word/loc*
   (check-apply* poem->word/loc*
