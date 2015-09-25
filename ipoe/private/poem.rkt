@@ -2,12 +2,21 @@
 
 ;; Note: all vectors in this file are immutable
 
-;; TODO standardize #t or #f for success case (plase just remove the #f)
+;; TODO enforce immutable vectors (overwrite for/vector?)
+;; TODO standardize #t or #f for success casex
+;;  (plase just remove the #f and use and/no-quirks)
+;; TODO refactor into multiple files
+;;  (separate validators interface from core structs from library code?)
 
 (provide
+  ;; TODO rename to remove /loc?
+  stanza/loc->string
+  line/loc->string
+  word/loc->string
+
   ;(struct-out stanza/loc)
   ;(struct-out line/loc)
-  (struct-out word/loc)
+  (struct-out word/loc) ;; TODO stop with the struct-out
   (struct-out poem)
 
   (rename-out [and/no-quirks and] [for/no-quirks for/and])
@@ -36,6 +45,10 @@
   ;; Succeeds if the two lines contain the same words.
   ;; i.e., are equal after removing punctuation.
 
+  line->word*
+  ;; (-> Line/Loc (Sequenceof Word/Loc))
+  ;; Return a sequence of words in the line
+
   make-poem
   ;; (-> String Poem)
   ;; Parse a poem from an input source
@@ -56,6 +69,10 @@
   stanza
   ;; (-> Natural Poem Stanza)
   ;; Get a stanza from a poem.
+
+  stanza-count-lines
+  ;; (-> Stanza/Loc Natural)
+  ;; Count the number of lines in a stanza
 
   stanza->line*
   ;; (-> Stanza (Sequenceof Line))
@@ -221,6 +238,13 @@
             (cons (list->vector (string->word* (car line*)))
                   curr-stanza))]))))
 
+;; (: line->word* TODO)
+(define (line->word* ln)
+  (match-define (line/loc w* l-num s-num) ln)
+  (for/vector ([w (in-vector w*)]
+               [w-num (in-naturals)])
+    (word/loc w w-num l-num s-num)))
+
 (define (make-poem line*)
   (define stanza*
     (for/vector ([s (line*->stanza* line*)])
@@ -247,6 +271,11 @@
 (define (stanza s-num s*)
   (stanza/loc (safe-vector-ref s-num s* 'stanza) s-num))
 
+;; TODO test
+(define (stanza-count-lines st)
+  (match-define (stanza/loc l* s-num) st)
+  (vector-length l*))
+
 ;; (: stanza->line* (-> Stanza/Loc (Vectorof Line/Loc)))
 (define (stanza->line* s)
   (match-define (stanza/loc l* s-num) s)
@@ -267,13 +296,18 @@
                 #:when (not (string=? w1 (word/loc-word w2/loc))))
       (quirk (*bad-extra-penalty*)
              (format "~a and ~a must match"
-               (word->string w1/loc)
-               (word->string w2/loc)))))
+               (word/loc->string w1/loc)
+               (word/loc->string w2/loc)))))
   (or (eq? #f r)
       r))
 
 ;; -----------------------------------------------------------------------------
 ;; --- private
+
+;; (: stanza/loc->string (-> Stanza String))
+(define (stanza/loc->string st)
+  (match-define (stanza/loc l* s-num) st)
+  (format "Stanza ~a" s-num))
 
 ;; (: line/loc->string (-> Line String))
 (define (line/loc->string ln)
@@ -289,8 +323,8 @@
    [else
     (vector-ref x* i)]))
 
-;; (: word->string (-> Word String))
-(define (word->string w/loc)
+;; (: word/loc->string (-> Word String))
+(define (word/loc->string w/loc)
   (match-define (word/loc w wn ln sn) w/loc)
   (format "Word ~a on line ~a of stanza ~a ('~a')" wn ln sn w))
 
@@ -453,6 +487,14 @@
              (lambda () (stanza 0 '#())))
   (check-exn (regexp "ipoe:safe-vector-ref")
              (lambda () (stanza -1 '#(a b c))))
+
+  ;; -- stanza-count-lines
+  (check-apply* stanza-count-lines
+   [(stanza/loc '#() 0) == 0]
+   [(stanza/loc '#(#("a") #("b")) 1)
+    == 2]
+   [(stanza/loc '#(#("yes" "sir") #("youve") #("got" "it")) 3)
+    == 3])
 
   ;; -- stanza->line*
   (check-apply* stanza->line*
