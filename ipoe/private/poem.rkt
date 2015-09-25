@@ -14,12 +14,13 @@
   line/loc->string
   word/loc->string
 
-  ;(struct-out stanza/loc)
-  ;(struct-out line/loc)
-  (struct-out word/loc) ;; TODO stop with the struct-out
+  ;; TODO stop with the struct-out
+  (struct-out stanza/loc)
+  (struct-out line/loc)
+  (struct-out word/loc)
   (struct-out poem)
 
-  (rename-out [and/no-quirks and] [for/no-quirks for/and])
+  and/no-quirks for/no-quirks
   ;; The `and` macro, lifted to fail if it gets a quirk? struct
   ;; (and succeed on #f)
 
