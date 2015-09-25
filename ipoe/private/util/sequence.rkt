@@ -15,6 +15,11 @@
   ;; Return a new sequence missing the first N elements of the argument.
   ;; Unlike `sequence-tail` does not throw an exception if the sequence has
   ;;  fewer than N element; instead returns an empty sequence.
+
+  sequence-last
+  ;; (-> (Sequenceof Any) (U Any #f))
+  ;; Return the last element in the sequence, or #f is the sequence is empty.
+  ;; Does not terminate if the sequence is infinite
 )
 
 ;; -----------------------------------------------------------------------------
@@ -44,6 +49,10 @@
     (if (sequence-empty? s)
         s
         (sequence-tail s 1))))
+
+(define (sequence-last seq)
+  (for/fold ([e #f]) ([s seq])
+    s))
 
 ;; =============================================================================
 
@@ -90,5 +99,11 @@
 
   (check-true
    (sequence-empty? (sequence-skip 10 (in-range 0 5))))
+
+  ;; -- sequence-last
+  (check-apply* sequence-last
+   ['(1 2 3) == 3]
+   ['() == #f]
+   ['(a b c d e) == 'e])
 
 )
