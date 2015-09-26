@@ -254,7 +254,7 @@
                    (word/loc-word W0))))
           (quirk (*bad-rhyme-penalty*)
             ;; TODO cleaner error message
-            (format "Expected a word to rhyme with ~a, got ~a (position ~a, line ~a, stanza ~a)\n"
+            (format "Expected a word to rhyme with ~a, got ~a (position ~a, line ~a, stanza ~a)"
               (word/loc-word W0)
               (word/loc-word W1)
               (word/loc-w-num W1)
