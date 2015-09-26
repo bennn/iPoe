@@ -2,6 +2,8 @@
 
 ;; Offer spelling suggestions
 
+;; TODO rename epsilon to 'max-distance'
+
 (provide
   filter-similar
   ;; (-> [String (Listof String)] [#:limit Natural #:max-distance Natural] (Listof String))
