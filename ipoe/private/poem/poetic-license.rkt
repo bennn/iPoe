@@ -83,15 +83,22 @@
 
 (define (poetic-license-report L)
   (displayln "Finished checking poem.")
-  (define q* (reverse (unbox (license-quirk* L))))
+  (define q* (prune-quirk* (unbox (license-quirk* L))))
   (cond
    [(null? q*)
     (displayln "Looks great!")]
    [else
-    (for ([q (in-list (reverse (unbox (license-quirk* L))))])
+    (for ([q (in-list q*)])
       (display "- ")
       (displayln (quirk->string q)))
     (printf "Remaining poetic license: ~a\n" (unbox (license-credit L)))]))
+
+;; Reverse a list of quirks & prune irrelevant ones
+(define (prune-quirk* q*)
+  (for/fold ([acc '()])
+            ([q (in-list q*)]
+             #:when (positive? (quirk->cost q)))
+    (cons q acc)))
 
 ;; =============================================================================
 
