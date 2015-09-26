@@ -70,21 +70,16 @@
     ;; Read one datum & dispatch on it
     (match (read in)
      [(? eof-object?)
-      #:when (and name rhyme-scheme)
+      #:when name
       ;; This is a GOOD end-of-file
-      (define rs+s (if syllables
+      ;; TODO what to do if syllables is set, but rs is #f?
+      (define rs+s (if (and syllables rhyme-scheme)
                        (replace-wildcard-syllables rhyme-scheme syllables)
-                       rhyme-scheme))
+                       (or rhyme-scheme '()))) ;; 2015-09-26: Default to free-verse
       (form name rs+s description extra-validator)]
      [(? eof-object?)
       ;; A bad end of file. Missing some data.
-      (user-error err-loc (format "Unexpected end-of-file, missing ~a"
-        (cond [(and (not name) (not rhyme-scheme))
-               "name & rhyme scheme"]
-              [(not name)
-               "name"]
-              [else
-              "rhyme-scheme"])))]
+      (user-error err-loc "Unexpected end-of-file, missing #:name field")]
      ;; -- Keywords
      ['#:name
       ;; Keyword for poem name

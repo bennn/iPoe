@@ -2,4 +2,3 @@
 
 ;; Anything goes!
 #:name free-verse
-#:rhyme-scheme ()
