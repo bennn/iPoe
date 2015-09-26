@@ -562,7 +562,7 @@
     #f]
    [else
     (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:online? online?))
-    (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with an explicit #:syllables argument." word))
+    (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with an explicit #:syllables argument or in #:interactive? mode." word))
     (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param #:interactive? interactive? #:online? online?))
     (define rhyme* (filter word-exists? (rhyme-result-rhyme* rr)))
     (define almost-rhyme* (filter word-exists? (rhyme-result-almost-rhyme* rr)))
@@ -813,16 +813,19 @@
     (get-user-input read-natural
       #:prompt (format "How many syllables does '~a' have?" word)
       #:description descr))
+  ;; TODO this is ugly
   (cond
    [(not syllables)
     (if interactive?
-      (case (get-user-input read-yes-or-no
-              #:prompt (format "Does '~a' have ~a syllables?" word ref-syllables))
-       [(Y) ref-syllables]
-       [(N) (get-user-syllables)])
+      (if (not ref-syllables)
+        (get-user-syllables)
+        (case (get-user-input read-yes-or-no
+                #:prompt (format "Does '~a' have ~a syllables?" word ref-syllables))
+         [(Y) ref-syllables]
+         [(N) (get-user-syllables)]))
       ref-syllables)]
-   [(or (not ref-syllables) (= syllables ref-syllables))
-    ;; Good, validated user input against trusted source
+   [(or (= syllables ref-syllables) (not ref-syllables))
+    ;; Validated user input against trusted source, or just trust user for unknown word
     syllables]
    [interactive?
     (get-user-syllables
