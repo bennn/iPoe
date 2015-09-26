@@ -46,7 +46,7 @@
          (cmd:db (cdr ARG*))]
         ['help
          (print-help)]
-        ['init  ;; TODO
+        ['init
          (cmd:init (cdr ARG*))]
         ['new
          (cmd:new (cdr ARG*))]
@@ -54,6 +54,8 @@
          (cmd:remove (cdr ARG*))]
         ['show  ;; TODO
          (cmd:show (cdr ARG*))]
+        ['update
+         (cmd:update (cdr ARG*))]
         [k
          (print-unknown k)]))))
 
