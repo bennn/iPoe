@@ -21,7 +21,7 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/rackunit-abbrevs)
+    ipoe/private/util/rackunit-abbrevs)
 
 
   ;; -- rkt-file?

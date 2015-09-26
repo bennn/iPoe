@@ -51,7 +51,7 @@
   ;; (-> Line/Loc (Sequenceof Word/Loc))
   ;; Return a sequence of words in the line
 
-  [make-poem (-> string? poem?)]
+  [make-poem (-> (listof string?) poem?)]
   ;; (-> String Poem)
   ;; Parse a poem from an input source
   ;; TODO add more sources (input-port, path-string)

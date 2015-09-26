@@ -18,9 +18,10 @@
   ipoe/private/parameters
   ipoe/private/ui
   racket/match
-  (only-in ipoe/private/sequence
+  (only-in ipoe/private/util/sequence
     sequence-empty?
     sequence-skip)
+  ;; --
   (only-in racket/string string-join string-split)
   (only-in racket/sequence
     sequence->list)
@@ -337,7 +338,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   ;; -- arg-error
   (check-equal?

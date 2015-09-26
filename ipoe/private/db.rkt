@@ -88,7 +88,7 @@
   ipoe/private/nlp/infer
   ipoe/private/ui
   ipoe/private/db/migrate
-  (only-in ipoe/private/string
+  (only-in ipoe/private/util/string
     string-empty?)
   ;; --
   racket/match
@@ -825,7 +825,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit racket/sequence ipoe/private/rackunit-abbrevs)
+  (require rackunit racket/sequence ipoe/private/util/rackunit-abbrevs)
 
   ;; -------------------------------------------------------------------
 

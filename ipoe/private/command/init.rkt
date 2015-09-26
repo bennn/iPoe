@@ -153,7 +153,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   ;; -- get-username TODO
   (check-apply* (lambda (k1 k2)

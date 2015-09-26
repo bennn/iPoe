@@ -57,7 +57,7 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/rackunit-abbrevs
+    ipoe/private/util/rackunit-abbrevs
     (only-in ipoe/private/db
       add-word
       with-ipoe-db)

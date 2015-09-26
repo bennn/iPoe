@@ -62,8 +62,9 @@
 )
 
 (require
-  ipoe/private/string
   ipoe/private/ui
+  ipoe/private/util/string
+  ;; --
   (only-in racket/set mutable-set set-member? set-add!)
   (for-syntax racket/base syntax/parse racket/syntax)
   (only-in racket/file file->string file->lines)
@@ -294,7 +295,7 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/rackunit-abbrevs
+    ipoe/private/util/rackunit-abbrevs
     (only-in racket/string string-trim string-join)
     (only-in racket/list last)
     (only-in racket/file file->lines))

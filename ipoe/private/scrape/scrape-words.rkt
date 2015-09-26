@@ -30,7 +30,7 @@
 
 
 (define (scrape-word w)
-  (or (american-heritage w)
+  (or ;(american-heritage w)
       (dictionary.com w)
       (merriam-webster w)
       (the-free-dictionary w)))
