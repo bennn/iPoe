@@ -210,4 +210,15 @@
    ["hardcover" == (word-result "hardcover" "Having a rigid binding, as of cardboard covered with cloth or with leather. Used of books." 3 'american-heritage)]
    [not-a-word == #f]
   )
+
+  (define (check-syllables scraper w)
+    (word-result-num-syllables (scraper w)))
+
+  (check-apply* check-syllables
+   [dictionary.com "each" == 1]
+   [the-free-dictionary "each" == 1]
+   [merriam-webster "each" == 1]
+   [american-heritage "each" == 1]
+   [american-heritage "every" == 2]
+   [american-heritage "day" == 1])
 )
