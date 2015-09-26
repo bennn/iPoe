@@ -205,7 +205,7 @@
         (let ([r (filter-similar (symbol->string k)
                    (map symbol->string (set->list ALL-PARAMETERS))
                    #:limit 1 #:max-distance 2)])
-          (if r (format " Maybe you meant '~a'?" (car r)) "")))
+          (if (null? r) "" (format " Maybe you meant '~a'?" (car r)))))
       (alert (format "Unknown key '~a'.~a" k suggest-str))))
   ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
