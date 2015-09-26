@@ -2,6 +2,7 @@
 
 ;; TODO online? and interactive? should be parameters here,
 ;;  or just reference the good old parameters.rkt
+;; TODO add- rhyme, word, syllables should be in helper functions
 
 (provide
   add-word add-word*
@@ -526,8 +527,8 @@
       (add-word w #:db pgc
                   #:rhymes '()
                   #:almost-rhymes '()
-                  #:interactive? #f
-                  #:online? #f)))
+                  #:interactive? interactive?
+                  #:online? online?)))
   (for/list ([wid (in-list wid*)])
     (update-word/id wid #:db pgc
                         #:interactive? interactive?
@@ -799,6 +800,7 @@
                            syllables
                            #:online? [online? #t]
                            #:interactive? [interactive? #t])
+  (printf "RESOLVING for ~a, online? = ~a\n" word online?)
   (define-values (ref-syllables src)
     (if (not online?)
         (values (infer-syllables word) "our-heuristic")
