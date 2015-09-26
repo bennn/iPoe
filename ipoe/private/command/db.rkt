@@ -92,7 +92,6 @@
        [(list 'add-word (? string? s))
         ;; TODO options correct?
         (define wid (add-word s
-                              #:syllables -1
                               #:online? #t
                               #:interactive? #t))
         (if wid

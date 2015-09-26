@@ -807,16 +807,24 @@
           (if (word-result? wr)
               (values (word-result-num-syllables wr) (word-result-src wr))
               (values #f #f)))))
+  (define (get-user-syllables #:description [descr #f])
+    (get-user-input read-natural
+      #:prompt (format "How many syllables does '~a' have?" word)
+      #:description descr))
   (cond
    [(not syllables)
-    ref-syllables]
+    (if interactive?
+      (case (get-user-input read-yes-or-no
+              #:prompt (format "Does '~a' have ~a syllables?" word ref-syllables))
+       [(Y) ref-syllables]
+       [(N) (get-user-syllables)])
+      ref-syllables)]
    [(or (not ref-syllables) (= syllables ref-syllables))
     ;; Good, validated user input against trusted source
     syllables]
    [interactive?
-    (get-user-input read-natural
-                    #:prompt (format "Please enter the correct number of syllables for '~a'." word)
-                    #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
+    (get-user-syllables
+      #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
    [else
     (when interactive?
       (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables)." src word ref-syllables syllables)))
