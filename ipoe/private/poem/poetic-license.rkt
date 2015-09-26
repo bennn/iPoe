@@ -82,11 +82,16 @@
            (box '())))
 
 (define (poetic-license-report L)
-  (displayln "Finished checking poem")
-  (for ([q (in-list (reverse (unbox (license-quirk* L))))])
-    (display "- ")
-    (displayln (quirk->string q)))
-  (printf "Remaining poetic license: ~a\n" (unbox (license-credit L))))
+  (displayln "Finished checking poem.")
+  (define q* (reverse (unbox (license-quirk* L))))
+  (cond
+   [(null? q*)
+    (displayln "Looks great!")]
+   [else
+    (for ([q (in-list (reverse (unbox (license-quirk* L))))])
+      (display "- ")
+      (displayln (quirk->string q)))
+    (printf "Remaining poetic license: ~a\n" (unbox (license-credit L)))]))
 
 ;; =============================================================================
 
