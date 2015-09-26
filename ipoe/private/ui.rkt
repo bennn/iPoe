@@ -7,6 +7,10 @@
   ;; (-> String Void)
   ;; Display a message to the user
 
+  debug
+  ;; (-> String Void)
+  ;; Display a debugging message to the user
+
   get-user-input
   ;; (->* [(-> String A) #:prompt String] [#:descr (U #f String)] A)
   ;; Run a simple interactive loop to get input from (current-input-port).
@@ -50,6 +54,10 @@
 
 ;; For external clients
 (define alert displayln)
+
+(define (debug str)
+  (display "[DEBUG] ")
+  (displayln str))
 
 ;; Prompt the user until he/she/it returns someting `valid?`
 (define (get-user-input valid?
@@ -117,7 +125,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   ;; TODO test interactions
 
