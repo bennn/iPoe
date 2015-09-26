@@ -86,6 +86,24 @@
     "Display a generic help message, or give specific information about a command"
   )
   (command
+    'add-word
+    (lambda (v)
+      (match v
+       [(list 'add-word (? string? s))
+        ;; TODO options correct?
+        (define wid (add-word s
+                              #:syllables -1
+                              #:online? #t
+                              #:interactive? #t))
+        (if wid
+            (format "Successfully added word '~a' (ID ~a)" s wid)
+            (format "Failed to add word '~a'" s))]
+       [(cons 'add-word x)
+        (arg-error 'add-word "1 string" x)]
+       [_ #f]))
+     "Add a word to the database"
+  )
+  (command
     'id->word
     (lambda (v)
       (match v
@@ -93,9 +111,26 @@
         (or (id->word n)
             (format "Unbound ID '~a'" n))]
        [(cons 'id->word x)
-        (arg-error 'id->word "natural number" x)]
+        (arg-error 'id->word "1 natural number" x)]
        [_ #f]))
     "Return the word associated with a database ID"
+  )
+  (command ;; TODO test
+    'remove-word
+    (lambda (v)
+      (match v
+       [(list 'remove-word (? string? w))
+        (cond
+         [(not (word-exists? w))
+          (unknown-word w)]
+         [(remove-word w)
+          (format "Successfully removed word '~a'" w)]
+         [else
+          (format "Failed to remove word '~a'" w)])]
+       [(cons 'remove-word x)
+        (arg-error 'id->word "1 string" x)]
+       [_ #f]))
+    "Remove a word from the database"
   )
   (command
     'rhymes-with?
@@ -251,7 +286,7 @@
                    init-repl)
                  (init-repl)))))))))
 
-(define PROMPT #"ipoe> ")
+(define PROMPT #"ipoe:db> ")
 
 (define (init-repl [port #f])
   ;; -- Factor all REPL interactions through `respond`
