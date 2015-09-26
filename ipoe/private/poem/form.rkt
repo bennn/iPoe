@@ -217,8 +217,7 @@
             (when (quirk? extra-q)
               (poetic-license-apply L (list extra-q))))
           ;; --
-          (when (*interactive?*)
-            (poetic-license-report L))
+          (poetic-license-report L)
           ;; -- Done! Return anything needed to make testing easy
           (list P L option*)))))))
 
