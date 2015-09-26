@@ -3,21 +3,25 @@ iPoe
 
 Interactive POetry Editor
 
-Overview
---------
+It's a text editor for poetry!
 
-Spellcheck is great.
-Grammar check is great.
-
-iPoe aims to provide rhythm, meter, rhyme, and form checks for common poetic formats like sonnets and villanelles.
-It seems the only thing in the way of that is an accurate database of words and phonics.
-
-This may take a while.
+[[ Insert screenshot here ]]
 
 
-Poetry editor, implemented as a Racket language.
+Requirements
+------------
 
-To start the database, use the command:
-```
-su postgres -c 'pg_ctl start -D /var/lib/postgres/data -l /tmp/PGSQL.log'
-```
+1. Install a recent development release of Racket (v6.2.900.17)
+2. Clone and install this repository: `git clone https://github.com/bennn/ipoe; raco pkg install ./ipoe`
+3. (Optional, but recommended) Install postgres.
+
+If you skip step 3 that's fine, we just save data on words locally, in a hashtable.
+
+
+Getting Started
+---------------
+1. Run `raco ipoe init` to initialize a database
+2. Check out the built-in poetic forms [[TODO how?]]
+3. Write a poem: `hello.rkt`
+4. Run `racket hello.rkt`
+
