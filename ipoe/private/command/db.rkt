@@ -290,7 +290,8 @@
 (define PROMPT #"ipoe:db> ")
 
 (define (init-repl [port #f])
-  ;; -- Factor all REPL interactions through `respond`
+  ;; -- Factor all REPL interactions through `respond`,
+  ;;    so they get saved to the logfile
   (define respond
     (if port
         (lambda (in out)
@@ -304,7 +305,7 @@
   ;; -- REPL
   (let loop ()
     (define input
-      (parameterize ([readline-prompt #"ipoe> "])
+      (parameterize ([readline-prompt PROMPT])
         (read)))
     (match (for/or ([c (in-list COMMAND*)]) (c input))
      ['EXIT
