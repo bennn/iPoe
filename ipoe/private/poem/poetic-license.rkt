@@ -59,9 +59,9 @@
    ['() (void)]
    [(cons qh qt)
     (poetic-license-deduct L qh)
-    (if (positive? (unbox (license-credit L)))
-        (poetic-license-apply L qt)
-        (poetic-license-error L qh))]))
+    (if (negative? (unbox (license-credit L)))
+        (poetic-license-error L qh)
+        (poetic-license-apply L qt))]))
 
 ;; Subtract the cost from the license
 ;; (: poetic-license-deduct (-> License Quirk Void))
