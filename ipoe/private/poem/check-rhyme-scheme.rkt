@@ -246,20 +246,26 @@
      [(wildcard? v)
       #t]
      [(word/loc? W0)
-      (or (rhyme=? W0 W1)
-          (and (almost-rhyme=? W0 W1)
-               (quirk (*almost-rhyme-penalty*)
-                 (format "Word '~a' almost rhymes with '~a'."
-                   (word/loc-word W1)
-                   (word/loc-word W0))))
-          (quirk (*bad-rhyme-penalty*)
-            ;; TODO cleaner error message
-            (format "Expected a word to rhyme with ~a, got ~a (position ~a, line ~a, stanza ~a)"
-              (word/loc-word W0)
-              (word/loc-word W1)
-              (word/loc-w-num W1)
-              (word/loc-l-num W1)
-              (word/loc-s-num W1))))]
+      (cond
+       [(rhyme=? W0 W1)
+        #t]
+       [(almost-rhyme=? W0 W1)
+        (quirk (*almost-rhyme-penalty*)
+          (format "Word '~a' almost rhymes with '~a' (position ~a, line ~a, stanza ~a)"
+            (word/loc-word W1)
+            (word/loc-word W0)
+            (word/loc-w-num W1)
+            (word/loc-l-num W1)
+            (word/loc-s-num W1)))]
+       [else
+         (quirk (*bad-rhyme-penalty*)
+           ;; TODO cleaner error message
+           (format "Expected a word to rhyme with ~a, got ~a (position ~a, line ~a, stanza ~a)"
+             (word/loc-word W0)
+             (word/loc-word W1)
+             (word/loc-w-num W1)
+             (word/loc-l-num W1)
+             (word/loc-s-num W1)))])]
      [else
       (varmap-add! vm v W1)]))))
 

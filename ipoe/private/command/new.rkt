@@ -55,7 +55,7 @@
         (lambda ()
           (cond
            [(word-exists? w)
-            (alert (format "Word '~a' already exists, not adding (for now you can't update the syllables or rhymes)" w))]
+            (alert (format "Word '~a' already exists, not adding." w))]
            [(add-word w #:syllables (get-syllables w)
                         #:interactive? #t
                         #:online? (*online?*))

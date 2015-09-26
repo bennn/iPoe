@@ -243,9 +243,11 @@
 ;; -----------------------------------------------------------------------------
 ;; --- Parameters
 
+;; TODO ask about committing at the END, if unset
+
 (define *cmd-dbname* (make-parameter #f))
 (define *cmd-user* (make-parameter #f))
-(define *commit?* (make-parameter #f))
+(define *commit?* (make-parameter #t))
 (define *take* (make-parameter 20))
 (define *skip* (make-parameter 0))
 (define *output-file* (make-parameter #f))
@@ -260,7 +262,7 @@
   (command-line
    #:argv arg*
    #:once-each
-    [("-c" "--commit") "Commit session to database" (*commit?* #t)]
+    [("-c" "--commit") "Commit session to database" (*commit?* #f)]
     [("-d" "--dbname") d-p "Database name" (*cmd-dbname* d-p)]
     [("-o" "--output") o-p "Save interactions to file" (*output-file* o-p)]
     [("-t" "--take") t-p "Default number of query results to show" (*take* t-p)]
