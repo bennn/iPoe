@@ -7,7 +7,7 @@
 ;;  (plase just remove the #f and use and/no-quirks)
 ;; TODO refactor into multiple files
 ;;  (separate validators interface from core structs from library code?)
-
+(require racket/contract/base)
 (provide
   ;; TODO rename to remove /loc?
   stanza/loc->string
@@ -24,69 +24,70 @@
   ;; The `and` macro, lifted to fail if it gets a quirk? struct
   ;; (and succeed on #f)
 
-  contains-word?
+  (contract-out
+  [contains-word? (-> line/loc? string? boolean?)]
   ;; (-> Line/Loc String Boolean)
   ;; True if the line contains the word
 
-  last-word
+  [last-word (-> line/loc? word/loc?)]
   ;; (-> Line Word)
   ;; Return the final word in the line
 
-  last-stanza
+  [last-stanza (-> poem? stanza/loc?)]
   ;; (-> Poem Stanza)
   ;; Return the final stanza in the poem
 
-  line
+  [line (-> natural-number/c stanza/loc? line/loc?)]
   ;; (-> Natural Stanza Line)
   ;; Get a line from a stanza.
   ;; (Basically, a synonym for `list-ref`)
 
-  line=?
+  [line=? (-> line/loc? line/loc? boolean?)]
   ;; (-> Line Line Either)
   ;; Succeeds if the two lines contain the same words.
   ;; i.e., are equal after removing punctuation.
 
-  line->word*
+  [line->word* (-> line/loc? sequence?)]
   ;; (-> Line/Loc (Sequenceof Word/Loc))
   ;; Return a sequence of words in the line
 
-  make-poem
+  [make-poem (-> string? poem?)]
   ;; (-> String Poem)
   ;; Parse a poem from an input source
   ;; TODO add more sources (input-port, path-string)
 
-  poem-count-stanza*
+  [poem-count-stanza* (-> poem? natural-number/c)]
   ;; (-> Poem Natural)
   ;; Count the number of stanzas in the poem
 
-  poem->stanza*
+  [poem->stanza* (-> poem? sequence?)]
   ;; (-> Poem (Sequenceof Stanza/Loc))
   ;; Return all stanzas in a poem
 
-  poem->word/loc*
+  [poem->word/loc* (-> poem? sequence?)]
   ;; (-> Poem (Sequenceof Word))
   ;; Return a sequence of all words in the poem
 
-  stanza
+  [stanza (-> natural-number/c poem? stanza/loc?)]
   ;; (-> Natural Poem Stanza)
   ;; Get a stanza from a poem.
 
-  stanza-count-lines
+  [stanza-count-lines (-> stanza/loc? natural-number/c)]
   ;; (-> Stanza/Loc Natural)
   ;; Count the number of lines in a stanza
 
-  stanza->line*
+  [stanza->line* (-> stanza/loc? sequence?)]
   ;; (-> Stanza (Sequenceof Line))
   ;; Get the lines from a stanza
 
-  word
+  [word (-> natural-number/c line/loc? word/loc?)]
   ;; (-> Natural Line Word)
   ;; Get a word from a line
 
-  word=?
+  [word=? (-> word/loc? word/loc? boolean?)]
   ;; (-> Word Word Either)
   ;; Success if two words are equal
-)
+))
 
 ;; -----------------------------------------------------------------------------
 
@@ -262,11 +263,31 @@
 
 ;; TODO streaming algorithm
 (define (poem->word/loc* P)
-  (define stanza* (poem-stanza* P))
-  (for*/list ([s (in-vector stanza*)]
-              [l (in-vector s)]
-              [w (in-vector l)])
+  (for*/list ([st (poem->stanza* P)]
+              [ln (stanza->line* st)]
+              [w  (line->word* ln)])
     w))
+
+;  (define stanza* (poem-stanza* P))
+;  (define S (vector-length stanza*))
+;  (in-generator (let loop ([s-num 0])
+;    (cond
+;     [(= s-num S)
+;      (void)]
+;     [else
+;      (define line* (stanza/loc-line* (vector-ref stanza* s-num)))
+;      (define L (vector-length line*))
+;      (in-generator (let loop ([l-num 0])
+;        (cond
+;         [(= l-num L)
+;          (void)]
+;         [else
+;          (define word* (line/loc-line
+;          (for ([w-num (in-
+;  (for*/list ([s-num (in-range (vector-length stanza*))]
+;              [l-num (in-range (in-vector s))]
+;              [w-num (in-range (in-vector l))])
+;    w))
 
 ;; (: stanza (-> Natural Poem Stanza))
 (define (stanza s-num s*)
@@ -473,7 +494,14 @@
   ;; -- poem->word/loc*
   (check-apply* poem->word/loc*
    [(poem "" #(#(#("a" "b" "c") #("d" "e")) #(#("f") #("g"))))
-    == '("a" "b" "c" "d" "e" "f" "g")])
+    == (list
+         (word/loc "a" 0 0 0)
+         (word/loc "b" 1 0 0)
+         (word/loc "c" 2 0 0)
+         (word/loc "d" 0 1 0)
+         (word/loc "e" 1 1 0)
+         (word/loc "f" 0 0 1)
+         (word/loc "g" 0 1 1))])
 
   ;; -- stanza
   (check-apply* stanza
