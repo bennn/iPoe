@@ -800,7 +800,6 @@
                            syllables
                            #:online? [online? #t]
                            #:interactive? [interactive? #t])
-  (printf "RESOLVING for ~a, online? = ~a\n" word online?)
   (define-values (ref-syllables src)
     (if (not online?)
         (values (infer-syllables word) "our-heuristic")

@@ -183,7 +183,7 @@
       (define S1 (line->syllables ln))
       (unless (or (wildcard? S0)
                   (= S0 S1))
-        (quirk (*bad-syllable-penalty*)
+        (quirk (* (*bad-syllable-penalty*) (abs (- S0 S1)))
           (format "Expected ~a syllables on ~a, got ~a syllables" S0 (line/loc->string ln) S1))))))
 
 ;; Counts the number of syllables in a line.
