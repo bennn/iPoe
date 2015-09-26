@@ -481,9 +481,10 @@
        (add-rhyme/unsafe wid rid #:db pgc)))
 
 (define (add-rhyme/unsafe wid rid #:db [pgc (*connection*)])
-  (query-exec pgc
-    "INSERT INTO word_rhymes (word, rhyme) VALUES ($1, $2);"
-    wid rid))
+  (define q* (list "INSERT INTO word_rhymes (word, rhyme) VALUES ($1, $2);"
+                   "INSERT INTO word_rhymes (word, rhyme) VALUES ($2, $1);"))
+  (for ([q-str (in-list q*)])
+    (query-exec pgc q-str wid rid)))
 
 ;; --- add-almost-rhyme
 
@@ -508,9 +509,10 @@
        (add-almost-rhyme/unsafe wid aid #:db pgc)))
 
 (define (add-almost-rhyme/unsafe wid aid #:db [pgc (*connection*)])
-  (query-exec pgc
-    "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($1, $2);"
-    wid aid))
+  (define q* (list "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($1, $2);"
+                   "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($2, $1);"))
+  (for ([q-str (in-list q*)])
+    (query-exec pgc q-str wid aid)))
 
 ;; -----------------------------------------------------------------------------
 ;; --- add-word
