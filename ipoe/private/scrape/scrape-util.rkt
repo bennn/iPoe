@@ -3,10 +3,6 @@
 ;; Helper functions for scrapers
 
 (provide
-  count-chars
-  ;; (-> (U Char (-> Char Boolean)) String Natural)
-  ;; Count the number of characters satisfying the predicate
-
   url->html
   ;; (-> (U url String) html)
   ;; Get the html data that lives at location URL
@@ -38,13 +34,11 @@
   (only-in html read-html)
   (only-in "html.rkt" html->xexp)
   sxml
+  (only-in ipoe/private/util/string
+    string-count-chars)
 )
 
 ;; =============================================================================
-
-(define (count-chars f str)
-  (define p (if (char? f) (lambda (c) (char=? c f)) f))
-  (for/sum ([c (in-string str)] #:when (p c)) 1))
 
 (define (url->html arg)
   ;; Sure about `get-impure-port`?
@@ -84,13 +78,6 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
-  (check-apply* count-chars
-   [#\4 "42" == 1]
-   [#\a "foo" == 0]
-   [#\x "" == 0]
-   [(lambda (c) (or (eq? c #\c) (eq? c #\d)))
-    "cadddr" == 4]
-  )
 )

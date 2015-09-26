@@ -7,10 +7,6 @@
 
   ;; -- Option parsing / binding
 
-  IPOE-CONFIG
-  ;; Path-String
-  ;; Expected name of the local / global ipoe configuration file
-
   almost-option?
   ;; (-> String Boolean)
   ;; True if the line of text looks kind of like a configuration option.
@@ -48,7 +44,14 @@
   save-option
   ;; (->* [Symbol Any] [#:location (U 'local 'global)] Boolean)
   ;; Write the `#:Symbol Any` pair to a configuration file.
-  ;; By default, saves to the global config.
+  ;; Does NOT check if the option already exists in the file.
+  ;; Optional argument #:location chooses whether to update the local
+  ;;  or global config.
+
+  update-option
+  ;; (-> [Symbol Any] [#:location (U 'local 'global)] Boolean)
+  ;; Write the `#:Symbol Any` pair to the configuration file,
+  ;;  replacing any old binding for the symbol.
 
   with-config
   ;; (-> (-> Any) #:config String Any)
@@ -59,11 +62,12 @@
 )
 
 (require
-  ipoe/private/string
   ipoe/private/ui
+  ipoe/private/util/string
+  ;; --
   (only-in racket/set mutable-set set-member? set-add!)
   (for-syntax racket/base syntax/parse racket/syntax)
-  (only-in racket/file file->string)
+  (only-in racket/file file->string file->lines)
 )
 
 ;; =============================================================================
@@ -93,14 +97,15 @@
 (define-parameter verbose #f)
 
 ;; -- poetic license / demerits
+;;    A cost of #f is infinite
 (define-parameter poetic-license 0)
-(define-parameter almost-rhyme-penalty 0)
-(define-parameter bad-rhyme-penalty 0)
-(define-parameter bad-word-penalty 0)
-(define-parameter bad-extra-penalty 0)
-(define-parameter bad-syllable-penalty 0)
-(define-parameter bad-stanza-penalty 0)
-(define-parameter bad-lines-penalty 0)
+(define-parameter almost-rhyme-penalty 1)
+(define-parameter bad-extra-penalty 10)
+(define-parameter bad-lines-penalty #f)
+(define-parameter bad-rhyme-penalty 3)
+(define-parameter bad-stanza-penalty #f)
+(define-parameter bad-syllable-penalty 1)
+(define-parameter spelling-error-penalty 0)
 
 ;; -----------------------------------------------------------------------------
 
@@ -119,6 +124,12 @@
 ;; (: almost-option? (-> String Boolean))
 (define (almost-option? line)
   (regexp-match? almost-option-regexp line))
+
+;; Prepare a key/value pair to be written to an options file
+;; TODO should we rename? Sounds a little like we're formatting an option-match
+;; (: format-option (-> Symbol Any String))
+(define (format-option k v)
+  (format "#:~a ~s" k v))
 
 ;; Generate the filenames for local & global configs
 ;; (: get-config-filenames (-> (Values String String)))
@@ -203,7 +214,7 @@
     [*poetic-license* (hash-ref o* poetic-license *poetic-license*)]
     [*almost-rhyme-penalty* (hash-ref o* almost-rhyme-penalty *almost-rhyme-penalty*)]
     [*bad-rhyme-penalty* (hash-ref o* bad-rhyme-penalty *bad-rhyme-penalty*)]
-    [*bad-word-penalty* (hash-ref o* bad-word-penalty *bad-word-penalty*)]
+    [*spelling-error-penalty* (hash-ref o* spelling-error-penalty *spelling-error-penalty*)]
     [*bad-extra-penalty* (hash-ref o* bad-extra-penalty *bad-extra-penalty*)]
     [*bad-syllable-penalty* (hash-ref o* bad-syllable-penalty *bad-syllable-penalty*)]
     [*bad-stanza-penalty* (hash-ref o* bad-stanza-penalty *bad-stanza-penalty*)]
@@ -211,15 +222,41 @@
     (thunk)))
 
 (define (save-option k v #:location [loc 'global])
-  (define-values [global-config local-config] (get-config-filenames))
-  (define fname
-    (case loc
-     [(global) global-config]
-     [(local)  local-config]
-     [else     (error 'parameters:save-option
-                      (format "Unknown config location '~e'" loc))]))
+  (define fname (symbol->config-filename loc))
   (with-output-to-file fname #:exists 'append
-    (lambda () (printf "#:~a ~s\n" k v))))
+    (lambda () (displayln (format-option k v)))))
+
+(define (symbol->config-filename s)
+  (define-values [global-config local-config] (get-config-filenames))
+  (case s
+   [(global) global-config]
+   [(local)  local-config]
+   [else     (error 'parameters:symbol->config-filename
+                    (format "Unknown config location '~e'" s))]))
+
+;; TODO implement an update-config*, instead of walking the whole file each time
+(define (update-option k v #:location [loc 'global])
+  (define fname (symbol->config-filename loc))
+  ;; Inefficient, but the file is supposed to be small
+  (define old-line* (if (file-exists? fname)
+                        (file->lines fname)
+                        '()))
+  (with-output-to-file fname #:exists 'replace
+    (lambda ()
+      (define fmt (format-option k v))
+      ;; Try to replace an old option, else print a new binding
+      (unless
+        (for/fold ([success? #f])
+                  ([ln (in-list old-line*)])
+          (define o (option? ln))
+          (cond
+           [(and o (eq? k (option-match-key o)))
+            (displayln fmt)
+            #t]
+           [else
+            (displayln ln)
+            success?]))
+        (displayln fmt)))))
 
 ;; Execute the thunk with the given string as the only config file.
 (define (with-config thunk #:local [local #f] #:global [global #f])
@@ -258,8 +295,8 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/rackunit-abbrevs
-    (only-in racket/string string-trim)
+    ipoe/private/util/rackunit-abbrevs
+    (only-in racket/string string-trim string-join)
     (only-in racket/list last)
     (only-in racket/file file->lines))
 
@@ -277,6 +314,12 @@
    ["# : key val"]
    [""]
    ["key val:#"])
+
+  ;; -- format-option
+  (check-apply* format-option
+   ['k 'v == "#:k v"]
+   [1 2 == "#:1 2"]
+   ['written? '(1 2 "foo") == "#:written? (1 2 \"foo\")"])
 
   ;; -- get-config-filenames
   (let-values ([(f1 f2) (get-config-filenames)])
@@ -423,7 +466,7 @@
     (check-true (*online?*))
     (check-true (<= 0 (*bad-lines-penalty*))))
 
-  ;; -- save-option
+  ;; -- save-option TODO abbreviate tests
   (with-config #:local ""
     (lambda ()
       (define-values [gc lc] (get-config-filenames))
@@ -446,5 +489,74 @@
       (save-option key val #:location 'global)
       (check-equal? (string-trim (file->string gc))
                     (format "#:~a ~a" key val))))
+
+  ;; -- symbol->config-filename
+  (let-values ([(gc lc) (get-config-filenames)])
+    (check-apply* symbol->config-filename
+     ['global == gc]
+     ['local == lc])
+    (check-exn #rx"parameters:symbol->config-filename"
+      (lambda () (symbol->config-filename 'zardoz))))
+
+  ;; -- update-option
+  (let-values ([(k v) (values 'hello 'world)]
+               [(gc lc) (get-config-filenames)])
+    (define option-str (format-option k v))
+    (define (local->line*) (file->lines lc))
+    (define (global->line*) (file->lines gc))
+    ;; --- update-option, nothing exists (local)
+    (with-config #:local ""
+      (lambda ()
+        (update-option k v #:location 'local)
+        (check-equal? (local->line*) (list "" option-str))))
+    ;; --- update-option, nothing exists (global)
+    (with-config #:global ""
+      (lambda ()
+        (update-option k v #:location 'global)
+        (check-equal? (global->line*) (list "" option-str))))
+    ;; --- update-option, key exists (global)
+    (with-config #:global (format "#:~a john" k)
+      (lambda ()
+        (update-option k v #:location 'global)
+        (check-equal? (global->line*) (list option-str))))
+    ;; --- update-option, key exists + other bindings exist
+    (let ([existing-opt "#:foo bar"])
+      (with-config #:global (string-append (format "#:~a john\n" k)
+                                           existing-opt)
+        (lambda ()
+          (update-option k v #:location 'global)
+          (define line* (global->line*))
+          (check-equal? (length line*) 2)
+          (check-equal? (car line*) option-str)
+          (check-equal? (cadr line*) existing-opt))))
+    ;; --- update-option, key exists + garbage exists
+    (let* ([existing-opt "#:baz quux"]
+           [existing-key (format "#:~a you" k)]
+           [garbage1     "    "]
+           [garbage2     "malformed!"]
+           [opt*         (list existing-opt existing-key garbage1 garbage2)])
+      (with-config #:global (string-join opt* "\n")
+        (lambda ()
+          (update-option k v #:location 'global)
+          (define line* (global->line*))
+          (check-equal? (length line*) (length opt*))
+          (check-equal? (car line*) (car opt*))
+          (check-equal? (cadr line*) option-str)
+          (check-equal? (caddr line*) (caddr opt*))
+          (check-equal? (cadddr line*) (cadddr opt*)))))
+    ;; --- update-option, only other bindings exist
+    (let* ([opt1 "#:a b"]
+           [opt2 "garbage"]
+           [opt3 "(a list of 5 garbage)"]
+           [opt4 "#:another \"good-key\""]
+           [opt* (list opt1 opt2 opt3 opt4)])
+      (with-config #:global (string-join opt* "\n")
+        (lambda ()
+          (update-option k v #:location 'global)
+          (define line* (global->line*))
+          (check-equal? (length line*) (add1 (length opt*)))
+          (for ([o (in-list opt*)] [l (in-list line*)])
+            (check-equal? o l))
+          (check-equal? (last line*) option-str)))))
 
 )

@@ -14,7 +14,7 @@
 (require
   syntax/strip-context
   racket/splicing
-  ipoe/lang/poem-spec
+  ipoe/private/poem/form
   (only-in racket/syntax format-id)
 )
 
@@ -24,21 +24,28 @@
   (syntax->datum (ipoe-read-syntax #f in)))
 
 (define (ipoe-read-syntax src-path in)
-   (define ps (input->poem-spec in))
-   (with-syntax ([mod-id   (format-id #f "~a" (poem-spec-name ps))]
-                 [descr    (poem-spec-description ps)]
-                 [validate (poem-spec->validator ps)]
-                 [def-req  validator-requires])
+   (define ps (make-form in))
+   (with-syntax ([mod-id   (format-id #f "~a" (form-name ps))]
+                 [descr    (form-description ps)]
+                 [validate (form->validator ps)]
+                 [default-requires  validator-requires])
      (strip-context
        #'(module mod-id racket/base
-           (provide (rename-out [custom-read read] [custom-read-syntax read-syntax]))
-           def-req
-           (require
+           (provide (rename-out [custom-read read]
+                                [custom-read-syntax read-syntax]))
+           default-requires
+           (require ;;TODO really need all this?
+             ipoe/private/poem
+             ipoe/private/poem/check-rhyme-scheme
+             ipoe/private/poem/check-spelling
+             ipoe/private/poem/poetic-license
              ipoe/private/parameters
-             ipoe/private/either
              (only-in ipoe/private/ui alert)
-             (only-in ipoe/private/db with-ipoe-db add-word* ipoe-db-connected?)
-             (only-in ipoe/private/spellcheck check-spelling)
+             (only-in ipoe/private/db
+               with-ipoe-db
+               add-word*
+               ipoe-db-connected?
+               word-exists?)
              (only-in syntax/strip-context strip-context))
            (define (custom-read in) (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)

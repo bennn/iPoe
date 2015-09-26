@@ -14,7 +14,9 @@
   racket/string
   (only-in racket/match match-define)
   (only-in sxml if-car-sxpath)
-  "scrape-util.rkt"
+  ipoe/private/scrape/scrape-util
+  (only-in ipoe/private/util/string
+    string-count-chars)
 )
 
 ;; =============================================================================
@@ -87,11 +89,13 @@
     (lambda (sxml)
       (let ([h1 ((if-car-sxpath '(// h1 span @ data-syllable *text*)) sxml)])
         (and h1
-             (add1 (count-chars #\· h1)))))
+             (add1 (string-count-chars #\· h1)))))
 
     ;; src
     'dictionary.com))
 
+;; 2015-09-23: The word 'coalman' doesn't have syllables, but it does
+;;  have a page on this site. Should we accept that?
 (define the-free-dictionary
   (word-scraper
     ;; word->url
@@ -105,7 +109,7 @@
     ;; sxml->num-syllables
     (lambda (sxml)
      (let ([h2 ((if-car-sxpath `(// div ,(id? "Definition") section h2 *text*)) sxml)])
-       (and h2 (add1 (count-chars #\· h2)))))
+       (and h2 (add1 (string-count-chars #\· h2)))))
 
     ;; src
     'the-free-dictionary))
@@ -151,7 +155,7 @@
     (lambda (sxml)
       (let* ([div ((if-car-sxpath `(// div ,(class? "rtseg"))) sxml)]
              [res ((if-car-sxpath `(// *text*)) div)])
-        (and res (add1 (count-chars #\· res)))))
+        (and res (add1 (string-count-chars #\· res)))))
 
     ;; src
     'american-heritage))
@@ -170,7 +174,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   (define not-a-word "hguwisdvzodxv")
 
@@ -188,6 +192,7 @@
   (check-apply* the-free-dictionary
    ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
    ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
+   ["coalman" == #f]
    [not-a-word == #f]
   )
 
@@ -205,4 +210,15 @@
    ["hardcover" == (word-result "hardcover" "Having a rigid binding, as of cardboard covered with cloth or with leather. Used of books." 3 'american-heritage)]
    [not-a-word == #f]
   )
+
+  (define (check-syllables scraper w)
+    (word-result-num-syllables (scraper w)))
+
+  (check-apply* check-syllables
+   [dictionary.com "each" == 1]
+   [the-free-dictionary "each" == 1]
+   [merriam-webster "each" == 1]
+   [american-heritage "each" == 1]
+   [american-heritage "every" == 2]
+   [american-heritage "day" == 1])
 )

@@ -1,9 +1,11 @@
 ipoe/private/scrape
 ===================
 
-Scrapers and other tools for getting new words.
+Scrapers for taking information off the internet.
 
 - `scrape-rhymes.rkt` Get rhyme data for a word.
-- `scrape-syllables.rkt` Get syllables for a word.
+- `scrape-words.rkt` Check if a word exists, get the number of syllables.
+
+Helpers:
 - `scrape-util.rkt` General tools for scraping tasks.
-- `user-input.rkt` Helpers for interacting with users.
+- `html.rkt` Neil VanDyke's html parser

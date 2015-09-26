@@ -5,9 +5,18 @@
   ;; (-> String String Boolean)
   ;; True if the second string is contained within the first
 
+  string-count-chars
+  ;; (-> (U Char (-> Char Boolean)) String Natural)
+  ;; Count the number of characters satisfying the predicate
+
   string-empty?
-  ;; (-> String Boolean)
+  ;; (->* [String] [#:trim? Boolean #f] Boolean)
   ;; True if the argument is an empty string
+  ;; Optional argument #:trim decides whether to ignore whitespace.
+
+  string-normalize-downcase
+  ;; (-> String String)
+  ;; Filter non-alphabetic characters from the string & downcase what's left
 
   string-prefix?
   ;; (-> String String Boolean)
@@ -25,7 +34,10 @@
 )
 
 (require
-  (only-in racket/port with-input-from-string)
+  (only-in racket/port
+    with-input-from-string)
+  (only-in racket/string
+    string-trim)
 )
 
 ;; =============================================================================
@@ -38,8 +50,21 @@
       (char=? (string-ref str (+ i start))
               (string-ref sub i)))))
 
-(define (string-empty? s)
-  (zero? (string-length s)))
+(define (string-count-chars f str)
+  (define p (if (char? f) (lambda (c) (char=? c f)) f))
+  (for/sum ([c (in-string str)]
+            #:when (p c))
+    1))
+
+(define (string-empty? s #:trim? [trim? #f])
+  (let ([s/trim (if trim? (string-trim s) s)])
+    (zero? (string-length s/trim))))
+
+(define (string-normalize-downcase str)
+  (define char* (for/list ([c (in-string str)]
+                           #:when (char-alphabetic? c))
+                  (char-downcase c)))
+  (apply string char*))
 
 (define (string-prefix? str prefix)
   (define L1 (string-length str))
@@ -67,7 +92,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/rackunit-abbrevs)
+  (require rackunit ipoe/private/util/rackunit-abbrevs)
 
   ;; -- string-contains?
   (check-true* string-contains?
@@ -83,16 +108,58 @@
    ["racket" "kc"]
    ["racket" "racketr"])
 
+  ;; -- string-count-chars
+  (check-apply* string-count-chars
+   [#\4 "42" == 1]
+   [#\a "foo" == 0]
+   [#\x "" == 0]
+   [(lambda (c) (or (eq? c #\c) (eq? c #\d)))
+    "cadddr" == 4]
+  )
+
   ;; -- string-empty?
   (check-true* string-empty?
    [""]
    [(string)]
    [(make-string 0)]
-   [(string-append "" "")])
+   [(string-append "" "")]
+   [""]
+   [" " #:trim? #t]
+   ["\t" #:trim? #t]
+   ["\n" #:trim? #t]
+   ["\r" #:trim? #t]
+   ["\t\t\t" #:trim? #t]
+   ["    " #:trim? #t]
+   ["\n\r\t" #:trim? #t])
 
   (check-false* string-empty?
    ["a"]
-   ["b c d"])
+   [" hello "]
+   ["why\nnot\n"]
+   ["\ta\tb"]
+   ["a"]
+   ["b c d"]
+   ["\r"]
+   ["\t\t\t"]
+   ["    "])
+
+  ;; -- string-normalize-downcase
+  (check-apply* string-normalize-downcase
+    ["a" == "a"]
+    ["" == ""]
+    ["." == ""]
+    ["hello," == "hello"]
+    ["WHAT'S-THIS" == "whatsthis"]
+    ["161" == ""]
+    ["+_d!@#$%^&*(angi)<>?,t." == "dangit"]
+    ["asdf" == "asdf"]
+    ["cat61" == "cat"]
+    ["ARGH"  == "argh"]
+    ["waiT?" == "wait"]
+    ["don't" == "dont"]
+    ["hel,p" == "help"]
+    ["..,." == ""]
+    ["\t    \t " == ""])
 
   ;; -- string-prefix?
   (check-true* string-prefix?
