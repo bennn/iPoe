@@ -62,10 +62,11 @@
 )
 
 (require
+  ipoe/private/suggest
   ipoe/private/ui
   ipoe/private/util/string
   ;; --
-  (only-in racket/set mutable-set set-member? set-add!)
+  (only-in racket/set mutable-set set-member? set-add! set->list)
   (for-syntax racket/base syntax/parse racket/syntax)
   (only-in racket/file file->string file->lines)
 )
@@ -200,7 +201,12 @@
   ;; -- check for unknown keys
   (for ([k (in-hash-keys o*)])
     (unless (set-member? ALL-PARAMETERS k)
-      (alert (format "Unknown key '~a'" k))))
+      (define suggest-str ;; TODO abstract this, and try to do fewer symbol->string inline
+        (let ([r (filter-similar (symbol->string k)
+                   (map symbol->string (set->list ALL-PARAMETERS))
+                   #:limit 1 #:max-distance 2)])
+          (if r (format " Maybe you meant '~a'?" (car r)) "")))
+      (alert (format "Unknown key '~a'.~a" k suggest-str))))
   ;; -- update all parameters, use macro-defined identifiers to avoid typos
   (parameterize (
     [*user*  (hash-ref o* user *user*)]
