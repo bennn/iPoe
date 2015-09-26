@@ -208,15 +208,15 @@
           (when (*spellcheck?*)
             (define q* (check-spelling (poem->word/loc* P)))
             (poetic-license-apply L q*))
-          ;; -- Check rhyme scheme. TODO poetic license option/param
+          ;; -- Check rhyme scheme.
           (let ([rs '#,rs])
             (when (not (null? rs))
               (define q* (check-rhyme-scheme P rs))
               (poetic-license-apply L q*)))
           ;; -- Check extra validator
-          (let ([extra-q (#,check-extra P)])
-            (when (quirk? extra-q)
-              (poetic-license-apply L (list extra-q))))
+          (let ([extra-q* (#,check-extra P)])
+            (when (not (null? extra-q*))
+              (poetic-license-apply L extra-q*)))
           ;; --
           (poetic-license-report L)
           ;; -- Done! Return anything needed to make testing easy
