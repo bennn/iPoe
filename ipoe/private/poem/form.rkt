@@ -57,6 +57,7 @@
   (when old-val
     (user-error src (format "Parsed two ~as: '~a' and '~a'" msg old-val v))))
 
+;; TODO refactor into a command/db style parser. Heavily document options.
 ;; Read an input file as a poem form
 (define (make-form in)
   (define err-loc 'ipoe:parse)
@@ -157,7 +158,7 @@
   ;; (: check-extra #'(-> Poem Void))
   (define check-extra
     (or (form-extra-validator F) #'(lambda (x) #t)))
-  ;; -- Define the poem-checker as syntax, because
+  ;; -- Define the poem-checker as syntax
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
       (define configuring? (box #t))
