@@ -157,7 +157,7 @@
   (define ev    (form-extra-validator F))
   ;; (: check-extra #'(-> Poem Void))
   (define check-extra
-    (or (form-extra-validator F) #'(lambda (x) #t)))
+    (or (form-extra-validator F) #'(lambda (x) null)))
   ;; -- Define the poem-checker as syntax
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
