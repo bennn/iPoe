@@ -16,6 +16,7 @@
   racket/cmdline
   ipoe/private/db
   ipoe/private/parameters
+  ipoe/private/suggest
   ipoe/private/ui
   racket/match
   (only-in ipoe/private/util/sequence
@@ -194,6 +195,10 @@
   )
 ))
 
+(define COMMAND-ID*
+  (for/list ([cmd (in-list COMMAND*)])
+    (symbol->string (command-id cmd))))
+
 (define HELP-STR
   (string-join
     (for/list ([c (in-list COMMAND*)])
@@ -269,11 +274,23 @@
      ['EXIT
       (displayln "Goodbye")]
      [#f
-      (printf "Unrecognized command '~a'\n" input)
+      (printf "Unrecognized command '~a'.~a\n" input (suggest-cmd input))
       (loop)]
      [r
       (respond input r)
       (loop)])))
+
+;; TODO test
+(define (suggest-cmd cmd)
+  (match cmd
+   [(cons (? symbol? s) _)
+    (define sim* (filter-similar (symbol->string s) COMMAND-ID*
+                                 #:limit 1 #:max-distance 3))
+    (if (null? sim*)
+      ""
+      (format " Maybe you meant '~a'?" (car sim*)))]
+   [_
+    ""]))
 
 ;; -----------------------------------------------------------------------------
 

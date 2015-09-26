@@ -257,6 +257,8 @@
     (only-in racket/string string-split)
   )
 
+  ;; -- TODO redo tests
+
 ;  ;; -- helper function, convert a syntactic function into a lambda
 ;  (define (eval-extra-validator F)
 ;    (stx->validator (form-extra-validator F)))

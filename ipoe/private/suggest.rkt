@@ -4,10 +4,11 @@
 
 (provide
   filter-similar
-  ;; (->* [String (Sequenceof String)] [#:limit Natural] (Listof String))
-  ;; (filter-similar w w* #:limit N)
+  ;; (->* [String (Sequenceof String)] [#:limit Natural #:max-distance Natural] (Listof String))
+  ;; (filter-similar w w* #:limit N #:max-distance M)
   ;; Return the top `N` words from the sequence `w*` with respect to their
   ;;  levenshtein distance from `w`.
+  ;; No results will have distance greater than M.
 
   suggest-spelling
   ;; (-> String (Listof String))
