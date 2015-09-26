@@ -31,7 +31,6 @@
   ipoe/private/poem/poetic-license
   ipoe/private/parameters
   racket/match
-  (only-in racket/sequence sequence->list)
   (only-in ipoe/private/db
     add-word*
     with-ipoe-db
@@ -243,16 +242,17 @@
 
 (define validator-requires ;;TODO
   #'(require
-      ipoe/private
       ipoe/private/poem
-      (only-in racket/sequence sequence->list)))
+  (only-in ipoe/private/ui
+    debug alert)
+      ipoe/private/util/string))
 
 ;; =============================================================================
 
 (module+ test
   (require
     rackunit
-    ipoe/private/rackunit-abbrevs
+    ipoe/private/util/rackunit-abbrevs
     (only-in racket/port with-input-from-string)
     (only-in racket/string string-split)
   )
