@@ -43,7 +43,7 @@
    [("-r" "--rhyme") r-param
     "Declare a rhyme for the word" (*rhymes* (cons r-param (*rhymes*)))]
    [("-s" "--syllables") s-param
-    "Set number of syllables" (*syllables* s-param)]
+    "Set number of syllables" (*syllables* (string->number s-param))]
    #:args (w)
    (let ([wid (parameterize-from-hash (options-init)
                 (lambda ()
