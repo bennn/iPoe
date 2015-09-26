@@ -26,7 +26,7 @@
   ;; (and succeed on #f)
 
   (contract-out
-  [contains-word? (-> line/loc? string? boolean?)]
+  [contains-word? (-> line/loc? (or/c word/loc? string?) (or/c quirk? boolean?))]
   ;; (-> Line/Loc String Boolean)
   ;; True if the line contains the word
 
@@ -84,8 +84,7 @@
   ;; (-> Natural Line Word)
   ;; Get a word from a line
 
-  [word=? (-> word/loc? word/loc? boolean?)]
-  ;; (-> Word Word Either)
+  [word=? (->* [word/loc?] #:rest (listof word/loc?) (listof quirk?))]
   ;; Success if two words are equal
 ))
 
@@ -163,7 +162,6 @@
   (car w*))
 
 ;; TODO allow multi-word matchings. (So that w-param can be an integer, say)
-;; (: contains-word? (-> Line/Loc Word+ Boolean))
 (define (contains-word? line w-param)
   (define w1 (if (word/loc? w-param)
                  (word/loc-word w-param) ;; Keep the locations?
@@ -311,15 +309,12 @@
 ;; (: word=? (-> Word Word * Either))
 (define (word=? w1/loc . w*/loc)
   (define w1 (word/loc-word w1/loc))
-  (define r
-    (for/first ([w2/loc (in-list w*/loc)]
-                #:when (not (string=? w1 (word/loc-word w2/loc))))
-      (quirk (*bad-extra-penalty*)
-             (format "~a and ~a must match"
-               (word/loc->string w1/loc)
-               (word/loc->string w2/loc)))))
-  (or (eq? #f r)
-      r))
+  (for/list ([w2/loc (in-list w*/loc)]
+             #:when (not (string=? w1 (word/loc-word w2/loc))))
+    (quirk (*bad-extra-penalty*)
+           (format "~a and ~a must match"
+             (word/loc->string w1/loc)
+             (word/loc->string w2/loc)))))
 
 ;; -----------------------------------------------------------------------------
 ;; --- private

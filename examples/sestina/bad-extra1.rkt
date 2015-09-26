@@ -1,4 +1,4 @@
-#lang ipoe/sesta-rima
+#lang ipoe/sestina
 
 It raining on black coal and warm wet ashes.
 There are tyre-marks in the yard, Agnew's old lorry
