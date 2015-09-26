@@ -26,6 +26,9 @@
 
 ;; =============================================================================
 
+;; TODO need a better design for costs. (U #f Natural) is not really working;
+;;  sometimes we want to ignore costs
+
 ;; A `quirk` represents something unexpected that we found while
 ;;  checking the poem.
 ;; i.e. spelling errors, stanza mismatches
@@ -64,11 +67,12 @@
         (poetic-license-apply L qt))]))
 
 ;; Subtract the cost from the license
+;; If cost is `#f`, you are dead.
 ;; (: poetic-license-deduct (-> License Quirk Void))
 (define (poetic-license-deduct L q)
   (define c (quirk->cost q))
   (define old-c (unbox (license-credit L)))
-  (define new-c (- old-c (or c old-c)))
+  (define new-c (- old-c (or c (add1 old-c))))
   (set-box! (license-credit L) new-c)
   (define old-q* (unbox (license-quirk* L)))
   (set-box! (license-quirk* L) (cons q old-q*)))
@@ -97,7 +101,8 @@
 (define (prune-quirk* q*)
   (for/fold ([acc '()])
             ([q (in-list q*)]
-             #:when (positive? (quirk->cost q)))
+             #:when (let ([c (quirk->cost q)])
+                      (or (not c) (<= 0 c))))
     (cons q acc)))
 
 ;; =============================================================================
