@@ -38,7 +38,7 @@
   >string
   ;; String
   ;; Used to report a quirk to the user
-) #:transparent )
+) #:prefab )
 
 (struct license (
   credit
@@ -48,7 +48,7 @@
   quirk*
   ;; (Boxof (Listof Quirk))
   ;; List of accepted quirks.
-) #:transparent )
+) #:prefab )
 
 ;; -----------------------------------------------------------------------------
 

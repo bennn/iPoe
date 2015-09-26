@@ -133,7 +133,7 @@
   stanza*
   ;; (Vectorof (Vectorof (Vectorof Word)))
   ;; Normalized stanzas. This is where the magic happens.
-) #:transparent )
+) #:prefab )
 
 ;; -----------------------------------------------------------------------------
 
