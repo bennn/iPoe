@@ -815,6 +815,8 @@
       #:description descr))
   ;; TODO this is ugly
   (cond
+   [(and (not syllables) (not ref-syllables))
+    (get-user-syllables)] ;; A hack, for presentation 09-27
    [(not syllables)
     (if interactive?
       (if (not ref-syllables)
