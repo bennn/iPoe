@@ -72,7 +72,7 @@
       (let ([w (string-normalize-downcase str)])
         (cond
          [(string-empty? w)
-          (alert (format "Cannot parse string '~a', ignoring it." w))
+          ;(alert (format "Cannot parse string '~a', ignoring it." w))
           '()]
          [else (list w)]))))
 
