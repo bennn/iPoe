@@ -8,13 +8,13 @@
   successive stanza following a rotating pattern. Furthermore
   the 3-line end stanza must contain 2 of these end words on
   each line."
-#:rhyme-scheme ((* * * * * *)
-                (* * * * * *)
-                (* * * * * *)
-                (* * * * * *)
-                (* * * * * *)
-                (* * * * * *)
-                (* * *))
+#:rhyme-scheme {[* * * * * *]
+                [* * * * * *]
+                [* * * * * *]
+                [* * * * * *]
+                [* * * * * *]
+                [* * * * * *]
+                [* * *]}
 #:extra-validator
   (lambda (P)
     (append (apply append

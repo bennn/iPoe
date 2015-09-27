@@ -1,6 +1,6 @@
 #lang ipoe/villanelle
 
-#:poetic-license 30
+#:poetic-license 1
 
 
 Do not go gentle into that good night,

@@ -1,6 +1,5 @@
 #lang ipoe/english-sonnet
 
-#:poetic-license 10
 
 Shall I compare thee to a summer's day?
 Thou art more lovely and more temperate:

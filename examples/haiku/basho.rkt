@@ -1,7 +1,6 @@
 #lang ipoe/haiku
 
-#:poetic-license 30
-#:bad-syllables-penalty 5
+#:poetic-license 3
 
 No blossoms and no moon,
 and he is drinking sake
