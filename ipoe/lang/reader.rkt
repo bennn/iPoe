@@ -34,19 +34,6 @@
            (provide (rename-out [custom-read read]
                                 [custom-read-syntax read-syntax]))
            default-requires
-           (require ;;TODO really need all this?
-             ipoe/private/poem
-             ipoe/private/poem/check-rhyme-scheme
-             ipoe/private/poem/check-spelling
-             ipoe/private/poem/poetic-license
-             ipoe/private/parameters
-             (only-in ipoe/private/ui alert)
-             (only-in ipoe/private/db
-               with-ipoe-db
-               add-word*
-               ipoe-db-connected?
-               word-exists?)
-             (only-in syntax/strip-context strip-context))
            (define (custom-read in) (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)
              (with-syntax ([str (validate in)])

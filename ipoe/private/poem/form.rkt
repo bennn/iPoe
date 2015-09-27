@@ -235,11 +235,21 @@
        ;;   (-> (Listof (Listof String)) Boolean) contract
        expr))
 
-(define validator-requires ;;TODO
-  #'(require
+(define validator-requires
+  #'(require ;; TODO really need all this?
       ipoe/private/poem
-  (only-in ipoe/private/ui
-    debug alert)
+      ipoe/private/poem
+      ipoe/private/poem/check-rhyme-scheme
+      ipoe/private/poem/check-spelling
+      ipoe/private/poem/poetic-license
+      ipoe/private/parameters
+      ipoe/private/ui
+      (only-in ipoe/private/db
+        with-ipoe-db
+        add-word*
+        ipoe-db-connected?
+        word-exists?)
+      (only-in syntax/strip-context strip-context)
       ipoe/private/util/string))
 
 ;; =============================================================================
