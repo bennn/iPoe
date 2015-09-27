@@ -106,6 +106,7 @@
 (define-parameter bad-rhyme-penalty 3)
 (define-parameter bad-stanza-penalty #f)
 (define-parameter bad-syllable-penalty 1)
+(define-parameter repeat-rhyme-penalty 3)
 (define-parameter spelling-error-penalty 0)
 
 ;; -----------------------------------------------------------------------------

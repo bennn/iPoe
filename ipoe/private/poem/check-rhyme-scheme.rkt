@@ -126,6 +126,12 @@
   (for ([k+v (in-list kv*)])
     (varmap-add! vm (car k+v) (cdr k+v))))
 
+;; TODO test
+(define (varmap-exists? vm w)
+  (for/first ([(k v) (in-hash (varmap-vm vm))]
+              #:when (rhyme=? w v))
+    k))
+
 (define (varmap-init)
   (varmap (make-hasheq)))
 
@@ -266,6 +272,15 @@
              (word/loc-w-num W1)
              (word/loc-l-num W1)
              (word/loc-s-num W1)))])]
+     [(varmap-exists? vm W1)
+      => (lambda (s)
+      (quirk (*repeat-rhyme-penalty*)
+        (format "Words that rhyme with '~a' are already bound to the symbol ~a. Expected a new rhyme (word ~a, line ~a, stanza ~a)"
+          (word/loc-word W1)
+          s
+          (word/loc-w-num W1)
+          (word/loc-l-num W1)
+          (word/loc-s-num W1))))]
      [else
       (varmap-add! vm v W1)]))))
 
