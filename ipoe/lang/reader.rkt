@@ -24,10 +24,10 @@
   (syntax->datum (ipoe-read-syntax #f in)))
 
 (define (ipoe-read-syntax src-path in)
-   (define ps (make-form in))
-   (with-syntax ([mod-id   (format-id #f "~a" (form-name ps))]
-                 [descr    (form-description ps)]
-                 [validate (form->validator ps)]
+   (define F (make-form in))
+   (with-syntax ([mod-id   (format-id #f "~a" (form-name F))]
+                 [descr    (form-description F)]
+                 [validate (form->validator F)]
                  [default-requires  validator-requires])
      (strip-context
        #'(module mod-id racket/base
