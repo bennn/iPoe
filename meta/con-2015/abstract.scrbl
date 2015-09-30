@@ -1,9 +1,12 @@
 #lang scribble/sigplan @nocopyright
 
+@require[scribble/core]
 @require[scribble/manual]
 @require[scriblib/footnote]
 @require{bib.rkt}
 @define[ipoe @elem{iPoe}]
+@(define (exact . items)
+   (make-element (make-style "relax" '(exact-chars)) items))
 
 
 @title{A #lang For All Seasons}
@@ -27,10 +30,10 @@ This is precisely because Racket lets us express the system at a high level of a
 The following couplet is by Alexander Pope@~cite[essay-on-man].
 Prepending a language declaration @tt{#lang ipoe/couplet} above the couplet makes a complete @ipoe program.
 
-@codeblock{
+@exact|{\small\begin{verbatim}
     Hope spings eternal in the human breast,
     Man never is, but always to be blest.
-}
+\end{verbatim}}|
 
 Like all couplets of Pope's day, it is composed of two rhyming lines of iambic pentameter.
 The specification languge @tt{ipoe/couplet} captures the essence of this poetic form:
@@ -68,25 +71,25 @@ We leave these ideas to future work.
 While couplets are verse in their own right, they often appear as part of a larger poem.
 The English (or Shakespearian) Sonnet, for example, always ends with a couplet@~cite[shakes]:
 
-@codeblock{
-    Shall I compare thee to a summer's day?
-    Thou art more lovely and more temperate:
-    Rough winds do shake the darling buds of May,
-    And summer's lease hath all too short a date:
+@exact|{\small\begin{verbatim}
+ Shall I compare thee to a summer's day?
+ Thou art more lovely and more temperate:
+ Rough winds do shake the darling buds of May,
+ And summer's lease hath all too short a date:
 
-    Sometime too hot the eye of heaven shines,
-    And often is his gold complexion dimmed,
-    And every fair from fair sometime declines,
-    By chance, or nature's changing course untrimmed:
+ Sometime too hot the eye of heaven shines,
+ And often is his gold complexion dimmed,
+ And every fair from fair sometime declines,
+ By chance, or nature's changing course untrimmed:
 
-    But thy eternal summer shall not fade,
-    Nor lose possession of that fair thou ow'st,
-    Nor shall death brag thou wander'st in his shade,
-    When in eternal lines to time thou grow'st,
+ But thy eternal summer shall not fade,
+ Nor lose possession of that fair thou ow'st,
+ Nor shall death brag thou wander'st in his shade,
+ When in eternal lines to time thou grow'st,
 
-    So long as men can breathe, or eyes can see,
-    So long lives this, and this gives life to thee.
-}
+ So long as men can breathe, or eyes can see,
+ So long lives this, and this gives life to thee.
+\end{verbatim}}|
 
 We can specify English Sonnets using the same techniques from the couplet specification.
 For brevity, however, we use the new directive @tt{#:syllables} to declare that all lines, unless otherwise specified, should contain 10 syllables.
@@ -135,32 +138,32 @@ Here are some classics:
 But some forms have additional structure.
 Here is a famous villanelle by Sylvia Plath@~cite[plath]:
 
-@codeblock{
-    I shut my eyes and all the world drops dead;
-    I lift my lids and all is born again.
-    (I think I made you up inside my head.)
+@exact|{\small\begin{verbatim}
+ I shut my eyes and all the world drops dead;
+ I lift my lids and all is born again.
+ (I think I made you up inside my head.)
 
-    The stars go waltzing out in blue and red,
-    And arbitrary blackness gallops in:
-    I shut my eyes and all the world drops dead.
+ The stars go waltzing out in blue and red,
+ And arbitrary blackness gallops in:
+ I shut my eyes and all the world drops dead.
 
-    I dreamed that you bewitched me into bed
-    And sung me moon-struck, kissed me quite insane.
-    (I think I made you up inside my head.)
+ I dreamed that you bewitched me into bed
+ And sung me moon-struck, kissed me quite insane.
+ (I think I made you up inside my head.)
 
-    God topples from the sky, hell's fires fade:
-    Exit seraphim and Satan's men:
-    I shut my eyes and all the world drops dead.
+ God topples from the sky, hell's fires fade:
+ Exit seraphim and Satan's men:
+ I shut my eyes and all the world drops dead.
 
-    I fancied you'd return the way you said,
-    But I grow old and I forget your name.
-    (I think I made you up inside my head.)
+ I fancied you'd return the way you said,
+ But I grow old and I forget your name.
+ (I think I made you up inside my head.)
 
-    I should have loved a thunderbird instead;
-    At least when spring comes they roar back again.
-    I shut my eyes and all the world drops dead.
-    (I think I made you up inside my head.)
-}
+ I should have loved a thunderbird instead;
+ At least when spring comes they roar back again.
+ I shut my eyes and all the world drops dead.
+ (I think I made you up inside my head.)
+\end{verbatim}}|
 
 Using the tools developed so far, we can give a partial specification for this and other villanelles:
 
@@ -198,21 +201,21 @@ The real benefit of these constraints is that, once encoded, they make it very e
 Villanelles are not too difficult to check by hand, but other forms are quite complicated.
 For example, the first two stanzas of Seamus Heaney's @emph{Two Lorries}@~cite[heaney] demonstrate the @emph{sestina's} word-cycling structure:
 
-@codeblock{
-    It's raining on black coal and warm wet ashes.
-    There are tyre-marks in the yard, Agnew's old lorry
-    Has all its cribs down and Agnew the coalman
-    With his Belfast accent's sweet-talking my mother.
-    Would she ever go to a film in Magherafelt?
-    But it's raining and he still has half the load
+@exact|{\small\begin{verbatim}
+ It's raining on black coal and warm wet ashes.
+ There are tyre-marks in the yard, Agnew's old lorry
+ Has all its cribs down and Agnew the coalman
+ With his Belfast accent's sweet-talking my mother.
+ Would she ever go to a film in Magherafelt?
+ But it's raining and he still has half the load
 
-    To deliver farther on. This time the load
-    Our coal came from was silk-black, so the ashes
-    Will be the silkiest white. The Magherafelt
-    (Via Toomebridge) bus goes by. The half-stripped lorry
-    With its emptied, folded coal-bags moves my mother:
-    The tasty ways of a leather-aproned coalman!
-}
+ To deliver farther on. This time the load
+ Our coal came from was silk-black, so the ashes
+ Will be the silkiest white. The Magherafelt
+ (Via Toomebridge) bus goes by. The half-stripped lorry
+ With its emptied, folded coal-bags moves my mother:
+ The tasty ways of a leather-aproned coalman!
+\end{verbatim}}|
 
 Here, the constraint should include terms like:
 
@@ -251,14 +254,14 @@ Second, create a file @tt{portrait/lang/reader.rkt} and fill it with:
 Finally, run the command @tt{raco pkg install ./portrait} to install the language.
 Now we can check and approve poems like the following@~cite[joyce]:
 
-@codeblock{
-    #;lang portrait
+@exact|{\small\begin{verbatim}
+    #lang portrait
 
     Stephen Daedelus is my name
     Ireland is my nation
     Clongowes is my dwelling place
     And heaven my expectation
-}
+\end{verbatim}}|
 
 Wonderful!
 Now, the reason it is @tt{#lang portrait} and not @tt{#lang ipoe/portrait} is that we created and installed a new Racket package.
@@ -282,23 +285,23 @@ Finally, although we have argued that Racket is the ideal language to implement 
 After all, Java, C, and Haskell are all Turing complete, and at least Haskell has many powerful libraries for extending the core language.
 Indeed@~cite[ct-limerick]:
 
-@codeblock{
+@exact|{\small\begin{verbatim}
     Each computer, in theory, is suitable
     To attack any problem computable.
     This thesis (Church Turing),
     Unproven, alluring,
     Remains, as we speak, irrefutable
-}
+\end{verbatim}}|
 
 Point taken, but in closing we would like to remind readers that:
 
-@codeblock{
+@exact|{\small\begin{verbatim}
     The gap between theory and practice
     is, quite frequently, drastic.
     And the programming language
     can help you or hang you --
     that's why I prefer hacking in Racket
-}
+\end{verbatim}}|
 
 @generate-bibliography[]
 
