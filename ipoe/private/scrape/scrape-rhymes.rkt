@@ -25,7 +25,6 @@
   ipoe/private/scrape/scrape-util
   (only-in sxml sxpath if-car-sxpath)
   (only-in racket/string string-trim string-join)
-  racket/set
 )
 
 ;; =============================================================================
