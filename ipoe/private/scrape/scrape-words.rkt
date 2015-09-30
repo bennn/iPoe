@@ -34,7 +34,7 @@
       (american-heritage w)
       (merriam-webster w)
       (the-free-dictionary w)
-      (urban-dictionary w)))
+      #;(urban-dictionary w)))
 
 ;; -----------------------------------------------------------------------------
 ;; Data Definition: Word Scraper
@@ -74,7 +74,6 @@
     (define url (word->url word))
     (define sxml (url->sxml url))
     (define w-res (sxml->word sxml))
-    (printf "WRES is ~a\n" w-res)
     (and
       w-res
       (string=? word w-res)
@@ -194,6 +193,23 @@
     ;; src
     'american-heritage)))
 
+;(define urban-dictionary
+;  (word-scraper
+;    ;; word->url
+;    (lambda (w) (string-append "http://www.urbandictionary.com/define.php?term=" w))
+;
+;    ;; sxml->definition
+;    (if-car-sxpath `(// div ,(class? "meaning") *text*))
+;
+;    ;; sxml->num-syllables (not stored on urbandict!)
+;    (lambda (sxml) #f)
+;
+;    ;; sxml->word
+;    (if-car-sxpath `(// div ,(class? "def-header") span *text*))
+;
+;    ;; src
+;    'urban-dictionary))
+
 ;; =============================================================================
 
 (module+ main
@@ -249,6 +265,12 @@
     ["stopping" == #f] ;; Word converted to root -- scraping should fail
   )
 
+;  (check-apply* urban-dictionary
+;   ["match" == #t]
+;   [not-a-word == #f]
+;   ["leagues" == #f]
+;  )
+
   (define (check-syllables scraper w)
     (word-result-num-syllables (scraper w)))
 
@@ -258,8 +280,8 @@
    [merriam-webster "each" == 1]
    [american-heritage "each" == 1]
    [american-heritage "every" == 2]
-   [american-heritage "day" == 1]
-   [urban-dictionary "magnificent" == #f]
-   [urban-dictionary "cat" == #f])
+   [american-heritage "day" == 1])
+   ;[urban-dictionary "magnificent" == #f]
+   ;[urban-dictionary "cat" == #f]
 
 )
