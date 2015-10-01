@@ -5,7 +5,7 @@
 (provide
   scrape-word
   ;; (-> String Word-Result)
-  ;; Search a poem for new words.
+  ;; Search the internet for a new word.
 
   (struct-out word-result)
 )
@@ -23,8 +23,8 @@
 
 (struct word-result (
   word ;; String, the result word
-  definition ;; (U #f String), a definition of the word
-  num-syllables ;; (U #f Natural), number of syllables in the word
+  definition ;; String, a definition of the word
+  num-syllables ;; Natural, number of syllables in the word
   src ;; Symbol, describes where this information came from
 ) #:prefab ) ;; prefab to easily serialize the db cache
 
