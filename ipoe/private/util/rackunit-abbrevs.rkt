@@ -24,31 +24,56 @@
 (require
   rackunit
   (only-in racket/port port->string port->lines)
-  (for-syntax racket/base syntax/parse)
+  (for-syntax racket/base syntax/parse rackunit syntax/stx)
 )
 
 ;; =============================================================================
 
+;;bg; copied from rackunit library (location.rkt)
+(define-for-syntax (syntax->location stx)
+  (list (syntax-source stx)
+   (syntax-line stx)
+   (syntax-column stx)
+   (syntax-position stx)
+   (syntax-span stx)))
+
 (define-syntax (check-true* stx)
   (syntax-parse stx
-    [(_ f [arg* ...] ...)
-     (syntax/loc stx (begin (check-true (f arg* ...)) ...))]
+    [(_ f [arg* ...] ...+)
+     (define loc (syntax->location stx))
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda () (check-true (f arg* ...)) ...)))]
     [_ (error 'check-true* "Expected (check-true* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
 (define-syntax (check-false* stx)
   (syntax-parse stx
-    [(_ f [arg* ...] ...)
-     (syntax/loc stx (begin (check-false (f arg* ...)) ...))]
+    [(_ f [arg* ...] ...+)
+     (define loc (syntax->location stx))
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda () (check-false (f arg* ...)) ...)))]
     [_ (error 'check-false* "Expected (check-false* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
-;; TODO fails when mixing == and !=, should really pick the right check- variant
 (define-syntax (check-apply* stx)
+  (define loc (syntax->location stx))
   (syntax-parse stx #:datum-literals (== !=)
-    [(_ f [arg* ... == res] ...)
-     (syntax/loc stx (begin (check-equal? (f arg* ...) res) ...))]
-    [(_ f [arg* ... != res] ...)
-     (syntax/loc stx (begin (check-not-equal? (f arg* ...) res) ...))]
-    [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
+    [(_ f [arg* ... (~or != ==) res] ...+)
+     ;; Well-formed call, map each [arg ... res] to a check
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda ()
+           #,@(stx-map
+             (lambda (s)
+               (syntax-parse s #:datum-literals (== !=)
+                [[arg* ... == res]
+                 (syntax/loc stx (check-equal? (f arg* ...) res))]
+                [[arg* ... != res]
+                 (syntax/loc stx (check-not-equal? (f arg* ...) res))]
+                [_
+                 (syntax/loc stx (void))]))
+           stx))))]
+    [_ (error 'check-apply* (format "~e\n    Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.\n    Got ~a" loc (syntax->datum stx)))]))
 
 (define (check-print spec f)
   (define-values [in out] (make-pipe))
@@ -72,7 +97,7 @@
     (error 'ipoe:check-print "Cannot understand spec '~a'\n" spec)]))
 
 
-;; =============================================================================
+;;; =============================================================================
 
 (module+ test
 
@@ -146,12 +171,11 @@
     [1 != -1]
   )
 
-  ;; TODO
-  ;(check-apply* (lambda (x) x)
-  ;  [1 == 1]
-  ;  [1 != 2]
-  ;  [2 == 2]
-  ;  [3 != 0])
+  (check-apply* (lambda (x) x)
+    [1 == 1]
+    [1 != 2]
+    [2 == 2]
+    [3 != 0])
 
   ;; -- check-print
   (let ([msg ""])
@@ -181,4 +205,14 @@
       (lambda ()
         (for ([i (in-range 3)]) (printf "~a ~a\n" i (gensym))))))
 
+  ;; -- Syntax error to forget function, or test cases
+;  (define-syntax-rule (test-syntax-error m ...)
+;    (begin
+;     (begin
+;      (check-exn #rx"check-"
+;        (lambda () (m (lambda () x))))
+;      (check-exn #rx"check-"
+;        (lambda () (m [#t])))) ...))
+;
+;  (test-syntax-error check-true* check-false* check-apply*)
 )

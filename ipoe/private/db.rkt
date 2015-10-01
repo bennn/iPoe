@@ -1731,7 +1731,7 @@
     ["asbferufvzfjuvfds" == #f]
   )
 
-  ;; Should run a local algorithm (and get the wrong answer for "hour"
+  ;; Should run a local algorithm (and get the wrong answer for "hour")
   (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #f))
     ["hour" == 2]
   )
