@@ -122,12 +122,12 @@
 
 ;;(define *logfile* (make-parameter #f))
 
-(define DBNAME-PROMPT "Enter the name of your local ipoe database (Leave blank to skip):")
+(define DBNAME-PROMPT "Enter the name of your local ipoe database:")
 (define DBNAME-DESCRIPTION
   (string-append "Missing run-time parameter for ipoe database name. "
                  "Please enter the database name."))
 
-(define USER-PROMPT "Enter your database username (Leave blank to skip):")
+(define USER-PROMPT "Enter your database username:")
 (define USER-DESCRIPTION
   (string-append "Missing run-time parameter for database username. "
                  "Please enter a username to connect to the ipoe database."))
@@ -151,6 +151,7 @@
                 (and interactive?
                      (not online?)
                      (get-user-input read-string
+                                     #:nullable? #t
                                      #:prompt USER-PROMPT
                                      #:description USER-DESCRIPTION))))
   (define db (or db-param
@@ -158,6 +159,7 @@
                  (and interactive?
                       (not online?)
                       (get-user-input read-string
+                                      #:nullable? #t
                                       #:prompt DBNAME-PROMPT
                                       #:description DBNAME-DESCRIPTION))))
   (cond

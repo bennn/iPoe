@@ -12,7 +12,7 @@
   ;; Display a debugging message to the user
 
   get-user-input
-  ;; (->* [(-> String A) #:prompt String] [#:descr (U #f String)] A)
+  ;; (->* [(-> String A) #:prompt String] [#:nullable? Boolean #:descr (U #f String)] A)
   ;; Run a simple interactive loop to get input from (current-input-port).
   ;; The first argument is used to accept/reject input at each step.
   ;; @optional{descr} Detailed information about what the user should enter 
@@ -42,8 +42,9 @@
   read-yes-or-no
   ;; (-> String (U 'Y 'N #f))
   ;; Read a yes-or-no input
-
 )
+
+;; -----------------------------------------------------------------------------
 
 (require
   readline ;; For a much-improved REPL experience
@@ -62,6 +63,7 @@
 ;; Prompt the user until he/she/it returns someting `valid?`
 (define (get-user-input valid?
                         #:prompt prompt-str
+                        #:nullable? [nullable? #f]
                         #:description [desc-str #f])
   ;; TODO use something more general/gui-friendly than printf
   (when desc-str (alert desc-str))
@@ -70,14 +72,18 @@
     (parameterize ([readline-prompt #"ipoe> "])
       (read)))
   (let loop ([response (read/prompt)])
-    (or (valid? response)
-        (begin
-         ;; Optimistically send a help message
-         (when (and desc-str (or (regexp-match "help" response)
-                                 (regexp-match "\\?"  response)))
-           (alert desc-str))
-         ;; Re-show the prompt and loop
-         (loop (read/prompt))))))
+    (cond
+     [(and nullable? (eq? #f response))
+      #f]
+     [(valid? response)
+      => (lambda (x) x)]
+     [else
+      ;; Optimistically send a help message
+      (when (and desc-str (or (regexp-match "help" response)
+                              (regexp-match "\\?"  response)))
+        (alert desc-str))
+      ;; Re-show the prompt and loop
+      (loop (read/prompt))])))
 
 (define (internal-error src str)
   (define err-loc (string->symbol (format "ipoe:~a:internal-error" src)))
