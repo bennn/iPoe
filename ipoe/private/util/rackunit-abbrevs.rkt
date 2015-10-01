@@ -73,7 +73,7 @@
                 [_
                  (syntax/loc stx (void))]))
            stx))))]
-    [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
+    [_ (error 'check-apply* (format "~e\n    Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.\n    Got ~a" loc (syntax->datum stx)))]))
 
 (define (check-print spec f)
   (define-values [in out] (make-pipe))
