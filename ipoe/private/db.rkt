@@ -481,10 +481,9 @@
        (add-rhyme/unsafe wid rid #:db pgc)))
 
 (define (add-rhyme/unsafe wid rid #:db [pgc (*connection*)])
-  (define q* (list "INSERT INTO word_rhymes (word, rhyme) VALUES ($1, $2);"
-                   "INSERT INTO word_rhymes (word, rhyme) VALUES ($2, $1);"))
-  (for ([q-str (in-list q*)])
-    (query-exec pgc q-str wid rid)))
+  (query-exec pgc "INSERT INTO word_rhymes (word, rhyme) VALUES ($1, $2);" wid rid)
+  (unless (= wid rid)
+    (query-exec pgc "INSERT INTO word_rhymes (word, rhyme) VALUES ($1, $2);" rid wid)))
 
 ;; --- add-almost-rhyme
 
@@ -509,10 +508,9 @@
        (add-almost-rhyme/unsafe wid aid #:db pgc)))
 
 (define (add-almost-rhyme/unsafe wid aid #:db [pgc (*connection*)])
-  (define q* (list "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($1, $2);"
-                   "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($2, $1);"))
-  (for ([q-str (in-list q*)])
-    (query-exec pgc q-str wid aid)))
+  (query-exec pgc "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($1, $2);" wid aid)
+  (unless (= wid aid)
+    (query-exec pgc "INSERT INTO word_almost_rhymes (word, almost_rhyme) VALUES ($1, $2);" aid wid)))
 
 ;; -----------------------------------------------------------------------------
 ;; --- add-word
@@ -815,8 +813,6 @@
       #:description descr))
   ;; TODO this is ugly
   (cond
-   [(and (not syllables) (not ref-syllables))
-    (get-user-syllables)] ;; A hack, for presentation 09-27
    [(not syllables)
     (if interactive?
       (if (not ref-syllables)
@@ -826,7 +822,7 @@
          [(Y) ref-syllables]
          [(N) (get-user-syllables)]))
       ref-syllables)]
-   [(or (= syllables ref-syllables) (not ref-syllables))
+   [(or (not ref-syllables) (= syllables ref-syllables))
     ;; Validated user input against trusted source, or just trust user for unknown word
     syllables]
    [interactive?
@@ -1082,7 +1078,7 @@
            [aid (add-word/unsafe a)])
       (add-almost-rhyme/unsafe wid aid)
       (check-true (almost-rhymes-with?/id wid aid))
-      (check-false (almost-rhymes-with?/id aid wid))))
+      (check-true (almost-rhymes-with?/id aid wid))))
 
   (let ([rx #rx"find-r"])
     (check-exn rx
@@ -1098,7 +1094,7 @@
            [rid (add-word/unsafe r)])
       (add-rhyme/unsafe wid rid)
       (check-true (rhymes-with?/id wid rid))
-      (check-false (rhymes-with?/id rid wid))))
+      (check-true (rhymes-with?/id rid wid))))
 
   (let ([rx #rx"find-r"])
     (check-exn rx
@@ -1278,8 +1274,8 @@
        (list s1))
       (add-syllables/unsafe wid s2)
       (check-equal?
-       (sequence->list (word->syllables* w))
-       (list s1 s2))))
+       (sort (sequence->list (word->syllables* w)) <)
+       (sort (list s1 s2) <))))
 
   (check-exn #rx"word->syllables*"
     (lambda () (word->syllables* "yolo")))
@@ -1371,6 +1367,20 @@
       (lambda () (add-syllables/id wid s)))
     (check-exn rx2
       (lambda () (with-online-test (add-syllables/id wid s)))))
+
+  ;; -- add-(almost-)rhyme, refl should not fail
+  (with-db-test
+    (let* ([w "sdfgyhujiuytrew"]
+           [wid (add-word/unsafe w)])
+      ;; -- don't rhyme at first
+      (check-false (rhymes-with? w w))
+      (check-false (almost-rhymes-with? w w))
+      ;; -- add
+      (add-rhyme/unsafe wid wid)
+      (add-almost-rhyme/unsafe wid wid)
+      ;; -- now it rhymes
+      (check-true (rhymes-with? w w))
+      (check-true (almost-rhymes-with? w w))))
 
   ;; -- add-rhyme, etc
   (let ([r-fun* (list add-rhyme* add-rhyme*/id add-rhyme add-rhyme/id add-rhyme/unsafe)]
