@@ -74,13 +74,12 @@
     (define url (word->url word))
     (define sxml (url->sxml url))
     (define w-res (sxml->word sxml))
+    (define d-res (sxml->definition sxml))
+    (define s-res (sxml->num-syllables sxml))
     (and
-      w-res
-      (string=? word w-res)
-      (word-result word
-        (sxml->definition sxml)
-        (sxml->num-syllables sxml)
-        src)))
+      w-res d-res s-res
+      (string-ci=? word w-res)
+      (word-result word d-res s-res src)))
 )
 
 ;; -----------------------------------------------------------------------------
@@ -230,6 +229,7 @@
 
   (check-apply* (lambda (w) (word-result? (scrape-word w)))
    ["yes" == #t]
+   ["mississippi" == #t]
    [not-a-word == #f]
   )
 
