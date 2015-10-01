@@ -24,7 +24,7 @@
 (require
   rackunit
   (only-in racket/port port->string port->lines)
-  (for-syntax racket/base syntax/parse rackunit)
+  (for-syntax racket/base syntax/parse rackunit syntax/stx)
 )
 
 ;; =============================================================================
@@ -55,18 +55,24 @@
          (lambda () (check-false (f arg* ...)) ...)))]
     [_ (error 'check-false* "Expected (check-false* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
-;; TODO fails when mixing == and !=, should really pick the right check- variant
 (define-syntax (check-apply* stx)
   (define loc (syntax->location stx))
   (syntax-parse stx #:datum-literals (== !=)
-    [(_ f [arg* ... == res] ...+)
+    [(_ f [arg* ... (~or != ==) res] ...+)
+     ;; Well-formed call, map each [arg ... res] to a check
      (quasisyntax/loc stx
        (with-check-info* (list (make-check-location '#,loc))
-         (lambda () (check-equal? (f arg* ...) res) ...)))]
-    [(_ f [arg* ... != res] ...+)
-     (quasisyntax/loc stx
-       (with-check-info* (list (make-check-location '#,loc))
-         (lambda () (check-not-equal? (f arg* ...) res) ...)))]
+         (lambda ()
+           #,@(stx-map
+             (lambda (s)
+               (syntax-parse s #:datum-literals (== !=)
+                [[arg* ... == res]
+                 (syntax/loc stx (check-equal? (f arg* ...) res))]
+                [[arg* ... != res]
+                 (syntax/loc stx (check-not-equal? (f arg* ...) res))]
+                [_
+                 (syntax/loc stx (void))]))
+           stx))))]
     [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
 
 (define (check-print spec f)
@@ -165,12 +171,11 @@
     [1 != -1]
   )
 
-  ;; TODO
-  ;(check-apply* (lambda (x) x)
-  ;  [1 == 1]
-  ;  [1 != 2]
-  ;  [2 == 2]
-  ;  [3 != 0])
+  (check-apply* (lambda (x) x)
+    [1 == 1]
+    [1 != 2]
+    [2 == 2]
+    [3 != 0])
 
   ;; -- check-print
   (let ([msg ""])
