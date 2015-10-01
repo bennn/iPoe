@@ -421,10 +421,10 @@
        ['third ==  #t]])
     ;; --- error
     (check-exn (regexp "ipoe:config")
-      (lambda () (test-from-file ["gibberish"] 0 [])))
+      (lambda () (test-from-file ["gibberish"] 0 [[#t == #t]])))
     ;; --- whitespace in value
     (check-exn (regexp "Error reading configuration")
-      (lambda () (test-from-file ["#:opt \"some value\""] 0 []))))
+      (lambda () (test-from-file ["#:opt \"some value\""] 0 [[#t == #t]]))))
 
   ;; -- option?
   (check-false* option?
@@ -454,7 +454,7 @@
   (let* ([opt (options-init)]
          [init-count (options-count opt)]
          [o1  (option? "#:online? #f")]
-         [o2  (option? "  #:bad-lines-penalty -666")]
+         [o2  (option? "  #:bad-rhyme-penalty -666")]
          [o3  (option? "nothin")]
          [o4  (option? "#:not real")])
     (for ([o (in-list (list o1 o2 o3 o4))])
@@ -462,16 +462,16 @@
     ;; -- pre-test
     (check-true (< init-count (options-count opt)))
     (check-true (*online?*))
-    (check-true (<= 0 (*bad-lines-penalty*)))
+    (check-true (<= 0 (*bad-rhyme-penalty*)))
     (check-print
-      "Unknown key 'not'\n"
+      "Unknown key 'not'.\n"
       (lambda () (parameterize-from-hash opt (lambda ()
         ;; -- mid-test
         (check-false (*online?*))
-        (check-true (negative? (*bad-lines-penalty*)))))))
+        (check-true (negative? (*bad-rhyme-penalty*)))))))
     ;; -- post-test
     (check-true (*online?*))
-    (check-true (<= 0 (*bad-lines-penalty*))))
+    (check-true (<= 0 (*bad-rhyme-penalty*))))
 
   ;; -- save-option TODO abbreviate tests
   (with-config #:local ""
