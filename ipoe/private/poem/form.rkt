@@ -26,8 +26,8 @@
 (require
   ;;ipoe/private
   ipoe/private/poem
-  ipoe/private/poem/check-rhyme-scheme
-  ipoe/private/poem/check-spelling
+  ipoe/private/poem/rhymecheck
+  ipoe/private/poem/spellcheck
   ipoe/private/poem/poetic-license
   ipoe/private/parameters
   racket/match
