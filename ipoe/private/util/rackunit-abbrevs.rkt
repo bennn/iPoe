@@ -24,30 +24,49 @@
 (require
   rackunit
   (only-in racket/port port->string port->lines)
-  (for-syntax racket/base syntax/parse)
+  (for-syntax racket/base syntax/parse rackunit)
 )
 
 ;; =============================================================================
 
+;;bg; copied from rackunit library (location.rkt)
+(define-for-syntax (syntax->location stx)
+  (list (syntax-source stx)
+   (syntax-line stx)
+   (syntax-column stx)
+   (syntax-position stx)
+   (syntax-span stx)))
+
 (define-syntax (check-true* stx)
   (syntax-parse stx
     [(_ f [arg* ...] ...+)
-     (syntax/loc stx (begin (check-true (f arg* ...)) ...))]
+     (define loc (syntax->location stx))
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda () (check-true (f arg* ...)) ...)))]
     [_ (error 'check-true* "Expected (check-true* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
 (define-syntax (check-false* stx)
   (syntax-parse stx
     [(_ f [arg* ...] ...+)
-     (syntax/loc stx (begin (check-false (f arg* ...)) ...))]
+     (define loc (syntax->location stx))
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda () (check-false (f arg* ...)) ...)))]
     [_ (error 'check-false* "Expected (check-false* f [arg* ...] ...). In other words, a function and parentheses-delimited lists of arguments.")]))
 
 ;; TODO fails when mixing == and !=, should really pick the right check- variant
 (define-syntax (check-apply* stx)
+  (define loc (syntax->location stx))
   (syntax-parse stx #:datum-literals (== !=)
     [(_ f [arg* ... == res] ...+)
-     (syntax/loc stx (begin (check-equal? (f arg* ...) res) ...))]
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda () (check-equal? (f arg* ...) res) ...)))]
     [(_ f [arg* ... != res] ...+)
-     (syntax/loc stx (begin (check-not-equal? (f arg* ...) res) ...))]
+     (quasisyntax/loc stx
+       (with-check-info* (list (make-check-location '#,loc))
+         (lambda () (check-not-equal? (f arg* ...) res) ...)))]
     [_ (error 'check-apply* "Expected (check-apply* f [arg* ... == res] ...) or (check-apply* f [arg* ... != res] ...). In other words, a function and parentheses-delimited lists of arguments & equality or dis-equality symbol & a result value to compare with.")]))
 
 (define (check-print spec f)
@@ -72,7 +91,7 @@
     (error 'ipoe:check-print "Cannot understand spec '~a'\n" spec)]))
 
 
-;; =============================================================================
+;;; =============================================================================
 
 (module+ test
 
