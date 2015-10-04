@@ -3,8 +3,6 @@
 ;; Note: all vectors in this file are immutable
 
 ;; TODO enforce immutable vectors (overwrite for/vector?)
-;; TODO standardize #t or #f for success casex
-;;  (plase just remove the #f and use and/no-quirks)
 ;; TODO refactor into multiple files
 ;;  (separate validators interface from core structs from library code?)
 
@@ -14,6 +12,8 @@
   stanza/loc->string
   line/loc->string
   word/loc->string
+
+  *poem*
 
   ;; TODO stop with the struct-out
   (struct-out stanza/loc)
@@ -68,7 +68,7 @@
   ;; (-> Poem (Sequenceof Word))
   ;; Return a sequence of all words in the poem
 
-  [stanza (-> natural-number/c poem? stanza/loc?)]
+  [stanza (->* [natural-number/c] [poem?] stanza/loc?)]
   ;; (-> Natural Poem Stanza)
   ;; Get a stanza from a poem.
 
@@ -134,6 +134,8 @@
   ;; Normalized stanzas. This is where the magic happens.
 ) #:prefab )
 
+(define *poem* (make-parameter #f))
+
 ;; -----------------------------------------------------------------------------
 
 (define-syntax (and/no-quirks stx)
@@ -153,7 +155,6 @@
       (for/fold ([tmp #f]) iterator
         (and/no-quirks tmp body)))]))
 
-;; TODO move to helpers
 (define (parse-word str)
   (define w* (string->word* str))
   (unless (= 1 (length w*))
@@ -234,7 +235,7 @@
             (cons (list->vector (string->word* (car line*)))
                   curr-stanza))]))))
 
-;; (: line->word* TODO)
+;; (: line->word* (-> line/loc (listof word/loc)))
 (define (line->word* ln)
   (match-define (line/loc w* l-num s-num) ln)
   (for/vector ([w (in-vector w*)]
@@ -283,13 +284,11 @@
 ;              [w-num (in-range (in-vector l))])
 ;    w))
 
-;; TODO could be more efficient
-;; (: stanza (-> Natural Poem Stanza))
-(define (stanza s-num P)
+;; (: stanza (->* [Natural] [Poem] Stanza))
+(define (stanza s-num [P (*poem*)])
   (define s* (poem->stanza* P))
   (safe-vector-ref s-num s* 'stanza))
 
-;; TODO test
 (define (stanza-count-lines st)
   (match-define (stanza/loc l* s-num) st)
   (vector-length l*))
@@ -350,6 +349,10 @@
     (only-in racket/string string-split)
     rackunit
     ipoe/private/util/rackunit-abbrevs)
+
+  (define (listofquirk? x*)
+    (and (list? x*)
+         (for/and ([x (in-list x*)]) (quirk? x))))
 
   ;; -- and/no-quirks / for/no-quirks
   (let ([q (quirk 1 "")])
@@ -430,7 +433,7 @@
     (lambda () (line -1 (stanza/loc '#(a b c) 11))))
 
   ;; -- line=?
-  (check-true* line=?
+  (check-true* (lambda x* (listofquirk? (apply line=? x*)))
     [(line/loc '#("") 1 2)
      (line/loc '#("") 4 6)]
     [(line/loc '#("shall" "i" "compare" "thee") 4 4)
@@ -441,12 +444,14 @@
      (line/loc '#("its" "working" "ok") 12 6)])
 
   ;; --- line=? accepts variable-arity
-  (check-true (line=? (line/loc '#("a") 0 1)
+  (check-true (listofquirk?
+                    (line=?
                       (line/loc '#("a") 0 1)
-                      (line 0 (stanza 0 '#(#(#("a")))))
-                      (line/loc '#("a") 7 2)))
+                      (line/loc '#("a") 0 1)
+                      (line 0 (stanza 0 (poem "" '#(#(#("a"))))))
+                      (line/loc '#("a") 7 2))))
 
-  (check-true* (lambda (l1 l2) (quirk? (line=? l1 l2)))
+  (check-true* (lambda (l1 l2) (listofquirk? (line=? l1 l2)))
    [(line/loc '#("A") 4 5)
     (line/loc '#("B") 82 1)]
    [(line/loc '#("just" "a" "minute") 1 1)
@@ -496,20 +501,24 @@
          (word/loc "f" 0 0 1)
          (word/loc "g" 0 1 1))])
 
-;; wtf TODO causuing a segfault
   ;; -- stanza
-;  (check-apply* stanza
-;   [0 (poem "" '#(a))
-;    == (stanza/loc 'a 0)]
-;   [1 (poem "" '#(a b c))
-;    == (stanza/loc 'b 1)]
-;   [5 (poem "" '#(a b c d e f))
-;    == (stanza/loc 'f 5)])
+  (check-apply* stanza
+   [0 (poem "" '#(a))
+    == (stanza/loc 'a 0)]
+   [1 (poem "" '#(a b c))
+    == (stanza/loc 'b 1)]
+   [5 (poem "" '#(a b c d e f))
+    == (stanza/loc 'f 5)])
+
+  (parameterize ([*poem* (poem "source" '#(a b c))])
+    (check-apply* stanza
+     [0 == (stanza/loc 'a 0)]
+     [2 == (stanza/loc 'c 2)]))
 
   (check-exn (regexp "ipoe:safe-vector-ref")
-             (lambda () (stanza 0 '#())))
+             (lambda () (stanza 0 (poem "" '#()))))
   (check-exn (regexp "ipoe:safe-vector-ref")
-             (lambda () (stanza -1 '#(a b c))))
+             (lambda () (stanza -1 (poem "hi" '#(a b c)))))
 
   ;; -- stanza-count-lines
   (check-apply* stanza-count-lines
@@ -534,33 +543,36 @@
   (check-apply* word
    [3 (line/loc '#("hel" "lo" "w" "orld") 1 2)
     == (word/loc "orld" 3 1 2)]
-   [0 (line 1 (stanza 2 '#(#() #() #(#("what" "is") #("going" "on")))))
+   [0 (line 1 (stanza 2 (poem "" '#(#() #() #(#("what" "is") #("going" "on"))))))
     == (word/loc "going" 0 1 2)])
 
   (check-exn (regexp "ipoe:safe-vector-ref")
              (lambda () (word 0 (line/loc '#() 3 8))))
 
   ;; -- word=?
-  (check-true* (lambda (w1 w2) (word=? w1 w2))
+  (check-true* (lambda (w1 w2) (listofquirk? (word=? w1 w2)))
    [(word/loc "yes" 1 2 3)
     (word/loc "yes" 3 1 5)]
-   [(word 0 (line 0 (stanza 0 '#(#(#("yes"))))))
-    (word 0 (line 0 (stanza 0 '#(#(#("yes"))))))]
-   [(word 0 (line 0 (stanza 0 '#(#(#("cant"))))))
-    (word 0 (line 0 (stanza 0 '#(#(#("cant"))))))]
+   [(word 0 (line 0 (stanza 0 (poem "hi" '#(#(#("yes")))))))
+    (word 0 (line 0 (stanza 0 (poem "hi" '#(#(#("yes")))))))]
+   [(word 0 (line 0 (stanza 0 (poem "hi" '#(#(#("cant")))))))
+    (word 0 (line 0 (stanza 0 (poem "hi" '#(#(#("cant")))))))]
   )
-  (check-true (word=? (word/loc "ab" 3 1 2)
-                      (word/loc "ab" 3 3 6)
-                      (word/loc "ab" 3 33 6)
-                      (word/loc "ab" 3 3 96)))
 
-  (check-true* (lambda (w1 w2) (quirk? (word=? w1 w2)))
+
+  (check-true (listofquirk? (word=? (word/loc "ab" 3 1 2)
+                            (word/loc "ab" 3 3 6)
+                            (word/loc "ab" 3 33 6)
+                            (word/loc "ab" 3 3 96))))
+
+  (check-true* (lambda (w1 w2) (listofquirk? (word=? w1 w2)))
    [(word/loc "a" 4 6 8)
     (word/loc "b" 8 1 51)])
 
-  (check-true (quirk? (word=? (word/loc "a" 1 1 1)
-                      (word/loc "b" 1 1 1)
-                      (word/loc "c" 1 1 1))))
+  (check-true (listofquirk? (word=?
+                              (word/loc "a" 1 1 1)
+                              (word/loc "b" 1 1 1)
+                              (word/loc "c" 1 1 1))))
 
   ;; -- safe-vector-ref
   (let ([v (vector #t #t #t)])
@@ -572,5 +584,4 @@
      [1 v]
      [2 v])
     (check-bad-ref* -1 -10 5 3 9000))
-
 )
