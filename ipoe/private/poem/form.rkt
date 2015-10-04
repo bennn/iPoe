@@ -29,10 +29,7 @@
   ipoe/private/poem/spellcheck
   ipoe/private/poem/poetic-license
   ipoe/private/parameters
-  (only-in ipoe/private/db
-    add-word*
-    with-ipoe-db
-    ipoe-db-connected?)
+  ipoe/private/db
   (only-in ipoe/private/ui
     user-error)
   ;; --
@@ -193,7 +190,6 @@
        (lambda ()
         (with-ipoe-db #:user (*user*)
                       #:dbname (*dbname*)
-                      #:interactive? (*interactive?*)
          (lambda ()
           (define P (make-poem line*))
           (define L (poetic-license-init (*poetic-license*)))
@@ -203,9 +199,7 @@
               (for/list ([w (poem->word/loc* P)]
                          #:when (not (word-exists? (word/loc-word w))))
                 (word/loc-word w)))
-            (add-word* unknown*
-                       #:online? (*online?*)
-                       #:interactive? (*interactive?*)))
+            (add-word* unknown*))
           ;; -- Check spelling, optionally (and someday, check grammar)
           (when (*spellcheck?*)
             (define q* (check-spelling (poem->word/loc* P)))
@@ -226,6 +220,9 @@
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
+;; TODO make sure these are good error messages
+;; TODO raise error if compiles without *poem* set?
+;; TODO rename, should be constraint? or something
 ;; (: validator? (-> Syntax Syntax))
 (define (validator? expr)
   ;; -- Just compile, name sure doesn't error
@@ -267,6 +264,8 @@
     (only-in racket/string string-split)
   )
 
+  (define o* (options-init))
+
 ;  ;; -- helper function, convert a syntactic function into a lambda
 ;  (define (eval-extra-validator F)
 ;    (stx->validator (form-extra-validator F)))
@@ -275,106 +274,126 @@
 ;    (parameterize ([current-namespace (make-base-namespace)])
 ;      (namespace-require 'ipoe/sugar)
 ;      (eval stx (current-namespace))))
+
+  ;; -- check-duplicate
+  ;; Always void if first arg is #f
+  (check-equal? (check-duplicate #f #:new-val 'a #:src 'b #:msg 'c)
+                (void))
+
+  ;; Always an exception if first arg is non-false
+  (let* ([src 'cdtest]
+         [src-str (symbol->string src)])
+    (check-exn (regexp src-str)
+               (lambda () (check-duplicate #t #:new-val 'any #:src src #:msg 'any)))
+    (check-exn (regexp src-str)
+               (lambda () (check-duplicate 'A #:new-val 'any #:src src #:msg 'any)))
+    (check-exn (regexp src-str)
+               (lambda () (check-duplicate "hi" #:new-val 'any #:src src #:msg 'any))))
+
+  ;; -- input->form
+  (define (test-make-form str)
+    (with-input-from-string str
+      (lambda () (make-form (current-input-port)))))
+
+  (check-apply* test-make-form
+   ["#:name couplet #:rhyme-scheme ((A A)) #:syllables 10"
+    == (form 'couplet '(((A . 10) (A . 10))) #f '())]
+   ["#:name couplet #:rhyme-scheme ((A A))"
+    == (form 'couplet '((A A)) #f '())]
+   ["#:rhyme-scheme ((A) (B) (C)) #:name yes"
+    == (form 'yes '((A) (B) (C)) #f '())]
+   ["#:rhyme-scheme ((A) (B) (C)) #:descr \"a short description\" #:name yes"
+    == (form 'yes '((A) (B) (C)) "a short description" '())]
+   ["#:rhyme-scheme ((A) (B) (C)) #:description \"yo lo\" #:name yes"
+    == (form 'yes '((A) (B) (C)) "yo lo" '())]
+   ;; It's okay to leave out the keywords
+   ["name (((Schema . 42)))"
+    == (form 'name '(((Schema . 42))) #f '())]
+   ["name  10 (((Schema . 42)))"
+    == (form 'name '(((Schema . 42))) #f '())]
+   ["name  10 (((Schema . 42) *))"
+    == (form 'name '(((Schema . 42) (* . 10))) #f '())]
+   ["name  \"aha\" (((Schema . 42) *))"
+    == (form 'name '(((Schema . 42) *)) "aha" '())])
+
+   ;; -- make-form, with #:constraint
+  (let* ([ps (test-make-form (string-append
+                                     "#:name has-extra "
+                                     "#:rhyme-scheme ((1 2 3) (A B (C . 3))) "
+                                     "#:constraint #t"))]
+         [c* (form-constraint* ps)])
+    (check-true (form? ps))
+    (check-equal? (form-name ps) 'has-extra)
+    (check-equal? (form-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
+    (check-true (list? c*))
+    (check-equal? (length c*) 1)
+    (check-true (with-constraint-namespace (eval (car c*)))))
+
+  (let* ([ps (test-make-form "name (((Schema . 42))) #t")]
+         [c* (form-constraint* ps)])
+    (check-true (form? ps))
+    (check-equal? (form-name ps) 'name)
+    (check-true (with-constraint-namespace (eval (car c*)))))
+
+  ;; -- read-keyword-value
+  (let* ([src 'rkvtest]
+         [src-regexp (regexp (symbol->string src))])
+    ;; On EOF, raises an exception
+    (check-exn src-regexp
+               (lambda () (read-keyword-value eof boolean? #:kw 'yolo #:src src)))
+    (define (test-read-keyword-value str p?)
+      (with-input-from-string str
+        (lambda ()
+          (read-keyword-value (current-input-port) p? #:kw 'test-kw #:src src))))
+
+    ;; --- If value matches predicate, pass
+    (check-apply* test-read-keyword-value
+      ["hello" symbol? == 'hello]
+      ["(())" list? == '(())]
+      ["1" integer? == 1])
+
+    ;; -- If value doesn't match predicate, fail
+    (check-exn src-regexp
+               (lambda () (test-read-keyword-value "42" string?)))
+    (check-exn src-regexp
+               (lambda () (test-read-keyword-value "42" symbol?))))
+
+  ;; -- form->validator
+  (define (make-validator spec)
+    (parameterize ([current-namespace (make-base-namespace)])
+      (eval #`(begin #,validator-requires #,(form->validator spec))
+            (current-namespace))))
+
+;  (define-syntax-rule (with-db-test e ...)
+;    (parameterize-from-hash o*
+;      (lambda ()
+;        (parameterize ([*interactive?* #f] [*online?* #f])
+;          (with-ipoe-db #:commit? #f
+;                        #:user (*user*)
+;                        #:dbname (*dbname*)
+;            (lambda () e ...))))))
 ;
-;  ;; -- check-duplicate
-;  ;; Always void if first arg is #f
-;  (check-equal? (check-duplicate #f #:new-val 'a #:src 'b #:msg 'c)
-;                (void))
-;
-;  ;; Always an exception if first arg is non-false
-;  (let* ([src 'cdtest]
-;         [src-str (symbol->string src)])
-;    (check-exn (regexp src-str)
-;               (lambda () (check-duplicate #t #:new-val 'any #:src src #:msg 'any)))
-;    (check-exn (regexp src-str)
-;               (lambda () (check-duplicate 'A #:new-val 'any #:src src #:msg 'any)))
-;    (check-exn (regexp src-str)
-;               (lambda () (check-duplicate "hi" #:new-val 'any #:src src #:msg 'any))))
-;
-;  ;; -- input->form
-;  (define (test-input->form str)
-;    (with-input-from-string str
-;      (lambda () (input->form (current-input-port)))))
-;
-;  (check-apply* test-input->form
-;   ["#:name couplet #:rhyme-scheme ((A A)) #;syllables 10"
-;    == (form 'couplet '(((A . 10) (A . 10))) #f #f)]
-;   ["#:name couplet #:rhyme-scheme ((A A))"
-;    == (form 'couplet '((A A)) #f #f)]
-;   ["#:rhyme-scheme ((A) (B) (C)) #:name yes"
-;    == (form 'yes '((A) (B) (C)) #f #f)]
-;   ["#:rhyme-scheme ((A) (B) (C)) #:descr \"a short description\" #:name yes"
-;    == (form 'yes '((A) (B) (C)) "a short description" #f)]
-;   ["#:rhyme-scheme ((A) (B) (C)) #:description \"yo lo\" #:name yes"
-;    == (form 'yes '((A) (B) (C)) "yo lo" #f)]
-;   ;; It's okay to leave out the keywords
-;   ["name (((Schema . 42)))"
-;    == (form 'name '(((Schema . 42))) #f #f)]
-;   ["name  10 (((Schema . 42)))"
-;    == (form 'name '(((Schema . 42))) #f #f)]
-;   ["name  10 (((Schema . 42) *))"
-;    == (form 'name '(((Schema . 42) (* . 10))) #f #f)]
-;   ["name  \"aha\" (((Schema . 42) *))"
-;    == (form 'name '(((Schema . 42) *)) "aha" #f)])
-;
-;   ;; -- input->form, with #:extra-validator
-;  (let* ([ps (test-input->form (string-append
-;                                     "#:name has-extra "
-;                                     "#:rhyme-scheme ((1 2 3) (A B (C . 3))) "
-;                                     "#:extra-validator (lambda (x) #t)"))]
-;         [ev (eval-extra-validator ps)])
-;    (check-true (form? ps))
-;    (check-equal? (form-name ps) 'has-extra)
-;    (check-equal? (form-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
-;    (check-true (ev '()))
-;    (check-true (ev '(("hello" "world"))))
-;    (check-true (ev '(()))))
-;  (let* ([ps (test-input->form "name (((Schema . 42))) (lambda (x) #t)")]
-;         [ev (eval-extra-validator ps)])
-;    (check-true (form? ps))
-;    (check-equal? (form-name ps) 'name)
-;    (check-equal? (ev '()) #t))
-;
-;  ;; -- read-keyword-value
-;  (let* ([src 'rkvtest]
-;         [src-regexp (regexp (symbol->string src))])
-;    ;; On EOF, raises an exception
-;    (check-exn src-regexp
-;               (lambda () (read-keyword-value eof boolean? #:kw 'yolo #:src src)))
-;    (define (test-read-keyword-value str p?)
-;      (with-input-from-string str
-;        (lambda ()
-;          (read-keyword-value (current-input-port) p? #:kw 'test-kw #:src src))))
-;
-;    ;; --- If value matches predicate, pass
-;    (check-apply* test-read-keyword-value
-;      ["hello" symbol? == 'hello]
-;      ["(())" list? == '(())]
-;      ["1" integer? == 1])
-;
-;    ;; -- If value doesn't match predicate, fail
-;    (check-exn src-regexp
-;               (lambda () (test-read-keyword-value "42" string?)))
-;    (check-exn src-regexp
-;               (lambda () (test-read-keyword-value "42" symbol?))))
-;
-;  ;; -- form->validator
-;  (define (make-validator spec)
-;    (parameterize ([current-namespace (make-base-namespace)])
-;      (eval #`(begin #,validator-requires #,(form->validator spec)) (current-namespace))))
-;
-;  (let* ([couplet-validator (make-validator (form 'couplet '((A A)) #f #f))]
-;         [pass-str "I was born\nhouse was worn\n"]
-;         [fail-str "roses are red\nviolets are blue\n"])
-;    (define (test-couplet str)
-;      (define port (open-input-string str))
-;      (define res (parameterize ([*interactive?* #f])
-;        (couplet-validator port)))
-;      (close-input-port port)
-;      res)
-;    (check-equal? (car (test-couplet pass-str)) (string-split pass-str "\n"))
-;    (check-exn (regexp "ipoe")
-;               (lambda () (test-couplet fail-str))))
+;    (let* ([couplet-form (form 'couplet '((A A)) #f '())]
+;           [w1 "asdgowiryrwurwj"]
+;           [w2 "gbuhijoqeort"]
+;           [w3 "gtyequritqw"]
+;           [w4 "gehwygbvdva"]
+;           [pass-str (string-append w1 "\n" w2 "\n")]
+;           [fail-str (string-append w3 "\n" w4 "\n")])
+;     (with-db-test ;; TODO this opens a DB inside a DB
+;        (add-word* (list w1 w2 w3 w4))
+;        (add-rhyme w1 w2)
+;        (define couplet-validator (make-validator couplet-form))
+;        (define (test-couplet str)
+;          (define port (open-input-string str))
+;          (define res
+;            (couplet-validator port))
+;          (close-input-port port)
+;          res)
+;        (check-equal? (car (test-couplet pass-str))
+;          (string-split pass-str "\n"))
+;        (check-exn (regexp "ipoe")
+;                   (lambda () (test-couplet fail-str)))))
 ;
 ;  ;; --- Testing options
 ;  (let* ([free-validator (make-validator (form 'free '() #f #f))]
@@ -468,5 +487,5 @@
 ;  ; (let ([v (validator? '(lambda (x) x))])
 ;  ;   (check-exn exn:fail:contract?
 ;  ;              (lambda () (v '()))))
-
 )
+

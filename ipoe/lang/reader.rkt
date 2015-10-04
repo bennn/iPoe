@@ -34,7 +34,8 @@
            (provide (rename-out [custom-read read]
                                 [custom-read-syntax read-syntax]))
            default-requires
-           (define (custom-read in) (syntax->datum (custom-read-syntax #f in)))
+           (define (custom-read in)
+             (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)
              (with-syntax ([str (validate in)])
                (strip-context #'(module anything racket
