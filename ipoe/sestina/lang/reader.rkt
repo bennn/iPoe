@@ -33,7 +33,7 @@
   ;; A specific pair of words must appear in each line the second
   ;;  in each pair must be the last word in the line.
   (apply append
-   (for/list ([ln (stanza->line* (last-stanza))]
+   (for/list ([ln (stanza->line* (stanza -1))]
               [fw (in-list '(1 3 5))]
               [lw (in-list '(4 2 0))])
      (define cw? (contains-word? ln (last-word (line fw (stanza 0)))))
