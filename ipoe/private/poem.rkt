@@ -33,9 +33,9 @@
   [last-stanza (->* [] [poem?] stanza/loc?)]
   ;; Return the final stanza in the poem
 
-  [line (-> natural-number/c stanza/loc? line/loc?)]
-  ;; (-> Natural Stanza Line)
+  [line (-> integer? stanza/loc? line/loc?)]
   ;; Get a line from a stanza.
+  ;; A negative index searches from last to first; (line -1 S) gets the last line
   ;; (Basically, a synonym for `list-ref`)
 
   [line=? (->* [line/loc?] [] #:rest (listof line/loc?) (listof quirk?))]
@@ -63,8 +63,7 @@
   ;; (-> Poem (Sequenceof Word))
   ;; Return a sequence of all words in the poem
 
-  [stanza (->* [natural-number/c] [poem?] stanza/loc?)]
-  ;; (-> Natural Poem Stanza)
+  [stanza (->* [integer?] [poem?] stanza/loc?)]
   ;; Get a stanza from a poem.
 
   [stanza-count-lines (-> stanza/loc? natural-number/c)]
@@ -75,8 +74,7 @@
   ;; (-> Stanza (Sequenceof Line))
   ;; Get the lines from a stanza
 
-  [word (-> natural-number/c line/loc? word/loc?)]
-  ;; (-> Natural Line Word)
+  [word (-> integer? line/loc? word/loc?)]
   ;; Get a word from a line
 
   [word=? (->* [word/loc?] #:rest (listof word/loc?) (listof quirk?))]
@@ -178,8 +176,8 @@
 ;; (: line (-> Natural Stanza/Loc Line/Loc))
 (define (line l-num s)
   (match-define (stanza/loc l* s-num) s)
-  (define l (safe-vector-ref l-num l* 'line))
-  (line/loc l l-num s-num))
+  (define-values [l i] (safe-vector-ref l-num l* 'line))
+  (line/loc l i s-num))
 
 ;; (: line=? (-> Line/Loc Line/Loc * Boolean))
 (define (line=? l1/loc . line*)
@@ -265,7 +263,8 @@
 ;; (: stanza (->* [Natural] [Poem] Stanza))
 (define (stanza s-num [P (*poem*)])
   (define s* (poem->stanza* P))
-  (safe-vector-ref s-num s* 'stanza))
+  (define-values [s i] (safe-vector-ref s-num s* 'stanza))
+  s)
 
 (define (stanza-count-lines st)
   (match-define (stanza/loc l* s-num) st)
@@ -281,7 +280,8 @@
 ;; (: word (-> Natural Line Word))
 (define (word w-num ln)
   (match-define (line/loc w* l-num s-num) ln)
-  (word/loc (safe-vector-ref w-num w* 'word) w-num l-num s-num))
+  (define-values [w i] (safe-vector-ref w-num w* 'word))
+  (word/loc w i l-num s-num))
 
 ;; (: word=? (-> Word Word * Either))
 (define (word=? w1/loc . w*/loc)
@@ -306,14 +306,15 @@
   (match-define (line/loc w* line-num stanza-num) ln)
   (format "Line ~a of Stanza ~a" line-num stanza-num))
 
-(define (safe-vector-ref i x* [elem-type 'element])
+(define (safe-vector-ref i-param x* [elem-type 'element])
   (define N (vector-length x*))
+  (define i (if (< i-param 0) (+ N i-param) i-param))
   (cond
    [(or (< i 0) (<= N i))
     (user-error 'ipoe:safe-vector-ref
-                (format "Cannot access ~a ~a, sequence only has ~a ~as" elem-type i N elem-type))]
+                (format "Cannot access ~a ~a, sequence only has ~a ~as" elem-type i-param N elem-type))]
    [else
-    (vector-ref x* i)]))
+    (values (vector-ref x* i) i)]))
 
 ;; (: word/loc->string (-> Word String))
 (define (word/loc->string w/loc)
@@ -381,11 +382,14 @@
   (check-equal?
     (line 5 (stanza/loc '#("a" "b" "c" "d" "e" "f") 1))
     (line/loc "f" 5 1))
+  (check-equal?
+    (line 5 (stanza/loc '#("a" "b" "c" "d" "e" "f") 1))
+    (line -1 (stanza/loc '#("a" "b" "c" "d" "e" "f") 1)))
 
   (check-exn #rx"ipoe:safe-vector-ref"
     (lambda () (line 0 (stanza/loc '#() 4))))
   (check-exn #rx"ipoe:safe-vector-ref"
-    (lambda () (line -1 (stanza/loc '#(a b c) 11))))
+    (lambda () (line -111 (stanza/loc '#(a b c) 11))))
 
   ;; -- line=?
   (check-true* (lambda x* (listofquirk? (apply line=? x*)))
@@ -462,6 +466,8 @@
     == (stanza/loc 'a 0)]
    [1 (poem "" '#(a b c))
     == (stanza/loc 'b 1)]
+   [-2 (poem "" '#(a b c))
+    == (stanza/loc 'b 1)]
    [5 (poem "" '#(a b c d e f))
     == (stanza/loc 'f 5)])
 
@@ -473,7 +479,7 @@
   (check-exn (regexp "ipoe:safe-vector-ref")
              (lambda () (stanza 0 (poem "" '#()))))
   (check-exn (regexp "ipoe:safe-vector-ref")
-             (lambda () (stanza -1 (poem "hi" '#(a b c)))))
+             (lambda () (stanza -30 (poem "hi" '#(a b c)))))
 
   ;; -- stanza-count-lines
   (check-apply* stanza-count-lines
@@ -499,6 +505,8 @@
    [3 (line/loc '#("hel" "lo" "w" "orld") 1 2)
     == (word/loc "orld" 3 1 2)]
    [0 (line 1 (stanza 2 (poem "" '#(#() #() #(#("what" "is") #("going" "on"))))))
+    == (word/loc "going" 0 1 2)]
+   [-2 (line 1 (stanza 2 (poem "" '#(#() #() #(#("what" "is") #("going" "on"))))))
     == (word/loc "going" 0 1 2)])
 
   (check-exn (regexp "ipoe:safe-vector-ref")
@@ -534,9 +542,9 @@
     (define-syntax-rule (check-bad-ref* i ...)
       (begin (check-exn #rx"ipoe:safe-vector-ref"
                         (lambda () (safe-vector-ref i v))) ...))
-    (check-true* safe-vector-ref
+    (check-true* (lambda (i v) (let-values ([(x j) (safe-vector-ref i v)]) x))
      [0 v]
      [1 v]
      [2 v])
-    (check-bad-ref* -1 -10 5 3 9000))
+    (check-bad-ref* -10 5 3 9000))
 )
