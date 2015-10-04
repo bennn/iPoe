@@ -21,10 +21,6 @@
   (struct-out word/loc)
   (struct-out poem)
 
-  and/no-quirks for/no-quirks
-  ;; The `and` macro, lifted to fail if it gets a quirk? struct
-  ;; (and succeed on #f)
-
   (contract-out
   [contains-word? (-> line/loc? (or/c word/loc? string?) (or/c quirk? boolean?))]
   ;; (-> Line/Loc String Boolean)
@@ -137,23 +133,6 @@
 (define *poem* (make-parameter #f))
 
 ;; -----------------------------------------------------------------------------
-
-(define-syntax (and/no-quirks stx)
- (syntax-parse stx
-  [(_ v)
-   (syntax/loc stx v)]
-  [(_ v v* ...)
-   (syntax/loc stx
-    (if (quirk? v)
-     v
-     (and/no-quirks v* ...)))]))
-
-(define-syntax (for/no-quirks stx)
-  (syntax-parse stx
-   [(_ iterator body)
-    (syntax/loc stx
-      (for/fold ([tmp #f]) iterator
-        (and/no-quirks tmp body)))]))
 
 (define (parse-word str)
   (define w* (string->word* str))
@@ -353,29 +332,6 @@
   (define (listofquirk? x*)
     (and (list? x*)
          (for/and ([x (in-list x*)]) (quirk? x))))
-
-  ;; -- and/no-quirks / for/no-quirks
-  (let ([q (quirk 1 "")])
-    (define-syntax-rule (check-q? e)
-      (check-equal? e q))
-    ;; --
-    (check-true (and/no-quirks #t))
-    (check-true (and/no-quirks #f #f #f #t))
-    (check-true (and/no-quirks 1 2 3 4 #t))
-    ;; --
-    (check-q? (and/no-quirks q))
-    (check-q? (and/no-quirks q #f #t #f))
-    (check-q? (and/no-quirks #f q #t))
-    (check-q? (and/no-quirks #t q #f))
-    ;; -- for/no-quirks
-    (check-true
-      (for/no-quirks ([x '(1 2 3 4)]) #t))
-    (check-true
-      (for/no-quirks ([x (list q q q)]) (quirk? x)))
-    (check-q?
-      (for/no-quirks ([x (list 1 2 3)]) q))
-    (check-q?
-      (for/no-quirks ([x (list 1 2 3)]) (if (= 1 x) q x))))
 
   ;; -- contains-word?
   (let ([ln (line/loc '#("i" "could" "not" "stop" "for" "death") 1 2)])
