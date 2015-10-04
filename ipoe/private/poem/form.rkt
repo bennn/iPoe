@@ -151,7 +151,10 @@
   (define name  (form-name F))
   (define rs    (form-rhyme-scheme F))
   (define descr (form-description F))
-  (define constraint* (form-constraint* F))
+  (define constraint*
+    ;; Implicitly thunk all the constraints
+    (for/list ([stx (in-list (form-constraint* F))])
+      #`(lambda () #,stx)))
   ;; -- Define the poem-checker as syntax
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
@@ -209,9 +212,8 @@
               (poetic-license-apply L q*)))
           ;; -- Check extra constraints, with current poem bound
           (parameterize ([*poem* P])
-            (poetic-license-apply L
-              (for/list ([c (in-list constraint*)])
-                c)))
+            (for/list ([e (in-list (list #,@constraint*))])
+              (poetic-license-apply L (e))))
           ;; --
           (poetic-license-report L)
           ;; -- Done! Return anything needed to make testing easy
@@ -222,9 +224,9 @@
 ;; (: validator? (-> Syntax Syntax))
 (define (validator? expr)
   ;; -- Just compile, name sure doesn't error
-  (define evaluated
-    (with-constraint-namespace
-      (eval expr (current-namespace))))
+  ;(define evaluated
+  ;  (with-constraint-namespace
+  ;    (eval expr (current-namespace))))
   expr)
 
 ;; TODO namespace should be very restricted
@@ -237,8 +239,8 @@
   #'(require ;; TODO really need all this?
       ipoe/private/poem
       ipoe/private/poem
-      ipoe/private/poem/check-rhyme-scheme
-      ipoe/private/poem/check-spelling
+      ipoe/private/poem/rhymecheck
+      ipoe/private/poem/spellcheck
       ipoe/private/poem/poetic-license
       ipoe/private/parameters
       ipoe/private/ui
@@ -259,8 +261,6 @@
     (only-in racket/port with-input-from-string)
     (only-in racket/string string-split)
   )
-
-  ;; -- TODO redo tests
 
 ;  ;; -- helper function, convert a syntactic function into a lambda
 ;  (define (eval-extra-validator F)
