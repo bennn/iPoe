@@ -1,10 +1,13 @@
 #lang racket/base
 
+;; Common helpers for command-line tools
+
 (provide
   rkt-file?
   ;; (-> String Boolean)
-
 )
+
+;; -----------------------------------------------------------------------------
 
 (require
   (only-in racket/string string-suffix?)
