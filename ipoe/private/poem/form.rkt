@@ -264,8 +264,6 @@
     (only-in racket/string string-split)
   )
 
-  (define o* (options-init))
-
 ;  ;; -- helper function, convert a syntactic function into a lambda
 ;  (define (eval-extra-validator F)
 ;    (stx->validator (form-extra-validator F)))
@@ -372,92 +370,100 @@
 ;                        #:user (*user*)
 ;                        #:dbname (*dbname*)
 ;            (lambda () e ...))))))
-;
-;    (let* ([couplet-form (form 'couplet '((A A)) #f '())]
-;           [w1 "asdgowiryrwurwj"]
-;           [w2 "gbuhijoqeort"]
-;           [w3 "gtyequritqw"]
-;           [w4 "gehwygbvdva"]
-;           [pass-str (string-append w1 "\n" w2 "\n")]
-;           [fail-str (string-append w3 "\n" w4 "\n")])
-;     (with-db-test ;; TODO this opens a DB inside a DB
-;        (add-word* (list w1 w2 w3 w4))
-;        (add-rhyme w1 w2)
-;        (define couplet-validator (make-validator couplet-form))
-;        (define (test-couplet str)
-;          (define port (open-input-string str))
-;          (define res
-;            (couplet-validator port))
-;          (close-input-port port)
-;          res)
-;        (check-equal? (car (test-couplet pass-str))
-;          (string-split pass-str "\n"))
-;        (check-exn (regexp "ipoe")
-;                   (lambda () (test-couplet fail-str)))))
-;
-;  ;; --- Testing options
-;  (let* ([free-validator (make-validator (form 'free '() #f #f))]
-;         [fake-options (string-append
-;                         "#:one option\n"
-;                         "#:another option\n\n\n"
-;                         "#:third  thing    \n"
-;                         "some text\n\nmore text\n"
-;                         "#:not anoption\n")]
-;         [real-options (string-append
-;                         "#:online? #f\n"
-;                         "#:interactive? #f\n"
-;                         "#:spellcheck? #f\n"
-;                         "#:poetic-license 9001\n\n"
-;                         "Things are good these days.\n")]
-;         [runon-options (string-append
-;                          "#:spellcheck? #f\n"
-;                          "#:yes #t #:no #f\n\n"
-;                          "yoooolo\n")])
-;    (define (test-free str)
-;      (define port (open-input-string str))
-;      (define res
-;        (parameterize ([*interactive?* #f])
-;          (free-validator port)))
-;      (close-input-port port)
-;      res)
-;    ;; --- Test for unknown / invalid options (they do nothing)
-;    (let ([fake-res (check-print
-;                      (list #rx"^Unknown key"
-;                            #rx"^Unknown key"
-;                            #rx"^Unknown key"
-;                            #rx"^Misspelled word")
-;                      (lambda () (test-free fake-options)))])
-;        (check-equal? (car fake-res)
-;                      '("some text" "" "more text" "#:not anoption"))
-;        (let* ([H (cdr fake-res)]
-;               [get (lambda (k) (hash-ref H k (lambda () #f)))])
-;          (check-apply* get
-;            ['one == 'option]
-;            ['another == 'option]
-;            ['third == 'thing])))
-;    ;; --- Test for known options (run-time config should change)
-;    (let* ([real-res (test-free real-options)]
-;           [H (cdr real-res)]
-;           [get (lambda (k) (hash-ref H k (lambda () #f)))])
-;      (check-equal? (car real-res) '("Things are good these days."))
-;      (check-apply* get
-;       ['online? == #f]
-;       ['interactive? == #f]
-;       ['spellcheck? == #f]
-;       ['poetic-license == 9001]))
-;    ;; -- Test options on one line
-;    (let* ([runon-res (check-print
-;                        (list #rx"as part of the poem text.$")
-;                        (lambda () (test-free runon-options)))]
-;           [str (car runon-res)]
-;           [H (cdr runon-res)]
-;           [get (lambda (k) (hash-ref H k (lambda () #f)))])
-;      (check-equal? str '("#:yes #t #:no #f" "" "yoooolo"))
-;      (check-apply* get
-;       ['spellcheck? == #f]
-;       ['yes == #f]
-;       ['no == #f])))
-;
+
+    (let* ([couplet-form (form 'couplet '((A A)) #f '())]
+           [w1 "hello"]
+           [w2 "hello"]
+           [w3 "green"]
+           [w4 "red"]
+           [pass-str (string-append w1 "\n" w2 "\n")]
+           [fail-str (string-append w3 "\n" w4 "\n")])
+        (define couplet-validator (make-validator couplet-form))
+        (define (test-couplet str)
+          (define port (open-input-string str))
+          (define res
+            (with-config #:local "#:interactive? #f\n#:online? #t\n"
+              (lambda () (couplet-validator port))))
+          (close-input-port port)
+          res)
+        (define r
+          (check-print
+            (list #rx"Finished" #rx"")
+            (lambda () (test-couplet pass-str))))
+        (check-true (poem? (car r)))
+        (check-exn
+          (regexp "ipoe")
+          (lambda () (test-couplet fail-str))))
+
+  ;; --- Testing options
+  (let* ([free-validator (make-validator (form 'free '() #f '()))]
+         [fake-options (string-append
+                         "#:one option\n"
+                         "#:another option\n\n\n"
+                         "#:third  thing    \n"
+                         "some text\n\nmore text\n"
+                         "#:not anoption\n")]
+         [real-options (string-append
+                         "#:online? #f\n"
+                         "#:interactive? #f\n"
+                         "#:spellcheck? #f\n"
+                         "#:poetic-license 9001\n\n"
+                         "Things are good these days.\n")]
+         [runon-options (string-append
+                          "#:spellcheck? #f\n"
+                          "#:yes #t #:no #f\n\n"
+                          "yoooolo\n")])
+    (define (test-free str)
+      (define port (open-input-string str))
+      (define res
+        (with-config #:local "#:interactive? #f\n#:online? #f\n"
+          (lambda () (free-validator port))))
+      (close-input-port port)
+      res)
+    ;; --- Test for unknown / invalid options (they do nothing)
+    (let ([fake-res (check-print
+                      (list #rx"^Unknown key"
+                            #rx"^Unknown key"
+                            #rx"^Unknown key"
+                            #rx"Finished"
+                            #rx"Misspelled"
+                            #rx"Remaining")
+                      (lambda () (test-free fake-options)))])
+        (define P (car fake-res))
+        (define H (caddr fake-res))
+        (check-true (poem? P))
+        (let* ([get (lambda (k) (hash-ref H k (lambda () #f)))])
+          (check-apply* get
+            ['one == 'option]
+            ['another == 'option]
+            ['third == 'thing])))
+    ;; --- Test for known options (run-time config should change)
+    (let* ([real-res (check-print
+                       (list #rx"" #rx"")
+                       (lambda () (test-free real-options)))]
+           [H (caddr real-res)]
+           [get (lambda (k) (hash-ref H k (lambda () #f)))])
+      (check-true (poem? (car real-res)))
+      (check-apply* get
+       ['online? == #f]
+       ['interactive? == #f]
+       ['spellcheck? == #f]
+       ['poetic-license == 9001]))
+    ;; -- Test options on one line
+    (let* ([runon-res (check-print
+                        (list #rx"as part of the poem text.$"
+                              #rx"Finished"
+                              #rx"")
+                        (lambda () (test-free runon-options)))]
+           [P (car runon-res)]
+           [H (caddr runon-res)]
+           [get (lambda (k) (hash-ref H k (lambda () #f)))])
+      (check-true (poem? P))
+      (check-apply* get
+       ['spellcheck? == #f]
+       ['yes == #f]
+       ['no == #f])))
+
 ;  ;; -- validator?
 ;  (check-false* validator?
 ;   ['#f]
