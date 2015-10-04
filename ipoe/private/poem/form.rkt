@@ -24,7 +24,6 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  ;;ipoe/private
   ipoe/private/poem
   ipoe/private/poem/rhymecheck
   ipoe/private/poem/spellcheck
@@ -45,7 +44,7 @@
   name ;; Symbol
   rhyme-scheme ;; RhymeScheme
   description ;; String
-  extra-validator ;; (-> Poem Either)
+  constraint* ;; (Listof Syntax)
 ) #:transparent )
 ;; (define-type Form form)
 
@@ -67,7 +66,7 @@
              [rhyme-scheme #f]
              [syllables #f]
              [description #f]
-             [extra-validator #f])
+             [constraint* '()])
     ;; Read one datum & dispatch on it
     (match (read in)
      [(? eof-object?)
@@ -77,7 +76,7 @@
       (define rs+s (if (and syllables rhyme-scheme)
                        (replace-wildcard-syllables rhyme-scheme syllables)
                        (or rhyme-scheme '()))) ;; 2015-09-26: Default to free-verse
-      (form name rs+s description extra-validator)]
+      (form name rs+s description constraint*)]
      [(? eof-object?)
       ;; A bad end of file. Missing some data.
       (user-error err-loc "Unexpected end-of-file, missing #:name field")]
@@ -87,52 +86,50 @@
       (define n (read-keyword-value in symbol?
                                     #:kw '#:name #:src err-loc))
       (check-duplicate name #:new-val n #:src err-loc #:msg "poem name")
-      (loop n rhyme-scheme syllables description extra-validator)]
+      (loop n rhyme-scheme syllables description constraint*)]
      ['#:rhyme-scheme
       ;; Keyword for rhyme scheme
       (define rs (read-keyword-value in rhyme-scheme?
                                      #:kw '#:rhyme-scheme #:src err-loc))
       (check-duplicate rhyme-scheme #:new-val rs #:src err-loc #:msg "rhyme scheme")
-      (loop name rs syllables description extra-validator)]
+      (loop name rs syllables description constraint*)]
      ['#:syllables
       ;; Sets the number of syllables in the rhyme scheme
       (define s (read-keyword-value in exact-positive-integer?
                                     #:kw '#:syllables #:src err-loc))
       (check-duplicate syllables #:new-val s #:src err-loc #:msg "syllable count")
-      (loop name rhyme-scheme s description extra-validator)]
+      (loop name rhyme-scheme s description constraint*)]
      [(or '#:descr '#:description)
       ;; Keyword for descriptions
       (define d (read-keyword-value in string? #:kw '#:description #:src err-loc))
       (check-duplicate description #:new-val d #:src err-loc #:msg "description")
-      (loop name rhyme-scheme syllables d extra-validator)]
-     ['#:extra-validator
-      ;; Keyword for validators, i.e. arbitrary boolean functions on stanzas
-      (define ev (read-keyword-value in (lambda (x) #t)
-                                     #:kw '#:extra-validator #:src err-loc))
-      (define ev+ (validator? ev))
-      (unless ev+ (user-error err-loc (format "Expected a function with type (-> (Listof (Listof String)) Boolean), but got '~a'" ev)))
-      (check-duplicate extra-validator #:new-val ev+ #:src err-loc #:msg "extra validator")
-      (loop name rhyme-scheme syllables description ev+)]
+      (loop name rhyme-scheme syllables d constraint*)]
+     ['#:constraint
+      ;; Keyword for extra constraints
+      (define c (read-keyword-value in (lambda (x) #t)
+                                    #:kw '#:constraint #:src err-loc))
+      (define c+ (validator? c))
+      (unless c+ (user-error err-loc (format "Expected a constraint expression, but got '~a'" c)))
+      (loop name rhyme-scheme syllables description (cons c+ constraint*))]
      ;; -- Infer data from predicates
      [(? symbol? n)
       (check-duplicate name #:new-val n #:src err-loc #:msg "poem name")
-      (loop n rhyme-scheme syllables description extra-validator)]
+      (loop n rhyme-scheme syllables description constraint*)]
      [(? rhyme-scheme? rs)
       (check-duplicate rhyme-scheme #:new-val rs #:src err-loc #:msg "rhyme scheme")
-      (loop name rs syllables description extra-validator)]
+      (loop name rs syllables description constraint*)]
      [(? exact-positive-integer? s)
       (check-duplicate syllables #:new-val s #:src err-loc #:msg "syllable count")
-      (loop name rhyme-scheme s description extra-validator)]
+      (loop name rhyme-scheme s description constraint*)]
      [(? string? d)
       (check-duplicate description #:new-val d #:src err-loc #:msg "description")
-      (loop name rhyme-scheme syllables d extra-validator)]
+      (loop name rhyme-scheme syllables d constraint*)]
      [x
       ;; Try parsing `x` as a validator, otherwise fail because it's undefined data
-      (define ev (validator? x))
+      (define c (validator? x))
       (cond
-       [ev
-        (check-duplicate extra-validator #:new-val ev #:src err-loc #:msg "extra validator")
-        (loop name rhyme-scheme syllables description ev)]
+       [c
+        (loop name rhyme-scheme syllables description (cons c constraint*))]
        [else
         (user-error err-loc
                     (format "Unknown value ~a in poem specification" x))])])))
@@ -154,10 +151,7 @@
   (define name  (form-name F))
   (define rs    (form-rhyme-scheme F))
   (define descr (form-description F))
-  (define ev    (form-extra-validator F))
-  ;; (: check-extra #'(-> Poem Void))
-  (define check-extra
-    (or (form-extra-validator F) #'(lambda (x) null)))
+  (define constraint* (form-constraint* F))
   ;; -- Define the poem-checker as syntax
   #`(lambda (in) ;; Input-Port
       ;; Read & process data from the input in-line.
@@ -213,10 +207,11 @@
             (when (not (null? rs))
               (define q* (check-rhyme-scheme P rs))
               (poetic-license-apply L q*)))
-          ;; -- Check extra validator
-          (let ([extra-q* (#,check-extra P)])
-            (when (not (null? extra-q*))
-              (poetic-license-apply L extra-q*)))
+          ;; -- Check extra constraints, with current poem bound
+          (parameterize ([*poem* P])
+            (poetic-license-apply L
+              (for/list ([c (in-list constraint*)])
+                c)))
           ;; --
           (poetic-license-report L)
           ;; -- Done! Return anything needed to make testing easy
@@ -224,16 +219,19 @@
 
 ;; Parse a syntax object as a function in a restricted namespace.
 ;; If ok, return the original syntax object.
-;; (: validator? (-> Syntax (U #'(-> (Listof (Listof String)) Boolean) #f)))
+;; (: validator? (-> Syntax Syntax))
 (define (validator? expr)
+  ;; -- Just compile, name sure doesn't error
   (define evaluated
-    (parameterize ([current-namespace (make-base-namespace)])
-      (namespace-require 'ipoe/private/poem) ;;TODO
+    (with-constraint-namespace
       (eval expr (current-namespace))))
-  (and (procedure? evaluated)
-       ;; 2015-08-19: Could create a syntax object protecting `expr` with a
-       ;;   (-> (Listof (Listof String)) Boolean) contract
-       expr))
+  expr)
+
+;; TODO namespace should be very restricted
+(define-syntax-rule (with-constraint-namespace e)
+  (parameterize ([current-namespace (make-base-namespace)])
+    (namespace-require 'ipoe/private/poem)
+    e))
 
 (define validator-requires
   #'(require ;; TODO really need all this?
