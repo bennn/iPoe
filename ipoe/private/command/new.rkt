@@ -48,10 +48,10 @@
   ;; Interactively add word (get syllables, get rhymes)
   (parameterize-from-hash (options-init)
     (lambda ()
+     (parameterize ([*interactive?* #t])
       (with-ipoe-db #:commit? #t
                     #:user (*user*)
                     #:dbname (*dbname*)
-                    #:interactive? #t
         (lambda ()
           (cond
            [(word-exists? w)
@@ -61,7 +61,7 @@
                         #:online? (*online?*))
             (alert "Success!")]
            [else
-            (alert (format "Failed to add word '~a'" w))]))))))
+            (alert (format "Failed to add word '~a'" w))])))))))
 
 ;; -----------------------------------------------------------------------------
 ;; --- util
@@ -70,4 +70,6 @@
   ;; No description
   (get-user-input read-natural
                   #:prompt (format "How many syllables does '~a' have?" w)))
+
+;; =============================================================================
 

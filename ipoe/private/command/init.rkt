@@ -1,5 +1,7 @@
 #lang racket/base
 
+;; Start a fresh ipoe database
+
 (provide
   init
 )
@@ -155,21 +157,21 @@
 (module+ test
   (require rackunit ipoe/private/util/rackunit-abbrevs)
 
-  ;; -- get-username TODO
+  ;; -- get-username
   (check-apply* (lambda (k1 k2)
                   (check-print (list #rx"command-line$")
                     (lambda () (get-username k1 k2))))
    ["foo" #f == "foo"]
    ["foo" "bar" == "foo"])
 
-  ;; -- get-dbname TODO
+  ;; -- get-dbname
   (check-apply* (lambda (k1 k2)
                   (check-print (list #rx"command-line$")
                     (lambda () (get-username k1 k2))))
    ["foo" #f == "foo"]
    ["foo" "bar" == "foo"])
 
-  ;; -- param-fallback TODO
+  ;; -- param-fallback
   (check-equal?
     (check-print (list #rx"command-line$")
       (lambda () (param-fallback "yes" #f #:src #f #:prompt #f #:descr #f)))

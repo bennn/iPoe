@@ -1,10 +1,12 @@
 #lang racket/base
 
-;; TODO update all words
+;; TODO update all words (audit)
 
 (provide
   update
 )
+
+;; -----------------------------------------------------------------------------
 
 (require
   ipoe/private/parameters
@@ -47,18 +49,18 @@
    #:args (w)
    (let ([wid (parameterize-from-hash (options-init)
                 (lambda ()
-                  (define i (if (*quiet*) #f (*interactive?*)))
-                  (define o (if (*offline*) #f (*online?*)))
+                 (define i (if (*quiet*) #f (*interactive?*)))
+                 (define o (if (*offline*) #f (*online?*)))
+                 (parameterize ([*interactive?* i])
                   (with-ipoe-db #:commit? #t
                                 #:user (or (*cmd-user*) (*user*))
                                 #:dbname (or (*cmd-dbname*) (*dbname*))
-                                #:interactive? i
                     (lambda ()
                       (update-word w
                                    #:syllables (*syllables*)
                                    #:rhymes (*rhymes*)
                                    #:almost-rhymes (*almost-rhymes*)
                                    #:interactive? i ;; So silly, have to repeat myself
-                                   #:online? o)))))])
+                                   #:online? o))))))])
      (when wid
          (printf "Successfully updated word '~a' (ID = ~a)\n" w wid)))))
