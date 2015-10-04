@@ -88,7 +88,8 @@
     res]
    [(list? spec)
     (define ln* (port->lines in))
-    (check-equal? (length ln*) (length spec))
+    (with-check-info (['expected spec] ['actual ln*])
+      (check-equal? (length ln*) (length spec)))
     (for ([r (in-list spec)]
           [s (in-list ln*)])
       (check-true (regexp-match? r s)))
