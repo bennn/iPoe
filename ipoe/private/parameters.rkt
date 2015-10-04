@@ -54,8 +54,8 @@
   ;;  replacing any old binding for the symbol.
 
   with-config
-  ;; (-> (-> Any) #:config String Any)
-  ;; For testing,
+  ;; (-> [(-> Any)] [#:local (U #f String) #:global (U #f String)] Void)
+  ;; For testing!
   ;; Execute the thunk where the #:config argument is the only
   ;;  configuration file, no matter the filesystems global or local config.
 
@@ -473,7 +473,7 @@
     (check-true (*online?*))
     (check-true (<= 0 (*bad-rhyme-penalty*))))
 
-  ;; -- save-option TODO abbreviate tests
+  ;; -- save-option
   (with-config #:local ""
     (lambda ()
       (define-values [gc lc] (get-config-filenames))
