@@ -30,8 +30,7 @@
   ;; (-> Line Word)
   ;; Return the final word in the line
 
-  [last-stanza (-> poem? stanza/loc?)]
-  ;; (-> Poem Stanza)
+  [last-stanza (->* [] [poem?] stanza/loc?)]
   ;; Return the final stanza in the poem
 
   [line (-> natural-number/c stanza/loc? line/loc?)]
@@ -164,7 +163,7 @@
   (line/loc (vector-ref l* l-num) l-num s-num))
 
 ;; (: last-stanza (-> Poem Stanza/Loc))
-(define (last-stanza P)
+(define (last-stanza [P (*poem*)])
   (define s* (poem-stanza* P))
   (define s-num (sub1 (vector-length s*)))
   (stanza/loc (vector-ref s* s-num) s-num))
