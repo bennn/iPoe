@@ -29,13 +29,15 @@
   ipoe/private/poem/spellcheck
   ipoe/private/poem/poetic-license
   ipoe/private/parameters
-  racket/match
   (only-in ipoe/private/db
     add-word*
     with-ipoe-db
     ipoe-db-connected?)
   (only-in ipoe/private/ui
     user-error)
+  ;; --
+  racket/match
+  (only-in racket/string string-prefix?)
 )
 
 ;; =============================================================================
@@ -111,6 +113,9 @@
       (define c+ (validator? c))
       (unless c+ (user-error err-loc (format "Expected a constraint expression, but got '~a'" c)))
       (loop name rhyme-scheme syllables description (cons c+ constraint*))]
+     ;; -- Check for unknown symbols
+     [(? keyword? x)
+      (user-error err-loc (format "Unknown keyword '~a'" (keyword->string x)))]
      ;; -- Infer data from predicates
      [(? symbol? n)
       (check-duplicate name #:new-val n #:src err-loc #:msg "poem name")
