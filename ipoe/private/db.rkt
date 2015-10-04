@@ -1,7 +1,5 @@
 #lang racket/base
 
-;; TODO online? and interactive? should be parameters here,
-;;  or just reference the good old parameters.rkt
 ;; TODO add- rhyme, word, syllables should be in helper functions
 
 (provide
@@ -143,27 +141,27 @@
 ;; Open a database connection & set parameters
 (define (db-init #:user [u-param #f]
                  #:dbname [db-param #f]
-                 #:online? [online? #f] ;; 2015-09-19: should maybe redesign
-                 #:interactive? [interactive? #f])
+                 #:online-only? [online-only? #f])
   ;; -- Resolve username and dbname
   (define u (or u-param
                 (unbox adhoc-user)
-                (and interactive?
-                     (not online?)
+                (and (*interactive?*)
+                     (not online-only?)
                      (get-user-input read-string
                                      #:nullable? #t
                                      #:prompt USER-PROMPT
                                      #:description USER-DESCRIPTION))))
   (define db (or db-param
                  (unbox adhoc-dbname)
-                 (and interactive?
-                      (not online?)
+                 (and (*interactive?*)
+                      (not online-only?)
                       (get-user-input read-string
                                       #:nullable? #t
                                       #:prompt DBNAME-PROMPT
                                       #:description DBNAME-DESCRIPTION))))
   (cond
-   [(and (not online?) u db (not (or (string-empty? u) (string-empty? db))))
+   [(and (not online-only?)
+         u db (not (or (string-empty? u) (string-empty? db))))
     ;; -- Have all parameters, try connecting to the database
     (*connection*
       (let ([on-err (lambda (e)
@@ -188,7 +186,7 @@
           (save-option 'dbname db))]
        [(N) (void)]))]
    [else
-    (when interactive?
+    (when (*interactive?*)
       (alert "Starting ipoe without a database connection (in online-only mode)"))
     (*connection* (read-cache))])
   ;; -- Return the new connection
@@ -213,10 +211,9 @@
 (define (with-ipoe-db thunk #:user [u #f]
                             #:dbname [db #f]
                             #:commit? [commit? #t]
-                            #:online? [o #f]
-                            #:interactive? [i #f])
+                            #:online-only? [oo #f])
   ;; Open a database connection
-  (let* ([pgc (db-init #:user u #:dbname db #:online? o #:interactive? i)])
+  (let* ([pgc (db-init #:user u #:dbname db #:online-only? oo)])
     (call-with-exception-handler
       ;; On error, close the DB connection
       (lambda (exn)
@@ -518,23 +515,16 @@
 ;; --- add-word
 
 ;; Iteratively add words to the database
-(define (add-word* word*
-                   #:db [pgc (*connection*)]
-                   #:interactive? [interactive? #f]
-                   #:online? [online? #f])
+(define (add-word* word* #:db [pgc (*connection*)])
   ;; Do 2 passes, in case some words rhyme with each other.
   ;; The first pass should not do any rhymes.
   (define wid*
     (for/list ([w (in-list word*)])
       (add-word w #:db pgc
                   #:rhymes '()
-                  #:almost-rhymes '()
-                  #:interactive? interactive?
-                  #:online? online?)))
+                  #:almost-rhymes null)))
   (for/list ([wid (in-list wid*)])
-    (update-word/id wid #:db pgc
-                        #:interactive? interactive?
-                        #:online? online?)))
+    (update-word/id wid #:db pgc)))
 
 ;; TODO should the output contain more information? rhymes we failed to add?
 ;; Add a new word to the database
@@ -542,28 +532,26 @@
                   #:db [pgc (*connection*)]
                   #:syllables [syllables-param #f]
                   #:rhymes [rhyme-param '()]
-                  #:almost-rhymes [almost-rhyme-param '()]
-                  #:interactive? [interactive? #f]
-                  #:online? [online? #f])
-  (when interactive?
+                  #:almost-rhymes [almost-rhyme-param '()])
+  (when (*interactive?*)
     (alert (format "Attempting to add new word '~a' to the database" word)))
   (cond
    [(online-mode? pgc)
-    (when interactive?
+    (when (*interactive?*)
       (alert (format "Cannot add word '~a', currently in online-only mode" word)))
     #f]
    [(not (connection? pgc))
-    (when interactive?
+    (when (*interactive?*)
       (alert (format "Cannot add word '~a', not connected to a database." word)))
     #f]
    [(word-exists? word #:db pgc)
-    (when interactive?
+    (when (*interactive?*)
       (alert (format "Word '~a' is already in the database" word)))
     #f]
    [else
-    (define syllables (resolve-syllables word syllables-param #:interactive? interactive? #:online? online?))
+    (define syllables (resolve-syllables word syllables-param))
     (unless syllables (db-error 'add-word "Cannot add word '~a', failed to infer syllables. Try again with an explicit #:syllables argument or in #:interactive? mode." word))
-    (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param #:interactive? interactive? #:online? online?))
+    (define rr (resolve-rhyme* word rhyme-param almost-rhyme-param))
     (define rhyme* (filter word-exists? (rhyme-result-rhyme* rr)))
     (define almost-rhyme* (filter word-exists? (rhyme-result-almost-rhyme* rr)))
     ;; -- got everything, time to add word
@@ -582,43 +570,34 @@
 
 ;; --- update
 
-(define (update-word* w*
-                      #:db [pgc (*connection*)]
-                      #:interactive? [interactive? #f]
-                      #:online? [online? #f])
+(define (update-word* w* #:db [pgc (*connection*)])
   (for/list ([w (in-list w*)])
-    (update-word w #:db pgc #:interactive? interactive? #:online? online?)))
+    (update-word w #:db pgc)))
 
 (define (update-word w
                      #:db [pgc (*connection*)]
                      #:syllables [s-param #f]
                      #:rhymes [r*-param '()]
-                     #:almost-rhymes [a*-param '()]
-                     #:interactive? [interactive? #f]
-                     #:online? [online? #f])
+                     #:almost-rhymes [a*-param '()])
   (cond
    [(online-mode? pgc)
-    (when interactive?
+    (when (*interactive?*)
       (alert (format "Cannot update word '~a', currently in online-only mode" w)))
     #f]
    [(not (connection? pgc))
-    (when interactive?
+    (when (*interactive?*)
       (alert (format "Cannot update word '~a', not connected to a database." w)))
     #f]
    [(word->id w #:db pgc)
     => (lambda (wid)
-    (define rr (resolve-rhyme* w r*-param a*-param
-                 #:interactive? interactive?
-                 #:online? online?))
+    (define rr (resolve-rhyme* w r*-param a*-param))
     (update-word/id wid
                     #:db pgc
                     #:syllables s-param
                     #:rhymes (rhyme-result-rhyme* rr)
-                    #:almost-rhymes (rhyme-result-almost-rhyme* rr)
-                    #:interactive? interactive?
-                    #:online? online?))]
+                    #:almost-rhymes (rhyme-result-almost-rhyme* rr)))]
    [else
-    (when interactive?
+    (when (*interactive?*)
       (alert (format "Cannot update word '~a', does not exist in database" w)))
     #f]))
 
@@ -626,9 +605,7 @@
                         #:db [pgc (*connection*)]
                         #:syllables [s-param #f]
                         #:rhymes [r*-param '()]
-                        #:almost-rhymes [a*-param '()]
-                        #:interactive? [interactive? #f]
-                        #:online? [online? #f])
+                        #:almost-rhymes [a*-param '()])
   ;; -- add syllables, if new
   (unless (or (not s-param)
               (has-syllables?/id wid s-param #:db pgc))
@@ -756,29 +733,25 @@
 
 (define (resolve-rhyme* word
                         rhyme*-param
-                        almost-rhyme*-param
-                        #:online? [online? #t]
-                        #:interactive? [interactive? #t])
-  (define rr (if online?
+                        almost-rhyme*-param)
+  (define rr (if (*online?*)
                  (scrape-rhyme word)
                  (make-rhyme-result '() '())))
   (define r* (merge-r word 'rhyme
                            rhyme*-param
-                           (filter word-exists? (rhyme-result-rhyme* rr))
-                           #:interactive? interactive?))
+                           (filter word-exists? (rhyme-result-rhyme* rr))))
   (define a* (merge-r word 'almost-rhyme
                            almost-rhyme*-param
-                           (filter word-exists? (rhyme-result-almost-rhyme* rr))
-                           #:interactive? interactive?))
+                           (filter word-exists? (rhyme-result-almost-rhyme* rr))))
   (make-rhyme-result r* a*))
 
 ;; Merge a user-supplied list of words with a new, reference-supplied list of words
 ;; If interactive?, ask the user to validate all new words
-(define (merge-r word type usr* ref* #:interactive? [interactive? #t])
+(define (merge-r word type usr* ref*)
   (cond
    [(not usr*)
     ref*]
-   [interactive?
+   [(*interactive?*)
     ;; Ask user about newly-found rhymes
     (define accepted (list->set usr*))
     (define new* (set-subtract (list->set ref*) accepted))
@@ -799,11 +772,9 @@
 
 ;; Validate the suggested number of syllables for a word
 (define (resolve-syllables word
-                           syllables
-                           #:online? [online? #t]
-                           #:interactive? [interactive? #t])
-  (define-values (ref-syllables src)
-    (if (not online?)
+                           user-syllables)
+  (define-values [ref-syllables src]
+    (if (not (*online?*))
         (values (infer-syllables word) "our-heuristic")
         (let ([wr (scrape-word word)])
           (if (word-result? wr)
@@ -815,26 +786,20 @@
       #:description descr))
   ;; TODO this is ugly
   (cond
-   [(not syllables)
-    (if interactive?
-      (if (not ref-syllables)
-        (get-user-syllables)
-        (case (get-user-input read-yes-or-no
-                #:prompt (format "Does '~a' have ~a syllables?" word ref-syllables))
-         [(Y) ref-syllables]
-         [(N) (get-user-syllables)]))
-      ref-syllables)]
-   [(or (not ref-syllables) (= syllables ref-syllables))
-    ;; Validated user input against trusted source, or just trust user for unknown word
-    syllables]
-   [interactive?
-    (get-user-syllables
-      #:description (format "Data mismatch: word '~a' expected to have ~a syllables, but ~a says it has ~a syllables." word syllables src ref-syllables))]
+   [(not ref-syllables)
+    ;; Reference missing, just trust user
+    user-syllables]
+   [(or (not user-syllables)
+        (not (= user-syllables ref-syllables)))
+    ;; User missing, OR user & ref disagree. Send a prompt.
+    (if (*interactive?*)
+      (case (get-user-input read-yes-or-no
+              #:prompt (format "Does '~a' have ~a syllables?" word ref-syllables))
+       [(Y) ref-syllables]
+       [(N) (get-user-syllables)])
+      (or user-syllables ref-syllables))]
    [else
-    (when interactive?
-      (alert (format "Source '~a' claims that word '~a' has ~a syllables (instead of the given ~a syllables)." src word ref-syllables syllables)))
-    syllables]))
-
+    ref-syllables]))
 
 ;; =============================================================================
 
@@ -854,17 +819,15 @@
     (parameterize-from-hash o* (lambda ()
       (parameterize ([*verbose* #t])
         (with-ipoe-db #:commit? #f
-                      #:interactive? #t
                       #:user (*user*)
                       #:dbname (*dbname*)
           (lambda () e))))))
 
   (define-syntax-rule (with-online-test e)
     (parameterize-from-hash o* (lambda ()
-      (with-ipoe-db #:commit? #f
-                    #:online? #t
-                    #:interactive? #f
-        (lambda () e)))))
+     (parameterize ([*interactive?* #f])
+      (with-ipoe-db #:commit? #f #:online-only? #t
+        (lambda () e))))))
 
   ;; Clear the cache first, then do the rest of the user's expression
   (define-syntax-rule (with-config/cache [global local] e)
@@ -896,10 +859,11 @@
   ;;       (thread-wait prompt-thread))))
 
   ;; -- with-ipoe-db, invalid user
-  (check-exn #rx"^Failed to connect"
-    (lambda ()
-      (with-ipoe-db #:user "ANONSTEIN" #:dbname "MISSING-TABLE"
-        (lambda () (void)))))
+  (parameterize ([*online?* #f])
+    (check-exn #rx"^Failed to connect"
+      (lambda ()
+        (with-ipoe-db #:user "ANONSTEIN" #:dbname "MISSING-TABLE"
+          (lambda () (void))))))
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
   (with-config/cache [#f #f]
@@ -1454,7 +1418,7 @@
          (check-exn rx (lambda () (with-online-test (a-fun arg1 arg2)))))))
      ))
 
-  ;; -- add-(almost-)rhyme*, one in the sequence fails (should return the successful ones
+  ;; -- add-(almost-)rhyme*, one in the sequence fails, should return the successful ones
   (with-db-test
    (let* ([w "asasdfa"]
           [wid (add-word/unsafe w)]
@@ -1477,7 +1441,7 @@
 
 
   ;; -- add-word
-  ;; -- add-word/unsafe (unsafe to call this without a connection
+  ;; -- add-word/unsafe, unsafe to call this without a connection
   (with-db-test
    (let ([new-word "ycvgpadfwd"])
      (check-false (word-exists? new-word))
@@ -1493,12 +1457,11 @@
     (with-db-test
      (let ([rid (add-word/unsafe r)]
            [aid (add-word/unsafe a)])
+      (parameterize ([*interactive?* #f] [*online?* #f])
        (add-word w
                  #:syllables s
                  #:rhymes (list r)
-                 #:almost-rhymes (list a)
-                 #:interactive? #f
-                 #:online? #f)
+                 #:almost-rhymes (list a))
        (check-true (word-exists? w))
        (check-equal?
         (sequence->list (word->syllables* w))
@@ -1507,17 +1470,16 @@
        (check-true (rhymes-with? w r))
        (check-false (rhymes-with? w a))
        (check-false (almost-rhymes-with? w r))
-       (check-true (almost-rhymes-with? w a))))
+       (check-true (almost-rhymes-with? w a)))))
     ;; Not interactive, Online. Should not fail, even though other rhymes do not exist.
     (with-db-test
      (let ([rid (add-word/unsafe r)]
            [aid (add-word/unsafe a)])
+      (parameterize ([*interactive?* #f] [*online?* #t])
        (add-word w
                  #:syllables s
                  #:rhymes (list r)
-                 #:almost-rhymes (list a)
-                 #:interactive? #f
-                 #:online? #t)
+                 #:almost-rhymes (list a))
        (check-true (word-exists? w))
        (check-equal?
         (sequence->list (word->syllables* w))
@@ -1526,50 +1488,44 @@
        (check-true (rhymes-with? w r))
        (check-false (rhymes-with? w a))
        (check-false (almost-rhymes-with? w r))
-       (check-true (almost-rhymes-with? w a))))
+       (check-true (almost-rhymes-with? w a)))))
     ;; New word, but unknown rhymes (doesn't matter if online or not)
     (with-db-test
      (for* ([online? (in-list (list #t #f))]
             [r* (in-list (list '() (list r)))])
+      (parameterize ([*interactive?* #f] [*online?* online?])
        (add-word w
                  #:syllables s
                  #:rhymes (list r)
-                 #:almost-rhymes (list a)
-                 #:interactive? #f
-                 #:online? online?)
+                 #:almost-rhymes (list a))
        (check-true (word-exists? w))
        (check-equal?
         (sequence->list (word->syllables* w))
         (list s))
        (check-false (word-exists? r))
-       (check-false (word-exists? a))))
+       (check-false (word-exists? a)))))
     ;; Nonsense words, no syllables. Fails in online mode. Offline we ALWAYS guess.
     (with-db-test
      (begin
-       (check-exn #rx"add-word"
-                  (lambda () (add-word w
-                                       #:interactive? #f
-                                       #:online? #t)))
-       (add-word w
-                 #:interactive? #f
-                 #:online? #f)
+       (parameterize ([*interactive?* #f] [*online?* #t])
+         (check-exn #rx"add-word"
+                    (lambda () (add-word w))))
+       (parameterize ([*interactive?* #f] [*online?* #f])
+         (add-word w))
        (check-true (word-exists? w))
        (check-true (for/and ([s (word->syllables* w)]) (positive? s))))))
 
   ;; --- add-word failures
   (let ([new-word "asdhvuianjsdkvasd"])
     ;; Not connected to DB
-    (check-false (add-word new-word))
     (check-false
      (check-print
       (list #rx"^Attempting to add" #rx"^Cannot add word .*? not connected")
-      (lambda () (add-word new-word #:interactive? #t))))
+      (lambda () (add-word new-word))))
     ;; Offline
     (check-false (with-online-test (add-word new-word)))
     (check-false
-     (check-print
-      (list #rx"^Attempting to add" #rx"^Cannot add word .*? currently in online-only")
-      (lambda () (with-online-test (add-word new-word #:interactive? #t))))))
+      (with-online-test (add-word new-word))))
 
   ;; -- add-word*
   (with-db-test
@@ -1577,28 +1533,25 @@
       ;; -- add 2 unrelated words, should work fine (just like add-word)
       (let ([w1 "adsgahdfs"]
             [w2 "hasgasdfa"])
-        (add-word* (list w1 w2) #:interactive? #f #:online? #f)
+        (parameterize ([*interactive?* #f] [*online?* #f])
+          (add-word* (list w1 w2)))
         (check-true (word-exists? w1))
         (check-true (word-exists? w2))
         (check-false (rhymes-with? w1 w2))
         (check-false (almost-rhymes-with? w1 w2)))
+      ))
       ;; -- add 2 words that rhyme, should work (defines words, then resolves rhymes)
-      ;; -- TODO not sure how to test this, DB independent
-      ;(let ([w1 "coalman"]
-      ;      [w2 "nobleman"])
-      ;  (add-word* (list w1 w2)
-      ;             #:interactive? #f #:online? #t)
-      ;  (check-true (word-exists? w1))
-      ;  (check-true (word-exists? w2))
-      ;  (check-true (almost-rhymes-with? w1 w2))
-      ;  (check-true (almost-rhymes-with? w2 w1)))
-      ;; -- ditto for almost-rhymes
-      ;(let ([w1 "ghrwuifnjs"]
-      ;      [w2 "apiwurgnapz"])
-      ;  (add-word* (list w1 w2)
-      ;             #:rhymes* (list (list w2) '())
-      ;             #:interactive? #f #:online #f)
-  ))
+      ;;(let ([w1 "ghrwuifnjs"]
+      ;;      [w2 "apiwurgnapz"])
+      ;;  (add-word w1
+      ;;             #:rhymes* (list (list w2) '()))
+      ;;  (check-true (word-exists? w1))
+      ;;  (check-true (word-exists? w2))
+      ;;  (check-false (rhymes-with? w1 w2))
+      ;;  (check-false (rhymes-with? w2 w1))
+      ;;  (check-true (almost-rhymes-with? w1 w2))
+      ;;  (check-true (almost-rhymes-with? w2 w1)))))
+
 
   ;; -- update-word* TODO
   (with-db-test
@@ -1612,7 +1565,8 @@
         (sequence->list (word->syllables* w1))
         '())
       ;; --
-      (update-word w1 #:syllables 88 #:rhymes (list w2) #:almost-rhymes (list w1) #:interactive? #f #:online? #f)
+      (parameterize ([*interactive?* #f] [*online?* #f])
+        (update-word w1 #:syllables 88 #:rhymes (list w2) #:almost-rhymes (list w1)))
       (check-true (rhymes-with? w1 w2))
       (check-true (almost-rhymes-with? w1 w1))
       (check-equal?
@@ -1621,18 +1575,17 @@
 
    ;; -- update word, good old error cases
    (let ([w "asdhaegdafsdf"])
+    (parameterize ([*interactive?* #f])
+     (check-false
+       (with-online-test (update-word w)))
      (check-false
        (check-print
-         (list #rx"online-only mode")
-         (lambda () (with-online-test (update-word w #:interactive? #t)))))
-     (check-false
-       (check-print
-         (list #rx"not connected")
-         (lambda () (update-word w #:interactive? #t))))
+         "";(list #rx"not connected")
+         (lambda () (update-word w))))
      (check-false
        (check-print
          (list #rx"does not exist")
-         (lambda () (with-db-test (update-word w #:interactive? #t))))))
+         (lambda () (with-db-test (update-word w)))))))
 
   ;; -- remove-word
   (let ([w "aspdognawv"])
@@ -1723,22 +1676,16 @@
   ;; -- TODO test resolve, never suggest words not-in-database
 
   ;; Should scrape internet for syllables
-  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #t))
-    ["hour" == 1]
-    ["never" == 2]
-    ["mississippi" == 4]
-    ["continuity" == 5]
-    ["asbferufvzfjuvfds" == #f]
-  )
-
-  ;; Should run a local algorithm (and get the wrong answer for "hour")
-  (check-apply* (lambda (w) (resolve-syllables w #f #:interactive? #f #:online? #f))
-    ["hour" == 2]
-  )
-
-  ;; Should trust the user input
-  (check-apply* (lambda (w)
-                    (resolve-syllables w 99 #:interactive? #f #:online? #f))
-    ["hour" == 99]
-  )
+  (parameterize ([*interactive?* #f] [*online?* #t])
+    (check-apply* (lambda (w) (resolve-syllables w #f))
+      ["hour" == 1]
+      ["never" == 2]
+      ["mississippi" == 4]
+      ["continuity" == 5]
+      ["asbferufvzfjuvfds" == #f]
+    )
+    ;; Should trust the user input
+    (check-apply* (lambda (w) (resolve-syllables w 99))
+      ["hour" == 99]
+    ))
 )

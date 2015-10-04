@@ -8,9 +8,9 @@
                  (B . 8)
                  (B . 8)
                  (A . 4)))
-#:extra-validator (lambda (s*)
-                    (let ([s (stanza 0 s*)])
-                      (line=? (line 0 s)
-                              (line 2 s)
-                              (line 6 s))))
+#:constraint
+  (let ([S (stanza 0)])
+    (line=? (line 0 S)
+            (line 2 S)
+            (line 6 S)))
 
