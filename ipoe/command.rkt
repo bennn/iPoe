@@ -10,7 +10,7 @@
   ;; Check a sequence of poems.
   ;; This is a shortcut for calling `racket FILE.rkt` on each poem individually
 
-  db
+  dbshell
   ;; Open a REPL session with the database
 
   init
@@ -34,7 +34,7 @@
 
 (require
   ipoe/private/command/check
-  ipoe/private/command/db
+  ipoe/private/command/dbshell
   ipoe/private/command/init
   ipoe/private/command/new
   ipoe/private/command/remove
