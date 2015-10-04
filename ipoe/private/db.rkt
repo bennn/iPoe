@@ -825,8 +825,9 @@
 
   (define-syntax-rule (with-online-test e)
     (parameterize-from-hash o* (lambda ()
+     (parameterize ([*interactive?* #f])
       (with-ipoe-db #:commit? #f #:online-only? #t
-        (lambda () e)))))
+        (lambda () e))))))
 
   ;; Clear the cache first, then do the rest of the user's expression
   (define-syntax-rule (with-config/cache [global local] e)
@@ -1517,7 +1518,6 @@
   ;; --- add-word failures
   (let ([new-word "asdhvuianjsdkvasd"])
     ;; Not connected to DB
-    (check-false (add-word new-word))
     (check-false
      (check-print
       (list #rx"^Attempting to add" #rx"^Cannot add word .*? not connected")
@@ -1525,11 +1525,7 @@
     ;; Offline
     (check-false (with-online-test (add-word new-word)))
     (check-false
-     (check-print
-      (list #rx"^Starting"
-            #rx"^Attempting to add"
-            #rx"^Cannot add word .*? currently in online-only")
-      (lambda () (with-online-test (add-word new-word))))))
+      (with-online-test (add-word new-word))))
 
   ;; -- add-word*
   (with-db-test
@@ -1581,10 +1577,7 @@
    (let ([w "asdhaegdafsdf"])
     (parameterize ([*interactive?* #f])
      (check-false
-       (check-print
-         (list #rx"^Starting"
-               #rx"online-only mode")
-         (lambda () (with-online-test (update-word w)))))
+       (with-online-test (update-word w)))
      (check-false
        (check-print
          "";(list #rx"not connected")
