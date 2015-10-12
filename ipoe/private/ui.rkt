@@ -46,11 +46,18 @@
 
 ;; -----------------------------------------------------------------------------
 
-;(require
-;  readline ;; For a much-improved REPL experience
-;  readline/pread
-;)
-(define readline-prompt (make-parameter #"> "))
+(require
+  ipoe/private/util/check-os
+)
+(if-windows
+  (begin
+    (define readline-prompt (make-parameter #"> "))
+    (define r:read read)
+    (define (read)
+      (begin
+        (display (readline-prompt))
+        (r:read))))
+  (require readline readline/pread))
 
 ;; =============================================================================
 
@@ -69,9 +76,7 @@
   ;; TODO use something more general/gui-friendly than printf
   (when desc-str (alert desc-str))
   (define (read/prompt)
-    (displayln prompt-str)
     (parameterize ([readline-prompt #"ipoe> "])
-      (display "ipoe> ")
       (read)))
   (let loop ([response (read/prompt)])
     (cond

@@ -12,6 +12,8 @@
 
 ;; -----------------------------------------------------------------------------
 
+(define PROMPT #"ipoe:db> ")
+
 (require
   racket/cmdline
   ipoe/private/db
@@ -26,10 +28,18 @@
   (only-in racket/string string-join string-split)
   (only-in racket/sequence
     sequence->list)
-;  readline ;; For a much-improved REPL experience
-;  readline/pread
+  ipoe/private/util/check-os
 )
-(define readline-prompt (make-parameter #"> "))
+
+(if-windows
+  (begin
+    (define readline-prompt (make-parameter #"> "))
+    (define r:read read)
+    (define (read)
+      (begin
+        (display (readline-prompt))
+        (r:read))))
+  (require readline readline/pread))
 
 ;; =============================================================================
 
@@ -288,8 +298,6 @@
                      init-repl)
                    (init-repl))))))))))
 
-(define PROMPT #"ipoe:db> ")
-
 (define (init-repl [port #f])
   ;; -- Factor all REPL interactions through `respond`,
   ;;    so they get saved to the logfile
@@ -307,7 +315,6 @@
   (let loop ()
     (define input
       (parameterize ([readline-prompt PROMPT])
-        (display PROMPT)
         (read)))
     (match (for/or ([c (in-list COMMAND*)]) (c input))
      ['EXIT
