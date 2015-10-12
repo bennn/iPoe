@@ -47,9 +47,12 @@
 ;; -----------------------------------------------------------------------------
 
 (require
-  readline ;; For a much-improved REPL experience
-  readline/pread
+  ipoe/private/util/check-os
+  (for-syntax racket/base)
 )
+(if-windows
+  (require ipoe/private/util/windows-readline)
+  (require readline readline/pread))
 
 ;; =============================================================================
 

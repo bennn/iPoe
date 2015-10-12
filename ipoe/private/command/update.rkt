@@ -49,16 +49,11 @@
                 (lambda ()
                   (define i (if (*quiet*) #f (*interactive?*)))
                   (define o (if (*offline*) #f (*online?*)))
-                  (with-ipoe-db #:commit? #t
-                                #:user (or (*cmd-user*) (*user*))
-                                #:dbname (or (*cmd-dbname*) (*dbname*))
-                                #:interactive? i
-                    (lambda ()
-                      (update-word w
-                                   #:syllables (*syllables*)
-                                   #:rhymes (*rhymes*)
-                                   #:almost-rhymes (*almost-rhymes*)
-                                   #:interactive? i ;; So silly, have to repeat myself
-                                   #:online? o)))))])
+                  (parameterize ([*interactive?* i])
+                    (with-ipoe-db #:commit? #t
+                                  #:user (or (*cmd-user*) (*user*))
+                                  #:dbname (or (*cmd-dbname*) (*dbname*))
+                      (lambda ()
+                        (update-word w #:syllables (*syllables*)))))))])
      (when wid
          (printf "Successfully updated word '~a' (ID = ~a)\n" w wid)))))

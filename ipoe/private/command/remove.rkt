@@ -35,18 +35,18 @@
      (define w word-or-form)
      (parameterize-from-hash (options-init)
        (lambda ()
-         (with-ipoe-db #:commit? #t
-                       #:user (*user*)
-                       #:dbname (*dbname*)
-                       #:interactive? #t
-           (lambda ()
-             (cond
-              [(not (word-exists? w))
-               (alert (format "Word '~a' does not exist, cannot remove." w))]
-              [(remove-word w)
-               (alert (format "Successfully removed word '~a'" w))]
-              [else
-               (alert (format "Failed to remove word '~a'" w))])))))])))
+         (parameterize ([*interactive?* #t])
+           (with-ipoe-db #:commit? #t
+                         #:user (*user*)
+                         #:dbname (*dbname*)
+             (lambda ()
+               (cond
+                [(not (word-exists? w))
+                 (alert (format "Word '~a' does not exist, cannot remove." w))]
+                [(remove-word w)
+                 (alert (format "Successfully removed word '~a'" w))]
+                [else
+                 (alert (format "Failed to remove word '~a'" w))]))))))])))
 
 ;; -----------------------------------------------------------------------------
 

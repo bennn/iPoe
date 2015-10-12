@@ -12,6 +12,8 @@
 
 ;; -----------------------------------------------------------------------------
 
+(define PROMPT #"ipoe:db> ")
+
 (require
   racket/cmdline
   ipoe/private/db
@@ -26,9 +28,15 @@
   (only-in racket/string string-join string-split)
   (only-in racket/sequence
     sequence->list)
-  readline ;; For a much-improved REPL experience
-  readline/pread
+  ipoe/private/util/check-os
+  ;; --
+  (for-syntax racket/base)
 )
+
+(if-windows
+  (require ipoe/private/util/windows-readline)
+  (require readline readline/pread))
+
 ;; =============================================================================
 
 (define-syntax-rule (arg-error id expected received)
@@ -91,9 +99,7 @@
       (match v
        [(list 'add-word (? string? s))
         ;; TODO options correct?
-        (define wid (add-word s
-                              #:online? #t
-                              #:interactive? #t))
+        (define wid (add-word s))
         (if wid
             (format "Successfully added word '~a' (ID ~a)" s wid)
             (format "Failed to add word '~a'" s))]
@@ -275,19 +281,16 @@
        (lambda ()
          (define u (or (*cmd-user*) (*user*)))
          (define d (or (*cmd-dbname*) (*dbname*)))
-         (with-ipoe-db #:commit? (*commit?*)
-                       #:user u
-                       #:dbname d
-                       #:interactive? #t
-                       #:online? #f
-           (lambda ()
-             (printf "Connected to database '~a' as user '~a'.\n" d u)
-             (if (*output-file*)
-                 (call-with-output-file* (*output-file*) #:exists 'replace
-                   init-repl)
-                 (init-repl)))))))))
-
-(define PROMPT #"ipoe:db> ")
+         (parameterize ([*interactive?* #t] [*online?* #f])
+           (with-ipoe-db #:commit? (*commit?*)
+                         #:user u
+                         #:dbname d
+             (lambda ()
+               (printf "Connected to database '~a' as user '~a'.\n" d u)
+               (if (*output-file*)
+                   (call-with-output-file* (*output-file*) #:exists 'replace
+                     init-repl)
+                   (init-repl))))))))))
 
 (define (init-repl [port #f])
   ;; -- Factor all REPL interactions through `respond`,
@@ -431,7 +434,7 @@
     (command-exec (find-command sym)))
 
   (define-syntax-rule (add-word/nothing w)
-     (add-word w #:rhymes '() #:almost-rhymes '() #:online? #f #:interactive? #f))
+     (add-word w #:rhymes '() #:almost-rhymes '()))
 
   (define o*
     (let-values ([(gc lc) (get-config-filenames)])
@@ -441,9 +444,10 @@
 
   (define-syntax-rule (with-db-test e)
     (parameterize-from-hash o* (lambda ()
-      (parameterize ([*verbose* #t])
+      (parameterize ([*verbose* #t]
+                     [*interactive?* #f]
+                     [*online?* #f])
         (with-ipoe-db #:commit? #f
-                      #:interactive? #f
                       #:user (*user*)
                       #:dbname (*dbname*)
           (lambda () e))))))

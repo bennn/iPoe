@@ -147,7 +147,7 @@
   (and (psql-installed?)
        (or (psql-running?)
            ;; Heeeere we go!
-           (and (alert "No psql server found, starting a new server ...")
+           (and (alert "No psql server found, starting a new server for user 'postgres' ...")
                 (system "su postgres -c 'pg_ctl start -D /var/lib/postgres/data -l /tmp/PGSQL.log'")))))
 
 ;; =============================================================================
