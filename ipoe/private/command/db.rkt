@@ -29,6 +29,8 @@
   (only-in racket/sequence
     sequence->list)
   ipoe/private/util/check-os
+  ;; --
+  (for-syntax racket/base)
 )
 
 (if-windows

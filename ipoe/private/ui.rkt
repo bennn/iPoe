@@ -48,6 +48,7 @@
 
 (require
   ipoe/private/util/check-os
+  (for-syntax racket/base)
 )
 (if-windows
   (begin
@@ -76,6 +77,7 @@
   ;; TODO use something more general/gui-friendly than printf
   (when desc-str (alert desc-str))
   (define (read/prompt)
+    (displayln prompt-str)
     (parameterize ([readline-prompt #"ipoe> "])
       (read)))
   (let loop ([response (read/prompt)])
