@@ -76,14 +76,17 @@
       (read)))
   (let loop ([response (read/prompt)])
     (cond
-     [(and nullable? (eq? #f response))
+     [(or (eof-object? response)
+          (and nullable? (eq? #f response)))
       #f]
      [(valid? response)
       => (lambda (x) x)]
      [else
       ;; Optimistically send a help message
-      (when (and desc-str (or (regexp-match "help" response)
-                              (regexp-match "\\?"  response)))
+      (when (and desc-str
+                 (string? response)
+                 (or (regexp-match "help" response)
+                     (regexp-match "\\?"  response)))
         (alert desc-str))
       ;; Re-show the prompt and loop
       (loop (read/prompt))])))
