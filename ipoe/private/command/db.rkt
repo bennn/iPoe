@@ -103,9 +103,7 @@
       (match v
        [(list 'add-word (? string? s))
         ;; TODO options correct?
-        (define wid (add-word s
-                              #:online? #t
-                              #:interactive? #t))
+        (define wid (add-word s))
         (if wid
             (format "Successfully added word '~a' (ID ~a)" s wid)
             (format "Failed to add word '~a'" s))]
@@ -440,7 +438,7 @@
     (command-exec (find-command sym)))
 
   (define-syntax-rule (add-word/nothing w)
-     (add-word w #:rhymes '() #:almost-rhymes '() #:online? #f #:interactive? #f))
+     (add-word w #:rhymes '() #:almost-rhymes '()))
 
   (define o*
     (let-values ([(gc lc) (get-config-filenames)])
