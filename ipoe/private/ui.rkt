@@ -46,10 +46,11 @@
 
 ;; -----------------------------------------------------------------------------
 
-(require
-  readline ;; For a much-improved REPL experience
-  readline/pread
-)
+;(require
+;  readline ;; For a much-improved REPL experience
+;  readline/pread
+;)
+(define readline-prompt (make-parameter #"> "))
 
 ;; =============================================================================
 
@@ -70,6 +71,7 @@
   (define (read/prompt)
     (displayln prompt-str)
     (parameterize ([readline-prompt #"ipoe> "])
+      (display "ipoe> ")
       (read)))
   (let loop ([response (read/prompt)])
     (cond

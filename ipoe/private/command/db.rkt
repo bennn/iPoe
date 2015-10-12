@@ -26,9 +26,11 @@
   (only-in racket/string string-join string-split)
   (only-in racket/sequence
     sequence->list)
-  readline ;; For a much-improved REPL experience
-  readline/pread
+;  readline ;; For a much-improved REPL experience
+;  readline/pread
 )
+(define readline-prompt (make-parameter #"> "))
+
 ;; =============================================================================
 
 (define-syntax-rule (arg-error id expected received)
@@ -275,17 +277,16 @@
        (lambda ()
          (define u (or (*cmd-user*) (*user*)))
          (define d (or (*cmd-dbname*) (*dbname*)))
-         (with-ipoe-db #:commit? (*commit?*)
-                       #:user u
-                       #:dbname d
-                       #:interactive? #t
-                       #:online? #f
-           (lambda ()
-             (printf "Connected to database '~a' as user '~a'.\n" d u)
-             (if (*output-file*)
-                 (call-with-output-file* (*output-file*) #:exists 'replace
-                   init-repl)
-                 (init-repl)))))))))
+         (parameterize ([*interactive?* #t] [*online?* #f])
+           (with-ipoe-db #:commit? (*commit?*)
+                         #:user u
+                         #:dbname d
+             (lambda ()
+               (printf "Connected to database '~a' as user '~a'.\n" d u)
+               (if (*output-file*)
+                   (call-with-output-file* (*output-file*) #:exists 'replace
+                     init-repl)
+                   (init-repl))))))))))
 
 (define PROMPT #"ipoe:db> ")
 
@@ -306,6 +307,7 @@
   (let loop ()
     (define input
       (parameterize ([readline-prompt PROMPT])
+        (display PROMPT)
         (read)))
     (match (for/or ([c (in-list COMMAND*)]) (c input))
      ['EXIT
@@ -441,9 +443,10 @@
 
   (define-syntax-rule (with-db-test e)
     (parameterize-from-hash o* (lambda ()
-      (parameterize ([*verbose* #t])
+      (parameterize ([*verbose* #t]
+                     [*interactive?* #f]
+                     [*online?* #f])
         (with-ipoe-db #:commit? #f
-                      #:interactive? #f
                       #:user (*user*)
                       #:dbname (*dbname*)
           (lambda () e))))))
