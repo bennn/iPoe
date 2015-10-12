@@ -51,13 +51,7 @@
   (for-syntax racket/base)
 )
 (if-windows
-  (begin
-    (define readline-prompt (make-parameter #"> "))
-    (define r:read read)
-    (define (read)
-      (begin
-        (display (readline-prompt))
-        (r:read))))
+  (require ipoe/private/util/windows-readline)
   (require readline readline/pread))
 
 ;; =============================================================================

@@ -1,7 +1,15 @@
 #lang racket/base
 
+;; Reflect on the current operating system.
+;; This is all because the `readline` library does not work on Windows.
+;; (But may be useful later, anyway)
+
 (provide
   if-windows
+  ;; (if-windows yes no)
+  ;; Conditional macro.
+  ;; If the current operating system is windows, execute `yes`.
+  ;; Otherwise, execute `no`.
 )
 
 (require
