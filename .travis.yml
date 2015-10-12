@@ -11,10 +11,10 @@ before_install:
   - cat ../travis-racket/install-racket.sh | bash
   - export PATH="${RACKET_DIR}/bin:${PATH}"
 
-install: raco pkg install --deps search-auto $TRAVIS_BUILD_DIR
+install: raco pkg install --deps search-auto $TRAVIS_BUILD_DIR/ipoe
 
 script:
-  - raco test $TRAVIS_BUILD_DIR
+  - raco test $TRAVIS_BUILD_DIR/ipoe
 
 after_success:
-  - raco cover -f coveralls -d $TRAVIS_BUILD_DIR/coverage ipoe/private
+  - raco cover -f coveralls -d $TRAVIS_BUILD_DIR/coverage $TRAVIS_BUILD_DIR/ipoe/private
