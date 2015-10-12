@@ -76,7 +76,8 @@
       (read)))
   (let loop ([response (read/prompt)])
     (cond
-     [(and nullable? (eq? #f response))
+     [(or (eof-object? response)
+          (and nullable? (eq? #f response)))
       #f]
      [(valid? response)
       => (lambda (x) x)]
