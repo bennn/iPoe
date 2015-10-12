@@ -153,7 +153,7 @@
                                      #:description USER-DESCRIPTION))))
   (define db (or db-param
                  (unbox adhoc-dbname)
-                 (and (*interactive?*)
+                 (and u (*interactive?*)
                       (not online-only?)
                       (get-user-input read-string
                                       #:nullable? #t
