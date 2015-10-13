@@ -24,23 +24,8 @@
 (define-syntax (if-windows stx)
   (syntax-parse stx
    [(_ yes no)
-    (if (windows?)
-      (syntax/loc stx yes)
-      (syntax/loc stx no))]
+    (case (system-type 'os)
+      [(windows) (syntax/loc stx yes)]
+      [(unix macosx) (syntax/loc stx no)])]
    [_ (error 'if-windows
         (format "Expected (if-windows YES NO), got '~a'" (syntax->datum stx)))]))
-
-(begin-for-syntax
-  ;; Check if we're on a Unix-like system
-  (define (unix?)
-    (string=? (path->string
-                (last
-                  (explode-path (find-system-path 'init-file))))
-              ".racketrc"))
-
-  (define (windows?)
-    (not (unix?)))
-
-  (define gnu
-    windows?)
-)
