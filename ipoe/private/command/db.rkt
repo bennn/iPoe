@@ -286,7 +286,8 @@
                          #:user u
                          #:dbname d
              (lambda ()
-               (printf "Connected to database '~a' as user '~a'.\n" d u)
+               (printf "Connected to database~a.\n"
+                 (if (and u d) (format " '~a' as user '~a'" d u) ""))
                (if (*output-file*)
                    (call-with-output-file* (*output-file*) #:exists 'replace
                      init-repl)
