@@ -17,6 +17,7 @@ before_script:
   - psql -c 'create database travis_ci_test;' -U postgres
   - echo "#:user \"postgres\"" >> $HOME/.ipoe
   - echo "#:dbname \"travis_ci_test\"" >> $HOME/.ipoe
+  - yes | raco ipoe init
 
 script:
   - raco test $TRAVIS_BUILD_DIR/ipoe
