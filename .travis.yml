@@ -13,6 +13,10 @@ before_install:
 
 install: raco pkg install --deps search-auto $TRAVIS_BUILD_DIR/ipoe
 
+before_script:
+  - psql -c 'create database travis_ci_test;' -U postgres
+  - echo "#:user \"postgres\"\n#:dbname \"travis_ci_test\"" > $TRAVIS_BUILD_DIR/.ipoe
+
 script:
   - raco test $TRAVIS_BUILD_DIR/ipoe
 
