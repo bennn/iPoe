@@ -49,7 +49,6 @@
   [make-poem (-> (listof string?) poem?)]
   ;; (-> String Poem)
   ;; Parse a poem from an input source
-  ;; TODO add more sources (input-port, path-string)
 
   [poem-count-stanza* (-> poem? natural-number/c)]
   ;; (-> Poem Natural)
@@ -219,6 +218,7 @@
     (word/loc w w-num l-num s-num)))
 
 (define (make-poem line*)
+  ;; 2015-10-04: Eventually add more input sources
   (define stanza*
     (for/vector ([s (line*->stanza* line*)])
       s))

@@ -42,13 +42,13 @@
         [rkt ;; Shortcut for checking, instead of 'racket FILE.rkt'
          #:when (string-suffix? (car ARG*) ".rkt")
          (cmd:check ARG*)]
-        ['db
-         (cmd:db (cdr ARG*))]
+        [(or 'db 'dbshell)
+         (cmd:dbshell (cdr ARG*))]
         ['help
          (print-help)]
         ['init
          (cmd:init (cdr ARG*))]
-        ['new
+        [(or 'new 'add)
          (cmd:new (cdr ARG*))]
         ['remove
          (cmd:remove (cdr ARG*))]

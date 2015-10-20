@@ -2,10 +2,8 @@
 
 ;; Command-line interface to the DB repl
 
-;; TODO syllables*, has-syllables?
-
 (provide
-  db
+  dbshell
   ;; (-> '() Void)
   ;; Start a fresh REPL for the database
 )
@@ -263,7 +261,7 @@
 ;; -----------------------------------------------------------------------------
 ;; --- REPL
 
-(define (db arg*)
+(define (dbshell arg*)
   ;; -- repl
   (command-line
    #:argv arg*
@@ -282,16 +280,17 @@
          (define u (or (*cmd-user*) (*user*)))
          (define d (or (*cmd-dbname*) (*dbname*)))
          (parameterize ([*interactive?* #t] [*online?* #f])
-           (with-ipoe-db #:commit? (*commit?*)
-                         #:user u
-                         #:dbname d
-             (lambda ()
-               (printf "Connected to database~a.\n"
-                 (if (and u d) (format " '~a' as user '~a'" d u) ""))
-               (if (*output-file*)
-                   (call-with-output-file* (*output-file*) #:exists 'replace
-                     init-repl)
-                   (init-repl))))))))))
+          (with-ipoe-db #:commit? (*commit?*)
+                        #:user u
+                        #:dbname d
+            (lambda ()
+              (printf "Connected to database '~a' as user '~a'.\n" d u)
+              (if (*output-file*)
+                  (call-with-output-file* (*output-file*) #:exists 'replace
+                    init-repl)
+                  (init-repl))))))))))
+
+(define PROMPT #"ipoe:db> ")
 
 (define (init-repl [port #f])
   ;; -- Factor all REPL interactions through `respond`,
@@ -473,13 +472,24 @@
    (let* ([id 'id->word]
           [exec (get-exec id)]
           [w "iabpgasgasd"])
-     (add-word/nothing w)
+     (add-word w)
      (define wid (word->id w))
      (check-equal? (exec (list id wid))  w)
      (remove-word w)
      (check-regexp-match #rx"^Unbound ID" (exec (list id wid)))
      (check-regexp-match #rx"^id->word: expected" (exec (list id "foo")))
      (check-false (exec 'blah))))
+
+  ;; --- remove-word
+  (with-db-test
+   (let* ([id 'remove-word]
+          [exec (get-exec id)]
+          [w "gyehqurghba"])
+     (add-word w)
+     (check-true (word-exists? w))
+     (check-regexp-match #rx"^Success"
+       (exec (list id w)))
+     (check-false (word-exists? w))))
 
   ;; --- rhymes-with?
   (with-db-test
@@ -488,9 +498,9 @@
           [r "asdgasdga"]
           [cmd (list 'rhymes-with? w r)])
      (check-regexp-match #rx"^Unknown word" (exec cmd))
-     (add-word/nothing w)
+     (add-word w)
      (check-regexp-match #rx"^Unknown word" (exec cmd))
-     (add-word/nothing r)
+     (add-word r)
      (check-equal? (exec cmd) "#f")
      (add-rhyme w r)
      (check-equal? (exec cmd) "#t")
@@ -507,7 +517,7 @@
           [s (string-length w)]
           [cmd (list 'syllables->word* s)])
      (check-equal? (exec cmd) "")
-     (add-word/nothing w)
+     (add-word w)
      (check-equal? (exec cmd) w)
      ;; --
      (check-equal? (exec (list id s '#:limit 5)) w)
@@ -528,9 +538,9 @@
           [cmd (list id w a)])
      (check-regexp-match #rx"^Unknown word" (exec cmd))
      ;; --
-     (add-word/nothing w)
+     (add-word w)
      (check-equal? (exec cmd) "")
-     (add-word/nothing a)
+     (add-word a)
      (add-rhyme w a)
      (check-equal? (exec cmd) "")
      (add-almost-rhyme w a)
@@ -551,7 +561,7 @@
           [exec (get-exec id)]
           [w "iabpgasgasd"]
           [cmd (list id w)])
-     (add-word/nothing w)
+     (add-word w)
      (define wid (word->id w))
      (check-equal? (exec cmd) wid)
      (remove-word w)
@@ -568,9 +578,9 @@
           [cmd (list id w a)])
      (check-regexp-match #rx"^Unknown word" (exec cmd))
      ;; --
-     (add-word/nothing w)
+     (add-word w)
      (check-equal? (exec cmd) "")
-     (add-word/nothing a)
+     (add-word a)
      (add-almost-rhyme w a)
      (check-equal? (exec cmd) "")
      (add-rhyme w a)
@@ -594,7 +604,7 @@
           [r (number->string s)]
           [cmd (list id w)])
      (check-regexp-match #rx"^Unknown word" (exec cmd))
-     (add-word/nothing w)
+     (add-word w)
      (check-equal? (exec cmd) r)
      ;; --
      (check-equal? (exec (list id w '#:limit 5)) r)
@@ -613,7 +623,7 @@
           [w "ahvgiwdvweqwetwetwe"]
           [cmd (list id w)])
      (check-equal? (exec cmd) "#f")
-     (add-word/nothing w)
+     (add-word w)
      (check-equal? (exec cmd) "#t")
      ;; --
      (check-regexp-match #rx"^word-exists\\?: expected" (exec (list id 'fasodg)))

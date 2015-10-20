@@ -1,10 +1,12 @@
 #lang racket/base
 
-;; TODO update all words
+;; TODO update all words (audit)
 
 (provide
   update
 )
+
+;; -----------------------------------------------------------------------------
 
 (require
   ipoe/private/parameters

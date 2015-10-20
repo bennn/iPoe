@@ -1,5 +1,7 @@
 #lang racket/base
 
+;; Start a fresh ipoe database
+
 (provide
   init
 )
@@ -35,11 +37,14 @@
        (lambda ()
          (define u (get-username (*new-user*) (*user*)))
          (define d (get-dbname   (*new-dbname*) (*dbname*)))
-         (unless (psql-exists? u d)
-           (and
-             (psql-create-user u)
-             (psql-create-db u d)
-             (psql-create-tables u d)
+         (and
+           (unless (psql-user-exists? u)
+             (psql-create-user u))
+           (unless (psql-db-exists? u d)
+             (psql-create-db u d))
+           (unless (psql-tables-exist? u d)
+             (psql-create-tables u d))
+           (unless (and (*user*) (*dbname*))
              (save-config u d))))))))
 
 ;; -----------------------------------------------------------------------------
@@ -93,10 +98,20 @@
 ;; (2015-09-21: could try to create user here like the name suggests, but
 ;;              we do need a superuser ...)
 (define (psql-create-user user)
+  (define cmd (format "createuser -d ~a" user))
+  (init-error "User '~a' does not exist. Run the command '~a' as a superuser and try again." user cmd))
+
+(define (psql-user-exists? user)
   (alert (format "Checking that user '~a' is recognized by psql ..." user))
-  (unless (system (format "psql -U ~a -l > /dev/null 2>&1" user))
-    (define cmd (format "createuser -d ~a" user))
-    (init-error "User '~a' does not exist. Run the command '~a' as a superuser and try again." user cmd)))
+  (system (format "psql -U ~a -l > /dev/null 2>&1" user)))
+
+(define (psql-db-exists? user dbname)
+  (alert (format "Checking that user '~a' has access to psql database '~a' ..." user dbname))
+  (system (format "psql -U ~a -d ~a -l > /dev/null 2>&1" user dbname)))
+
+(define (psql-tables-exist? user dbname)
+  (alert (format "Checking that 'word' database exists ..."))
+  (not (system (format "psql -U ~a -d ~a -c \"SELECT relname FROM pg_class WHERE relname='word';\" | grep -q \"0 rows\"" user dbname))))
 
 (define DESCRIPTION "DB for the Interactive Poetry Editor (ipoe)")
 (define (psql-create-db user dbname)
@@ -110,16 +125,6 @@
                 #:user user
                 #:dbname dbname
     create-ipoe-tables))
-
-;; True if we already have a database `d` for user `u`.
-(define (psql-exists? u d)
-  (alert "Checking for existing connection ...")
-  (and
-    ;; Try to connect, and watch for the exception
-    (with-handlers ([exn:fail:user? (lambda (e) #f)])
-      (with-ipoe-db #:commit? #f #:user u #:dbname d (lambda () #t)))
-    (alert (format "Successfully tested connection to existing database '~a' with user '~a'. No need to initialize a new database." d u))
-    #t))
 
 (define (psql-installed?)
   (alert "Checking for `psql` command ...")
@@ -155,21 +160,21 @@
 (module+ test
   (require rackunit ipoe/private/util/rackunit-abbrevs)
 
-  ;; -- get-username TODO
+  ;; -- get-username
   (check-apply* (lambda (k1 k2)
                   (check-print (list #rx"command-line$")
                     (lambda () (get-username k1 k2))))
    ["foo" #f == "foo"]
    ["foo" "bar" == "foo"])
 
-  ;; -- get-dbname TODO
+  ;; -- get-dbname
   (check-apply* (lambda (k1 k2)
                   (check-print (list #rx"command-line$")
                     (lambda () (get-username k1 k2))))
    ["foo" #f == "foo"]
    ["foo" "bar" == "foo"])
 
-  ;; -- param-fallback TODO
+  ;; -- param-fallback
   (check-equal?
     (check-print (list #rx"command-line$")
       (lambda () (param-fallback "yes" #f #:src #f #:prompt #f #:descr #f)))
@@ -204,39 +209,22 @@
         (lambda () (psql-create-user "FAKE-USER")))))
 
   ;; -- psql-create-user, success
-  (parameterize-from-hash (options-init)
-    (lambda ()
-      (define u (*user*))
-      (cond
-       [u
-        ;; User exists, let's try the test
-        (check-equal?
-          (check-print (list #rx"^Checking that user")
-            (lambda () (psql-create-user u)))
-          (void))]
-       [else
-        (displayln "TEST WARNING: cannot run psql-create-user success test, could not infer a valid DB user")])))
+  ;(parameterize-from-hash (options-init)
+  ;  (lambda ()
+  ;    (define u (*user*))
+  ;    (cond
+  ;     [u
+  ;      ;; User exists, let's try the test
+  ;      (check-equal?
+  ;        (check-print (list #rx"^Checking that user")
+  ;          (lambda () (psql-create-user u)))
+  ;        (void))]
+  ;     [else
+  ;      (displayln "TEST WARNING: cannot run psql-create-user success test, could not infer a valid DB user")])))
 
   ;; -- psql-create-db TODO
 
   ;; -- psql-create-tables TODO
-
-  ;; -- psql-exists?, pass
-  (parameterize-from-hash (options-init)
-    (lambda ()
-      (check-true
-        (check-print
-          (list
-            #rx"^Checking for existing connection"
-            #rx"^Successfully tested connection")
-          (lambda () (psql-exists? (*user*) (*dbname*)))))))
-
-  ;; -- psql-exists?, fail
-  (check-false
-    (check-print
-      (list #rx"^Checking")
-      (lambda ()
-        (psql-exists? "FAKE-USER" "FAKE-DB"))))
 
   ;; -- psql-installed?, pass (machine-dependent)
   (check-true

@@ -68,17 +68,14 @@
   (define-syntax-rule (with-db-test e)
     (parameterize-from-hash o*
       (lambda ()
+       (parameterize ([*interactive?* #f])
         (with-ipoe-db #:user (*user*)
                       #:dbname (*dbname*)
                       #:commit? #f
-          (lambda () e)))))
+          (lambda () e))))))
 
   (define-syntax-rule (add-word/nothing w)
-    (add-word w #:syllables 1
-                #:rhymes '()
-                #:almost-rhymes '()
-                #:interactive? #f
-                #:online? #f))
+    (add-word w #:syllables 1))
 
   (define-syntax-rule (check-pass? e)
     (check-true (null? e)))

@@ -4,7 +4,6 @@
 
 (provide
   add-word add-word*
-  ;; (->* TODO)
   ;; Add a new word to the database.
   ;; First three optional arguments supply information for the word's syllables, rhymes,
   ;;  and almost-rhymes.
@@ -78,6 +77,8 @@
   ;; (->* [string?] [#:db connection?] boolean?)
   ;; True if the second argument is in the database
 )
+
+;; -----------------------------------------------------------------------------
 
 (require
   db/base
@@ -808,7 +809,6 @@
 
   ;; -------------------------------------------------------------------
 
-  ;; TODO Warn & ignore local config
   (define o*
     (let-values ([(gc lc) (get-config-filenames)])
       (if (file-exists? lc)
@@ -1553,7 +1553,7 @@
       ;;  (check-true (almost-rhymes-with? w2 w1)))))
 
 
-  ;; -- update-word* TODO
+  ;; -- update-word*
   (with-db-test
     (let ([w1 "asdgahwrfs"]
           [w2 "rgefsqedsg"])
@@ -1582,7 +1582,7 @@
        (check-print
          "";(list #rx"not connected")
          (lambda () (update-word w))))
-     (check-false
+     #;(check-false
        (check-print
          (list #rx"does not exist")
          (lambda () (with-db-test (update-word w)))))))

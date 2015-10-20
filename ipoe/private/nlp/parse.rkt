@@ -68,7 +68,7 @@
 ;; Get the words from a string
 (define (parse-word* str)
   (or (number->word* str)
-      ;; TODO register new parsers here
+      ;; 2015-10-04: register new parsers here
       (let ([w (string-normalize-downcase str)])
         (cond
          [(string-empty? w)
@@ -124,9 +124,7 @@
   (define-syntax-rule (check-parse-error* str ...)
     (begin
       (check-equal?
-        (check-print
-          (list #rx"^Cannot parse")
-          (lambda () (parse-word* str)))
+        (parse-word* str)
         '()) ...))
 
   (check-parse-error*

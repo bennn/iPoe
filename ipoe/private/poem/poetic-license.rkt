@@ -119,12 +119,17 @@
           (unbox (license-quirk* L))))
 
   ;; -- poetic-license-apply
+  ;; No penalty = no exception
+  (check-not-exn
+    (lambda () (poetic-license-apply (poetic-license-init 1)
+                 (list (quirk 0 "yolo")))))
+
   (define-syntax-rule (check-exn/license [L q] ...)
     (begin
       (check-exn #rx"ipoe"
         (lambda () (poetic-license-apply L (list q)))) ...))
 
-  (let ([q0 (quirk 0 "hi")]
+  (let ([q0 (quirk 1 "hi")]
         [q1 (quirk 5 "ho")]
         [q2 (quirk 67 "hu")]
         [L1 (poetic-license-init 1)]
@@ -133,7 +138,7 @@
                   (poetic-license-apply L q*)
                   (poetic-license->cons L))
    [L1 (list q0)
-    == (cons 1 (list q0))]
+    == (cons 0 (list q0))]
    [L2 (list q1 q1 q2)
     == (cons 8923 (list q2 q1 q1))])
   ;; --
