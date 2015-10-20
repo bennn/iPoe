@@ -290,8 +290,6 @@
                     init-repl)
                   (init-repl))))))))))
 
-(define PROMPT #"ipoe:db> ")
-
 (define (init-repl [port #f])
   ;; -- Factor all REPL interactions through `respond`,
   ;;    so they get saved to the logfile
