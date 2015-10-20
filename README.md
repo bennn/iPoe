@@ -1,7 +1,7 @@
 iPoe
 ====
-[![Build Status](https://travis-ci.org/bennn/ipoe.svg)](https://travis-ci.org/bennn/ipoe)
-[![Coverage Status](https://coveralls.io/repos/bennn/ipoe/badge.svg?branch=master&service=github)](https://coveralls.io/github/bennn/ipoe?branch=master)
+[![Build Status](https://travis-ci.org/bennn/iPoe.svg)](https://travis-ci.org/bennn/iPoe)
+[![Coverage Status](https://coveralls.io/repos/bennn/iPoe/badge.svg?branch=master&service=github)](https://coveralls.io/github/bennn/iPoe?branch=master)
 
 Interactive POetry Editor
 
