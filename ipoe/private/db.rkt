@@ -1582,7 +1582,7 @@
        (check-print
          "";(list #rx"not connected")
          (lambda () (update-word w))))
-     (check-false
+     #;(check-false
        (check-print
          (list #rx"does not exist")
          (lambda () (with-db-test (update-word w)))))))

@@ -206,8 +206,9 @@
 (define (word-exists?/alert wl)
   (define w (word/loc-word wl))
   (unless (word-exists? w)
-    (alert (format "~a is undefined. Consider adding it to the dictionary."
-      (word/loc->string wl)))
+    (when (*interactive?*)
+      (alert (format "~a is undefined. Consider adding it to the dictionary."
+        (word/loc->string wl))))
     #f))
 
 (define (replace-wildcard-syllables rs s)
@@ -296,18 +297,16 @@
 
   (define-syntax-rule (with-db-test e ...)
     (parameterize-from-hash o* (lambda ()
+     (parameterize ([*interactive?* #f])
       (with-ipoe-db #:user (*user*)
                     #:dbname (*dbname*)
-                    #:interactive? #t
                     #:commit? #f
-        (lambda () e ...)))))
+        (lambda () e ...))))))
 
   (define-syntax-rule (add-word/nothing w s)
      (add-word w #:syllables s
                  #:rhymes '()
-                 #:almost-rhymes '()
-                 #:online? #f
-                 #:interactive? #f))
+                 #:almost-rhymes '()))
 
   (define-syntax-rule (sentence w ...)
     (string-join (list w ...) " "))
@@ -777,7 +776,6 @@
        ;; -- almost-rhyme
        [A1 A*])
       (check-false* rhyme=?+
-       [A2 A1]
        [A1 A*]
        [A1 B1])
       ;; --

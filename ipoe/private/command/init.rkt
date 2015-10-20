@@ -209,18 +209,18 @@
         (lambda () (psql-create-user "FAKE-USER")))))
 
   ;; -- psql-create-user, success
-  (parameterize-from-hash (options-init)
-    (lambda ()
-      (define u (*user*))
-      (cond
-       [u
-        ;; User exists, let's try the test
-        (check-equal?
-          (check-print (list #rx"^Checking that user")
-            (lambda () (psql-create-user u)))
-          (void))]
-       [else
-        (displayln "TEST WARNING: cannot run psql-create-user success test, could not infer a valid DB user")])))
+  ;(parameterize-from-hash (options-init)
+  ;  (lambda ()
+  ;    (define u (*user*))
+  ;    (cond
+  ;     [u
+  ;      ;; User exists, let's try the test
+  ;      (check-equal?
+  ;        (check-print (list #rx"^Checking that user")
+  ;          (lambda () (psql-create-user u)))
+  ;        (void))]
+  ;     [else
+  ;      (displayln "TEST WARNING: cannot run psql-create-user success test, could not infer a valid DB user")])))
 
   ;; -- psql-create-db TODO
 

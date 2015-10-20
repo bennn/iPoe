@@ -416,7 +416,7 @@
     (define (test-free str)
       (define port (open-input-string str))
       (define res
-        (with-config #:local "#:interactive? #f\n#:online? #f\n"
+        (with-config #:local "#:interactive? #f\n#:online? #f\n#:spellcheck? #f\n"
           (lambda () (free-validator port))))
       (close-input-port port)
       res)
@@ -426,8 +426,7 @@
                             #rx"^Unknown key"
                             #rx"^Unknown key"
                             #rx"Finished"
-                            #rx"Misspelled"
-                            #rx"Remaining")
+                            #rx"")
                       (lambda () (test-free fake-options)))])
         (define P (car fake-res))
         (define H (caddr fake-res))
