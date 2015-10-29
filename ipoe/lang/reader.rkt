@@ -49,7 +49,8 @@
                        (parameterize-from-hash O* dbshell))
                      (define help
                       "Type 'interact' to open a connection to the iPoe database")
-                     (define description descr)))))))))
+                     (define description descr)
+                     ;; Print a message in Dr.Racket
+                     (module+ test (displayln help))))))))))
 
-;; =============================================================================
 
