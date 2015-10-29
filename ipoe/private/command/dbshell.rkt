@@ -4,8 +4,9 @@
 
 (provide
   dbshell
-  ;; (-> '() Void)
+  ;; (->* [(Vectorof String)] Void)
   ;; Start a fresh REPL for the database
+  ;; Argument should be command line arguments
 )
 
 ;; -----------------------------------------------------------------------------
@@ -261,7 +262,7 @@
 ;; -----------------------------------------------------------------------------
 ;; --- REPL
 
-(define (dbshell arg*)
+(define (dbshell [arg* '#()])
   ;; -- repl
   (command-line
    #:argv arg*
