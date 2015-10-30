@@ -45,10 +45,10 @@
                      (require
                        (only-in ipoe/private/parameters parameterize-from-hash)
                        (only-in ipoe/private/command/dbshell dbshell))
-                     (define (interact)
+                     (define (connect)
                        (parameterize-from-hash O* dbshell))
                      (define help
-                      "Type 'interact' to open a connection to the iPoe database")
+                      "Type '(connect)' to open a connection to the iPoe database")
                      (define description descr)
                      ;; Print a message in Dr.Racket
                      (module+ test (displayln help))))))))))
