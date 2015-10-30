@@ -274,7 +274,7 @@
   (define (check-syllables scraper w)
     (word-result-num-syllables (scraper w)))
 
-  (check-apply* check-syllables
+  (check-apply* (lambda (scraper w) (word-result-num-syllables (scraper w)))
    [dictionary.com "each" == 1]
    [the-free-dictionary "each" == 1]
    [merriam-webster "each" == 1]

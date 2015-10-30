@@ -37,11 +37,20 @@
            (define (custom-read in)
              (syntax->datum (custom-read-syntax #f in)))
            (define (custom-read-syntax src-path in)
-             (with-syntax ([str (validate in)])
-               (strip-context #'(module anything racket
-                                  (provide text description)
-                                  (define description descr)
-                                  (define text 'str)))))))))
+             (with-syntax ([(P L O*) (validate in)]
+                           [mod-id2 (gensym 'mod-id)])
+               (strip-context
+                 #'(module mod-id2 racket
+                     ;; Set up a basic interactions environment
+                     (require
+                       (only-in ipoe/private/parameters parameterize-from-hash)
+                       (only-in ipoe/private/command/dbshell dbshell))
+                     (define (connect)
+                       (parameterize-from-hash O* dbshell))
+                     (define help
+                      "Type '(connect)' to open a connection to the iPoe database")
+                     (define description descr)
+                     ;; Print a message in Dr.Racket
+                     (module+ test (displayln help))))))))))
 
-;; =============================================================================
 

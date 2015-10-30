@@ -4,8 +4,9 @@
 
 (provide
   dbshell
-  ;; (-> '() Void)
+  ;; (->* [(Vectorof String)] Void)
   ;; Start a fresh REPL for the database
+  ;; Argument should be command line arguments
 )
 
 ;; -----------------------------------------------------------------------------
@@ -23,6 +24,7 @@
     sequence-empty?
     sequence-skip)
   ;; --
+  (only-in racket/format ~a)
   (only-in racket/string string-join string-split)
   (only-in racket/sequence
     sequence->list)
@@ -238,11 +240,12 @@
     (symbol->string (command-id cmd))))
 
 (define HELP-STR
-  (string-join
-    (for/list ([c (in-list COMMAND*)])
-      (format "    ~a : ~a" (command-id c) (command-descr c)))
-    "\n"
-    #:before-first "Available commands:\n"))
+  (let ([W (apply max (map (compose1 string-length symbol->string command-id) COMMAND*))])
+    (string-join
+     (for/list ([c (in-list COMMAND*)])
+       (format "    ~a : ~a" (~a (command-id c)#:min-width W) (command-descr c)))
+     "\n"
+     #:before-first "Available commands:\n")))
 
 ;; -----------------------------------------------------------------------------
 ;; --- Parameters
@@ -261,7 +264,7 @@
 ;; -----------------------------------------------------------------------------
 ;; --- REPL
 
-(define (dbshell arg*)
+(define (dbshell [arg* '#()])
   ;; -- repl
   (command-line
    #:argv arg*
@@ -285,6 +288,7 @@
                         #:dbname d
             (lambda ()
               (printf "Connected to database '~a' as user '~a'.\n" d u)
+              (printf "Enter 'help' for information and 'quit' to quit.\n")
               (if (*output-file*)
                   (call-with-output-file* (*output-file*) #:exists 'replace
                     init-repl)

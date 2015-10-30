@@ -16,7 +16,6 @@
   (for-syntax
     racket/base
     syntax/parse
-    (only-in racket/list last)
 ))
 
 ;; =============================================================================
