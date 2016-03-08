@@ -16,6 +16,7 @@
                 [* * * * * *]
                 [* * *]}
 #:constraint ;; Really, this is many constraints. Hence 'apply append'
+ (lambda ()
  (apply append
    ;; Word constraints (after position 0, want +1, +3, +4, +1, +2)
    (for/list ([l+s* (in-list '(((0 . 0) (1 . 1) (3 . 2) (4 . 3) (2 . 4) (5 . 5))
@@ -26,12 +27,13 @@
                                ((5 . 0) (0 . 1) (1 . 2) (3 . 3) (4 . 4) (2 . 5))))])
      (define (get-word l+s)
        (last-word (line (car l+s) (stanza (cdr l+s)))))
-     (apply word=? (map get-word l+s*))))
+     (apply word=? (map get-word l+s*)))))
 
 #:constraint
   ;; Tercet constraints.
   ;; A specific pair of words must appear in each line the second
   ;;  in each pair must be the last word in the line.
+ (lambda ()
   (apply append
    (for/list ([ln (stanza->line* (stanza -1))]
               [fw (in-list '(1 3 5))]
@@ -40,7 +42,7 @@
      (append
        (if (quirk? cw?) (list cw?) '())
        (word=? (last-word ln)
-         (last-word (line lw (stanza 0)))))))
+         (last-word (line lw (stanza 0))))))))
 
 ;; The examples I've seen only use the 6 words in the last line.
 ;; There's not as strict about the order, but

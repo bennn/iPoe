@@ -8,9 +8,9 @@
                  (B . 8)
                  (B . 8)
                  (A . 4)))
-#:constraint
+#:constraint (lambda ()
   (let ([S (stanza 0)])
     (line=? (line 0 S)
             (line 2 S)
-            (line 6 S)))
+            (line 6 S))))
 

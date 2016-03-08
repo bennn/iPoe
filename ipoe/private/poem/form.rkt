@@ -107,7 +107,7 @@
       ;; Keyword for extra constraints
       (define c (read-keyword-value in (lambda (x) #t)
                                     #:kw '#:constraint #:src err-loc))
-      (define c+ (validator? c))
+      (define c+ (valid-constraint? c))
       (unless c+ (user-error err-loc (format "Expected a constraint expression, but got '~a'" c)))
       (loop name rhyme-scheme syllables description (cons c+ constraint*))]
      ;; -- Check for unknown symbols
@@ -128,7 +128,7 @@
       (loop name rhyme-scheme syllables d constraint*)]
      [x
       ;; Try parsing `x` as a validator, otherwise fail because it's undefined data
-      (define c (validator? x))
+      (define c (valid-constraint? x))
       (cond
        [c
         (loop name rhyme-scheme syllables description (cons c constraint*))]
@@ -218,20 +218,19 @@
           ;; -- Done! Return anything needed to make testing easy
           (list P L option*)))))))
 
-;; Parse a syntax object as a function in a restricted namespace.
-;; If ok, return the original syntax object.
-;; TODO make sure these are good error messages
-;; TODO raise error if compiles without *poem* set?
-;; TODO rename, should be constraint? or something
-;; (: validator? (-> Syntax Syntax))
-(define (validator? expr)
-  ;; -- Just compile, name sure doesn't error
-  ;(define evaluated
-  ;  (with-constraint-namespace
-  ;    (eval expr (current-namespace))))
-  expr)
+;; A constraint is an extra thunk run after the poem is processed,
+;;  and assumed to evaluate to #f if some part of the poem is malformed.
+;; (: valid-constraint? (-> Syntax (U #f Syntax)))
+(define (valid-constraint? raw-expr)
+  (define expr
+    (with-handlers ([exn:fail? (lambda (e) #f)])
+      (with-constraint-namespace
+        (eval (compile raw-expr)))))
+  (and expr
+       (procedure? expr)
+       (procedure-arity-includes? expr 0)
+       expr))
 
-;; TODO namespace should be very restricted
 (define-syntax-rule (with-constraint-namespace e)
   (parameterize ([current-namespace (make-base-namespace)])
     (namespace-require 'ipoe/private/poem)
@@ -263,15 +262,6 @@
     (only-in racket/port with-input-from-string)
     (only-in racket/string string-split)
   )
-
-;  ;; -- helper function, convert a syntactic function into a lambda
-;  (define (eval-extra-validator F)
-;    (stx->validator (form-extra-validator F)))
-;
-;  (define (stx->validator stx)
-;    (parameterize ([current-namespace (make-base-namespace)])
-;      (namespace-require 'ipoe/sugar)
-;      (eval stx (current-namespace))))
 
   ;; -- check-duplicate
   ;; Always void if first arg is #f
@@ -318,20 +308,20 @@
   (let* ([ps (test-make-form (string-append
                                      "#:name has-extra "
                                      "#:rhyme-scheme ((1 2 3) (A B (C . 3))) "
-                                     "#:constraint #t"))]
+                                     "#:constraint (lambda () #t)"))]
          [c* (form-constraint* ps)])
     (check-true (form? ps))
     (check-equal? (form-name ps) 'has-extra)
     (check-equal? (form-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
     (check-true (list? c*))
     (check-equal? (length c*) 1)
-    (check-true (with-constraint-namespace (eval (car c*)))))
+    (check-true ((with-constraint-namespace (eval (car c*))))))
 
-  (let* ([ps (test-make-form "name (((Schema . 42))) #t")]
+  (let* ([ps (test-make-form "name (((Schema . 42))) (lambda () #t)")]
          [c* (form-constraint* ps)])
     (check-true (form? ps))
     (check-equal? (form-name ps) 'name)
-    (check-true (with-constraint-namespace (eval (car c*)))))
+    (check-true ((with-constraint-namespace (eval (car c*))))))
 
   ;; -- read-keyword-value
   (let* ([src 'rkvtest]
@@ -463,34 +453,30 @@
        ['yes == #f]
        ['no == #f])))
 
-;  ;; -- validator?
-;  (check-false* validator?
-;   ['#f]
-;   [#f]
-;   [''(1 2 3)]
-;   ['(+ 1 1)]
-;   ["hello"])
-;
-;  (check-true* (lambda (v) (and (validator? v) #t))
-;   ['(lambda (x) #t)]
-;   ['(lambda (x) #f)]
-;   ['(lambda (x) (< 5 (length x)))])
-;
-;  ;; --- test a "good" validator function
-;  ;;     2015-08-19: removed contract checks
-;  (let* ([v-stx (validator? '(lambda (x) (null? x)))]
-;         [v (stx->validator v-stx)])
-;    (check-true (v '()))
-;    (check-false (v '(())))
-;    ; (check-exn exn:fail:contract? (lambda () (v 1)))
-;  )
-;  ;; 2015-08-27: Commented validator tests until we bring back the contracts
-;  ; ;; --- invalid validator: wrong domain
-;  ; (check-exn exn:fail:contract?
-;  ;            (lambda () (validator? '(lambda (x y) x))))
-;  ; ;; --- invalid validator: wrong codomain
-;  ; (let ([v (validator? '(lambda (x) x))])
-;  ;   (check-exn exn:fail:contract?
-;  ;              (lambda () (v '()))))
+  ;; -- valid-constraint?
+  (check-false* valid-constraint?
+   ['#f]
+   [#f]
+   [''(1 2 3)]
+   ['(+ 1 1)]
+   ['(lambda (x) x)]
+   ['(lambda (x y #:z z) #t)]
+   ["hello"])
+
+  (check-true* (lambda (v) (and (valid-constraint? v) #t))
+   ['(lambda () #t)]
+   ['(lambda () #f)]
+   ['(lambda () (< 5 (length x)))])
+
+  ;; --- test a "good" validator function
+  (let ()
+    (let ([c (valid-constraint? '(lambda () #t))])
+      (check-true (if c #t #f))
+      (check-true (procedure? c))
+      (check-true (c)))
+    (let ([c (valid-constraint? '(lambda () (*poem*)))])
+      (check-true (if c #t #f))
+      (check-true (procedure? c))
+      (check-false (c))))
 )
 
