@@ -21,4 +21,6 @@ script:
   - raco test $TRAVIS_BUILD_DIR/ipoe
 
 after_success:
+  - raco setup --check-pkg-deps ipoe
+  - raco pkg install --auto cover cover-coveralls
   - raco cover -f coveralls -d $TRAVIS_BUILD_DIR/coverage $TRAVIS_BUILD_DIR/ipoe/private

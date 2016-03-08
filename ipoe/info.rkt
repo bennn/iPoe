@@ -10,8 +10,6 @@
    ))
 (define build-deps
   '("scribble-lib"
-    "cover"
-    "cover-coveralls"
     "racket-doc"))
 (define pkg-desc "Family of languages for editing poetry")
 (define pkg-authors '(ben))
