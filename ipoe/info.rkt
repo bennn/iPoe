@@ -3,9 +3,11 @@
 (define collection 'use-pkg-name)
 (define deps
   '("base" ;; v6.3
+    "html-parsing"
+    "levenshtein"
     "rackunit-lib"
     "sxml"
-    "levenshtein"))
+   ))
 (define build-deps
   '("scribble-lib"
     "cover"

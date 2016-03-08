@@ -34,7 +34,7 @@
 (require
   net/url
   (only-in html read-html)
-  (only-in "html.rkt" html->xexp)
+  (only-in html-parsing html->xexp)
   sxml
   (only-in ipoe/private/util/string
     string-count-chars)
