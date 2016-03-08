@@ -222,14 +222,11 @@
 ;;  and assumed to evaluate to #f if some part of the poem is malformed.
 ;; (: valid-constraint? (-> Syntax (U #f Syntax)))
 (define (valid-constraint? raw-expr)
-  (define expr
+  (define compile-ok?
     (with-handlers ([exn:fail? (lambda (e) #f)])
       (with-constraint-namespace
-        (eval (compile raw-expr)))))
-  (and expr
-       (procedure? expr)
-       (procedure-arity-includes? expr 0)
-       expr))
+        (and (compile raw-expr) #t))))
+  compile-ok?)
 
 (define-syntax-rule (with-constraint-namespace e)
   (parameterize ([current-namespace (make-base-namespace)])
@@ -308,20 +305,20 @@
   (let* ([ps (test-make-form (string-append
                                      "#:name has-extra "
                                      "#:rhyme-scheme ((1 2 3) (A B (C . 3))) "
-                                     "#:constraint (lambda () #t)"))]
+                                     "#:constraint #t"))]
          [c* (form-constraint* ps)])
     (check-true (form? ps))
     (check-equal? (form-name ps) 'has-extra)
     (check-equal? (form-rhyme-scheme ps) '((1 2 3) (A B (C . 3))))
     (check-true (list? c*))
     (check-equal? (length c*) 1)
-    (check-true ((with-constraint-namespace (eval (car c*))))))
+    (check-true (with-constraint-namespace (eval (car c*)))))
 
-  (let* ([ps (test-make-form "name (((Schema . 42))) (lambda () #t)")]
+  (let* ([ps (test-make-form "name (((Schema . 42))) #t")]
          [c* (form-constraint* ps)])
     (check-true (form? ps))
     (check-equal? (form-name ps) 'name)
-    (check-true ((with-constraint-namespace (eval (car c*))))))
+    (check-true (with-constraint-namespace (eval (car c*)))))
 
   ;; -- read-keyword-value
   (let* ([src 'rkvtest]
@@ -454,7 +451,7 @@
        ['no == #f])))
 
   ;; -- valid-constraint?
-  (check-false* valid-constraint?
+  #;(check-false* valid-constraint?
    ['#f]
    [#f]
    [''(1 2 3)]
@@ -463,13 +460,18 @@
    ['(lambda (x y #:z z) #t)]
    ["hello"])
 
+  ;; 2016-03-08 everything is valid
   (check-true* (lambda (v) (and (valid-constraint? v) #t))
+   ['#f]
+   [#f]
+   [''(1 2 3)]
+   ['(+ 1 1)]
    ['(lambda () #t)]
    ['(lambda () #f)]
    ['(lambda () (< 5 (length x)))])
 
   ;; --- test a "good" validator function
-  (let ()
+  #;(let ()
     (let ([c (valid-constraint? '(lambda () #t))])
       (check-true (if c #t #f))
       (check-true (procedure? c))
