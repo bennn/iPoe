@@ -152,8 +152,21 @@
   (and (psql-installed?)
        (or (psql-running?)
            ;; Heeeere we go!
-           (and (alert "No psql server found, starting a new server for user 'postgres' ...")
-                (system "su postgres -c 'pg_ctl start -D /var/lib/postgres/data -l /tmp/PGSQL.log'")))))
+           (let ([st (system-type 'os)])
+             (case st
+              [(macosx)
+               (define psql-dst (build-path (find-system-path 'home-dir) "Library" "LaunchAgents" "homebrew.mxcl.postgresql.plist"))
+               (unless (file-exists? psql-dst)
+                 (define psql-src "/usr/local/Cellar/postgresql/9.5.0/homebrew.mxcl.postgresql.plist")
+                 (unless (file-exists? psql-src)
+                   (init-error "Could not find psql sorouce file '~a'\n" psql-src))
+                 (system (format "cp ~a ~a" psql-src psql-dst)))
+               (system "launchctl load -w ~/Library/LaunchAgents/homebrew.mxcl.postgresql.plist")]
+              [(unix)
+               (and (alert "No psql server found, starting a new server for user 'postgres' ...")
+                    (system "su postgres -c 'pg_ctl start -D /var/lib/postgres/data -l /tmp/PGSQL.log'"))]
+              [else
+               (init-error "Cannot start ppostgres server on '~a', sorry" st)])))))
 
 ;; =============================================================================
 
