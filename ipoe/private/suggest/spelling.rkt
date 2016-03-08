@@ -19,7 +19,7 @@
 )
 
 (require
-  (only-in ipoe/private/suggest/levenshtein string-levenshtein)
+  (only-in levenshtein string-levenshtein)
   racket/runtime-path
 )
 
