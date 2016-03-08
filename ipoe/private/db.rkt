@@ -789,7 +789,10 @@
   (cond
    [(not ref-syllables)
     ;; Reference missing, just trust user
-    user-syllables]
+    (if (and (not user-syllables)
+             (*interactive?*))
+      (get-user-syllables)
+      user-syllables)]
    [(or (not user-syllables)
         (not (= user-syllables ref-syllables)))
     ;; User missing, OR user & ref disagree. Send a prompt.
