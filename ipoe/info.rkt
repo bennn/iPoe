@@ -2,10 +2,13 @@
 
 (define collection 'use-pkg-name)
 (define deps
-  '("base" ;; v6.3
+  '("base"
+    "db-lib"
     "html-parsing"
     "levenshtein"
+    "html-lib"
     "rackunit-lib"
+    "readline-lib"
     "sxml"
    ))
 (define build-deps
