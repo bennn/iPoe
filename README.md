@@ -2,43 +2,59 @@ iPoe
 ====
 [![Build Status](https://travis-ci.org/bennn/iPoe.svg)](https://travis-ci.org/bennn/iPoe)
 [![Coverage Status](https://coveralls.io/repos/bennn/iPoe/badge.svg?branch=master&service=github)](https://coveralls.io/github/bennn/iPoe?branch=master)
+[![Scribble](https://img.shields.io/badge/Docs-Scribble-blue.svg)](http://docs.racket-lang.org/ipoe/index.html)
 
 Interactive POetry Editor
 
-It's a text editor for poetry!
+It's a ~~text editor~~ compiler for poetry!
 
-[[ Insert screenshot here ]]
+```
+$ cat test.txt
+#lang ipoe/couplet
 
-Currently provides:
-- Validation for rhyme, syllable counts, line counts, and stanza counts
-- A specification language for poetic forms
+Humpty Dumpty sat on the wall
+Humpty Dumpty had a great big head
 
-Scroll to the bottom to see future plans.
+$ raco make test.txt
+ipoe: Expected a word to rhyme with 'wall', got 'head' (word 6, line 1, stanza 0)
+```
+
+#### Features:
+- Checking for rhyme, syllables, stanza counts, and line equality
+- Specification language (`#lang ipoe`) for defining new poetic forms
+
+Here is the specification for `#lang ipoe/couplet`.
+
+```
+#lang ipoe
+#:name couplet
+#:rhyme-scheme {[A A]}
+```
+
+That's 1 stanza with 2 rhyming lines with any number of syllables.
 
 
-Requirements
-------------
+## Install
 
-1. Install a recent development release of Racket (v6.2.900.17)
-2. Clone and install this repository:
-  ```git clone https://github.com/bennn/ipoe; raco pkg install ./ipoe```
-3. (Optional, but recommended) Install postgres.
+0. Install Racket v6.3 or later ([download](http://download.racket-lang.org/))
+1. Install this package
+  - from pkgs.racket-lang.org : `$ raco pkg install ipoe`
+  - or from GitHub : `$ git clone https://github.com/bennn/ipoe; raco pkg install ./ipoe`
+3. (optional) Install PostgreSQL ([download](https://www.postgresql.org/download))
+4. Connect to the internet
 
-If you skip step 3 that's fine, we just save data on words locally, in your current directory.
 
+## Getting Started
 
-Getting Started
----------------
-1. Run `raco ipoe init` to initialize a database
-2. Check out the built-in poetic forms [[TODO how?]]
-3. Write a poem: `hello.rkt`
+1. (if `postgresql` is running) Run `raco ipoe init` to initialize a database
+2. Browse the built-in poetic forms (`raco ipoe show`)
+3. Write a poem, e.g. `hello.rkt`
 4. Run `racket hello.rkt`
 
 
-Future Work
------------
-High-concern issues to deal with later.
-These are also on the [issues](https://github.com/bennn/iPoe/issues) page.
+## Future Work
+
+Check the [issue tracker](https://github.com/bennn/iPoe/issues) for more.
 
 #### Sharing & Collaboration
 - Submit poems, poetic forms, and words to a central repository
@@ -48,9 +64,11 @@ These are also on the [issues](https://github.com/bennn/iPoe/issues) page.
 
 #### Semantics
 - Include word meaning in the analysis, especially when giving suggestions
-- Use [WordNet](https://wordnet.princeton.edu/)
+- Try [WordNet](https://wordnet.princeton.edu/)
 
 #### Algorithms for Rhyme and Syllables
 - Especially a problem for rhymes (syllable information is more accurate)
 - Use the dictionary pronunciations / phonics
 
+#### Learning
+- Instead of using the internet / the user, parse Shakespeare's works and infer what words rhyme etc.
