@@ -171,7 +171,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
   ;; -- get-username
   (check-apply* (lambda (k1 k2)
@@ -198,22 +198,20 @@
       (lambda () (param-fallback #f "yes" #:src #f #:prompt #f #:descr #f)))
     "yes")
 
-  (define-syntax-rule (check-bad-param-0 p)
-    (check-exn #rx"ipoe:init"
+  (define ((check-bad-param-0 p))
+    (check-print (list #rx"^Got")
       (lambda ()
-        (check-print (list #rx"^Got")
-          (lambda ()
-            (param-fallback p #f #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))))
-  (define-syntax-rule (check-bad-param-1 p)
-    (check-exn #rx"ipoe:init"
-      (lambda ()
-        (check-print (list #rx"^Got")
-          (lambda ()
-            (param-fallback #f p #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))))
+        (param-fallback p #f #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))
 
-  (for ([bp (in-list '(yolo "54" "A1" "1_" "hello-there" "can't use this" "YO LO"))])
-    (check-bad-param-0 bp)
-    (check-bad-param-1 bp))
+  (define ((check-bad-param-1 p))
+    (check-print (list #rx"^Got")
+      (lambda ()
+        (param-fallback #f p #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))
+
+  (for ([bp (in-list '("54" "A1" "1_" "hello-there" "can't use this" "YO LO"))])
+    (check-exn #rx"ipoe:init" (check-bad-param-0 bp))
+    (check-exn #rx"ipoe:init" (check-bad-param-1 bp))
+    (void))
 
   ;; -- psql-create-user, failure
   (check-exn #rx"ipoe:init"

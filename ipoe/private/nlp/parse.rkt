@@ -79,9 +79,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require
-    rackunit
-    ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
   ;; -- number->word*
   (check-apply* number->word*

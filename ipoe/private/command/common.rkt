@@ -22,19 +22,14 @@
 ;; =============================================================================
 
 (module+ test
-  (require
-    rackunit
-    ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
 
-  ;; -- rkt-file?
-  ;(check-true* (lambda (p) (rkt-file? (path->string (make-resolved-module-path p))))
-  ;  ["./new.rkt"]
-  ;  ["./create.rkt"]
-  ;  ["./../private.rkt"])
+  (test-case "rkt-file?"
+    (check-true (rkt-file? (path->string (collection-file-path "main.rkt" "ipoe"))))
 
-  (check-false* rkt-file?
-    ["'a"]
-    ["1251"]
-    ["nope.txt"])
+    (check-false* rkt-file?
+      ["'a"]
+      ["1251"]
+      ["nope.txt"]))
 )

@@ -25,6 +25,7 @@
   ipoe/private/scrape/scrape-util
   (only-in sxml sxpath if-car-sxpath)
   (only-in racket/string string-trim string-join)
+  (only-in racket/list take)
 )
 
 ;; =============================================================================
@@ -108,18 +109,23 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
-  ;; -- rhymes, almost-rhymes
-  (let ([rr (scrape-rhyme "parent")])
-    (check-true (rhymes? rr "aberrant"))
-    (check-true (almost-rhymes? rr "embarrassed"))
-    (check-false (rhymes? rr "child"))
-    (check-false (almost-rhymes? rr "cat")))
+  (test-case "rhyme?:almost-rhyme?"
+    (let ([rr (scrape-rhyme "parent")])
+      (check-true (rhymes? rr "aberrant"))
+      (check-true (almost-rhymes? rr "embarrassed"))
+      (check-false (rhymes? rr "child"))
+      (check-false (almost-rhymes? rr "cat"))))
 
-  ;; -- scrape-rhyme
-  (check-apply* scrape-rhyme
-    ["mouse" == (make-rhyme-result '("porterhouse" "slaughterhouse" "clearinghouse" "boardinghouse" "packinghouse" "meetinghouse" "coffeehouse" "summerhouse" "firehouse" "boathouse" "powerhouse" "grouse" "blouse" "spouse" "dowse" "douse" "louse" "rouse" "house")
-                '("mouth" "mows" "south" "cows" "arouse" "bows" "vows" "boughs" "dhows" "hows" "cowers" "louche" "thous" "wows" "chows" "loughs" "pouffe" "taus" "allows" "brows" "browse" "endows" "ploughs" "plows" "avows" "drouth" "carouse" "prows" "scows" "drowse" "haymows" "espouse" "menopause" "windrows" "cornrows" "snowploughs" "hedgerows" "disavows" "cottonmouth" "prognathous" "doubts" "announce" "ounce" "shouts" "mounts" "outs" "bounce" "bouts" "toutes" "pounce" "louts" "routs" "snouts" "touts" "auks" "pouts" "jounce" "pouffes" "amounts" "counts" "renounce" "denounce" "scouts" "droughts" "spouts" "founts" "jousts" "clouts" "flounce" "flouts" "grouts" "trouts" "mahouts" "ousts" "trounce" "drouths" "stouts" "rousts" "accounts" "pronounce" "sprouts" "redoubts" "surmounts" "remounts" "loudmouths" "recounts" "dismounts" "marabouts" "downspouts" "layabouts" "runabouts" "turnabouts" "mangetouts" "discounts" "whereabouts" "thereabouts" "hereabouts" "roundabouts" "cottonmouths" "beansprouts" "gadabouts" "roustabouts" "waterspouts" "mispronounce" "walkabouts"))]
+  (test-case "scrape-rhyme"
+    (define r (scrape-rhyme "mouse"))
+    (check-true (rhyme-result? r))
+
+    (check-equal? (take (rhyme-result-rhyme* r) 3)
+                  '("porterhouse" "slaughterhouse" "clearinghouse"))
+
+    (check-equal? (take (rhyme-result-almost-rhyme* r) 3)
+                  '("mouth" "aus" "mows"))
   )
 )

@@ -15,6 +15,7 @@
 ;; -----------------------------------------------------------------------------
 
 (require
+  racket/string
   ipoe/private/util/string
 )
 
@@ -42,7 +43,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
   ;; -- naive-syllables
   (check-apply* naive-syllables

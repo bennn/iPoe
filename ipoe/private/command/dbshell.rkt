@@ -39,21 +39,21 @@
 
 ;; =============================================================================
 
-(define-syntax-rule (arg-error id expected received)
+(define (arg-error id expected received)
   (format "~a: expected ~a, got ~a" id expected received))
 
-(define-syntax-rule (query f arg rest)
+(define (query f arg rest)
   (let-values ([(l s) (parse-db-options rest)])
     (take l
       (skip s (f arg)))))
 
-(define-syntax-rule (unknown-word w)
+(define (unknown-word w)
   (format "Unknown word '~a'" w))
 
-(define-syntax-rule (warning msg arg* ...)
+(define (warning msg . arg*)
   (begin
     (display "Warning: ")
-    (displayln (format msg arg* ...))))
+    (displayln (apply format msg arg*))))
 
 ;; -----------------------------------------------------------------------------
 ;; --- Commands
@@ -397,7 +397,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
   ;; -- arg-error
   (check-equal?
@@ -415,21 +415,14 @@
     (unknown-word 'FOO)
     "Unknown word 'FOO'")
 
-  ;; -- warning
-  (check-print
-    "Warning: "
-    (lambda ()
-      (check-exn
-        exn:fail:contract?
-        (lambda () (warning 'FOO)))))
+  (test-case "warning"
+    (check-print
+      "Warning: FOO\n"
+      (lambda () (warning "FOO")))
 
-  (check-print
-    "Warning: FOO\n"
-    (lambda () (warning "FOO")))
-
-  (check-print
-    "Warning: FOO BAR BAZ\n"
-    (lambda () (warning "~a ~a ~a" 'FOO 'BAR 'BAZ)))
+    (check-print
+      "Warning: FOO BAR BAZ\n"
+      (lambda () (warning "~a ~a ~a" 'FOO 'BAR 'BAZ))))
 
   ;; -- COMMAND
   (define-syntax-rule (get-exec sym)

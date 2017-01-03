@@ -1,12 +1,11 @@
 #lang racket/base
 
-;; Endpoint of `raco ipoe`
+;; Front-end for `raco ipoe`
 
 (require
   racket/match
-  (prefix-in cmd: ipoe/command)
+  (prefix-in cmd: ipoe/private/command)
   (only-in racket/string string-suffix?)
-  (for-syntax racket/base)
 )
 
 ;; =============================================================================
@@ -29,7 +28,6 @@
 
 (module+ main
   (require racket/cmdline)
-  ;; -- parameters?
   (command-line
    #:program "ipoe"
    #:args ARG*

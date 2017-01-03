@@ -3,8 +3,7 @@
 (provide
   sequence-empty?
   ;; (-> Sequence Boolean)
-  ;; True if the sequence is empty. Does not advance the sequence.
-  ;; (How? idk, it's magic to me)
+  ;; True if the sequence is empty.
 
   sequence-first
   ;; (-> (Sequenceof Any) (U Any #f))
@@ -32,10 +31,7 @@
 ;; =============================================================================
 
 (define (sequence-empty? seq)
-  (for/fold ([e? #t])
-            ([s seq]
-             [i (in-range 1)])
-    #f))
+  (not (sequence-first seq)))
 
 (define (sequence-first seq)
   (for/fold ([acc #f])
@@ -57,7 +53,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
   ;; -- sequence-empty?
   (check-true* sequence-empty?

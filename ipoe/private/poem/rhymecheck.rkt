@@ -290,7 +290,7 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/util/rackunit-abbrevs
+    rackunit-abbrevs
     (only-in racket/string string-join))
 
   (define o* (options-init))

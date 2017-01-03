@@ -1,9 +1,8 @@
 #lang racket/base
 
-;; TBA
 ;; Uniform interface for
-;; - Removing poem forms
 ;; - Removing words
+;; - (TODO) Removing poem forms
 
 ;; TODO accept input from file?
 

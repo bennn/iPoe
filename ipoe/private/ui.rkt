@@ -138,7 +138,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
   ;; TODO test interactions
 

@@ -1,7 +1,10 @@
 #lang racket/base
 
-;; Look for #syllables and rhyme-scheme
-;; Expand into a module reader that checks the poetry
+;; Reader for `#lang ipoe`
+;;
+;; Programs written in `#lang ipoe` define a specification of a poetic form.
+;; This module defines how such programs expand --- into a new `#lang` that
+;;  reads text, checks it against the specification, and provides feedback.
 
 (provide
   (rename-out

@@ -2,9 +2,10 @@
 
 ;; Note: all vectors in this file are immutable
 
-;; TODO enforce immutable vectors (overwrite for/vector?)
-;; TODO refactor into multiple files
-;;  (separate validators interface from core structs from library code?)
+;; TODO
+;; - enforce immutable vectors (overwrite for/vector?)
+;; - refactor into multiple files
+;;   (separate validators interface from core structs from library code?)
 
 (require racket/contract/base)
 (provide
@@ -15,69 +16,68 @@
 
   *poem*
 
-  ;; TODO stop with the struct-out
   (struct-out stanza/loc)
   (struct-out line/loc)
   (struct-out word/loc)
   (struct-out poem)
 
   (contract-out
-  [contains-word? (-> line/loc? (or/c word/loc? string?) (or/c quirk? boolean?))]
-  ;; (-> Line/Loc String Boolean)
-  ;; True if the line contains the word
+    [contains-word? (-> line/loc? (or/c word/loc? string?) (or/c quirk? boolean?))]
+    ;; (-> Line/Loc String Boolean)
+    ;; True if the line contains the word
 
-  [last-word (-> line/loc? word/loc?)]
-  ;; (-> Line Word)
-  ;; Return the final word in the line
+    [last-word (-> line/loc? word/loc?)]
+    ;; (-> Line Word)
+    ;; Return the final word in the line
 
-  [last-stanza (->* [] [poem?] stanza/loc?)]
-  ;; Return the final stanza in the poem
+    [last-stanza (->* [] [poem?] stanza/loc?)]
+    ;; Return the final stanza in the poem
 
-  [line (-> integer? stanza/loc? line/loc?)]
-  ;; Get a line from a stanza.
-  ;; A negative index searches from last to first; (line -1 S) gets the last line
-  ;; (Basically, a synonym for `list-ref`)
+    [line (-> integer? stanza/loc? line/loc?)]
+    ;; Get a line from a stanza.
+    ;; A negative index searches from last to first; (line -1 S) gets the last line
+    ;; (Basically, a synonym for `list-ref`)
 
-  [line=? (->* [line/loc?] [] #:rest (listof line/loc?) (listof quirk?))]
-  ;; Succeeds if the two lines contain the same words.
-  ;; i.e., are equal after removing punctuation.
+    [line=? (->* [line/loc?] [] #:rest (listof line/loc?) (listof quirk?))]
+    ;; Succeeds if the two lines contain the same words.
+    ;; i.e., are equal after removing punctuation.
 
-  [line->word* (-> line/loc? sequence?)]
-  ;; (-> Line/Loc (Sequenceof Word/Loc))
-  ;; Return a sequence of words in the line
+    [line->word* (-> line/loc? sequence?)]
+    ;; (-> Line/Loc (Sequenceof Word/Loc))
+    ;; Return a sequence of words in the line
 
-  [make-poem (-> (listof string?) poem?)]
-  ;; (-> String Poem)
-  ;; Parse a poem from an input source
+    [make-poem (-> (listof string?) poem?)]
+    ;; (-> String Poem)
+    ;; Parse a poem from an input source
 
-  [poem-count-stanza* (-> poem? natural-number/c)]
-  ;; (-> Poem Natural)
-  ;; Count the number of stanzas in the poem
+    [poem-count-stanza* (-> poem? natural-number/c)]
+    ;; (-> Poem Natural)
+    ;; Count the number of stanzas in the poem
 
-  [poem->stanza* (-> poem? sequence?)]
-  ;; (-> Poem (Sequenceof Stanza/Loc))
-  ;; Return all stanzas in a poem
+    [poem->stanza* (-> poem? sequence?)]
+    ;; (-> Poem (Sequenceof Stanza/Loc))
+    ;; Return all stanzas in a poem
 
-  [poem->word/loc* (-> poem? sequence?)]
-  ;; (-> Poem (Sequenceof Word))
-  ;; Return a sequence of all words in the poem
+    [poem->word/loc* (-> poem? sequence?)]
+    ;; (-> Poem (Sequenceof Word))
+    ;; Return a sequence of all words in the poem
 
-  [stanza (->* [integer?] [poem?] stanza/loc?)]
-  ;; Get a stanza from a poem.
+    [stanza (->* [integer?] [poem?] stanza/loc?)]
+    ;; Get a stanza from a poem.
 
-  [stanza-count-lines (-> stanza/loc? natural-number/c)]
-  ;; (-> Stanza/Loc Natural)
-  ;; Count the number of lines in a stanza
+    [stanza-count-lines (-> stanza/loc? natural-number/c)]
+    ;; (-> Stanza/Loc Natural)
+    ;; Count the number of lines in a stanza
 
-  [stanza->line* (-> stanza/loc? sequence?)]
-  ;; (-> Stanza (Sequenceof Line))
-  ;; Get the lines from a stanza
+    [stanza->line* (-> stanza/loc? sequence?)]
+    ;; (-> Stanza (Sequenceof Line))
+    ;; Get the lines from a stanza
 
-  [word (-> integer? line/loc? word/loc?)]
-  ;; Get a word from a line
+    [word (-> integer? line/loc? word/loc?)]
+    ;; Get a word from a line
 
-  [word=? (->* [word/loc?] #:rest (listof word/loc?) (listof quirk?))]
-  ;; Success if two words are equal
+    [word=? (->* [word/loc?] #:rest (listof word/loc?) (listof quirk?))]
+    ;; Success if two words are equal
 ))
 
 ;; -----------------------------------------------------------------------------
@@ -327,7 +327,7 @@
   (require
     (only-in racket/string string-split)
     rackunit
-    ipoe/private/util/rackunit-abbrevs)
+    rackunit-abbrevs)
 
   (define (listofquirk? x*)
     (and (list? x*)

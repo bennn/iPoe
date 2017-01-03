@@ -1,12 +1,11 @@
 #lang racket/base
 
 ;; Command-line alternative to calling
-;;     racket FNAME.rkt
-;; Explicitly on an ipoe poem
+;;   racket FNAME.rkt
 
 (provide
   check
-  ;; (-> (Listof String) Void)
+  ;; raco ipoe check <file> ...
   ;; Compile a list of poems
 )
 
@@ -22,12 +21,12 @@
 
 ;; =============================================================================
 
-(define-syntax-rule (file-exists?/alert fname)
+(define (file-exists?/alert fname)
   (or (file-exists? fname)
       (and (alert (format "File '~a' does not exist, cannot check." fname))
            #f)))
 
-(define-syntax-rule (rkt?/alert fname)
+(define (rkt?/alert fname)
   (or (string-suffix? fname ".rkt")
       (and (alert (format "File '~a' is not a Racket module, cannot check." fname))
            #f)))

@@ -255,7 +255,8 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/util/rackunit-abbrevs
+    rackunit-abbrevs
+    ipoe/private/util/check-print
     (only-in racket/port with-input-from-string)
     (only-in racket/string string-split)
   )

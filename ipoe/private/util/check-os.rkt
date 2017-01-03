@@ -8,15 +8,12 @@
   if-windows
   ;; (if-windows yes no)
   ;; Conditional macro.
-  ;; If the current operating system is windows, execute `yes`.
-  ;; Otherwise, execute `no`.
+  ;; If the current operating system is windows, expand to `yes`.
+  ;; Otherwise, expand to `no`.
 )
 
 (require
-  (for-syntax
-    racket/base
-    syntax/parse
-))
+  (for-syntax racket/base syntax/parse))
 
 ;; =============================================================================
 

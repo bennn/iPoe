@@ -2,10 +2,6 @@
 
 ;; List information about installed poems
 
-;; Will probably work by reading the folder names in the cloned directory
-;;  and filtering those without a ./lang/reader file.
-;; See https://github.com/bennn/iPoe/issues/54
-
 (provide
   show
 )

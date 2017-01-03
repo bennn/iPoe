@@ -808,7 +808,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit racket/sequence ipoe/private/util/rackunit-abbrevs)
+  (require rackunit racket/sequence rackunit-abbrevs ipoe/private/util/check-print)
 
   ;; -------------------------------------------------------------------
 

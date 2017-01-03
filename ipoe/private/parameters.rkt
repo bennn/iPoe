@@ -302,7 +302,8 @@
 (module+ test
   (require
     rackunit
-    ipoe/private/util/rackunit-abbrevs
+    rackunit-abbrevs
+    ipoe/private/util/check-print
     (only-in racket/string string-trim string-join)
     (only-in racket/list last)
     (only-in racket/file file->lines))

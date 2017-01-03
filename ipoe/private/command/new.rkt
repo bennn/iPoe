@@ -1,8 +1,8 @@
 #lang racket/base
 
 ;; Uniform endpoint for
-;; - Registering new poem forms
 ;; - Adding word
+;; - (TODO) Registering new poem forms
 
 ;; TODO accept input from file? (lots of words to submit)
 

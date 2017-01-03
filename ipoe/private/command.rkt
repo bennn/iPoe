@@ -3,7 +3,8 @@
 ;; Command-line tools. For use with raco:
 ;;   raco ipoe COMMAND ARG ...
 ;; Will execute each tool with the list `ARG ...`
-;; (Tools will verify that `ARG ...` is well-formed)
+;;
+;; Tools verify that `ARG ...` is well-formed
 
 (provide
   check

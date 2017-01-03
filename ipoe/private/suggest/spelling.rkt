@@ -13,8 +13,8 @@
   ;; If argument #:max-distance is given, ignore words with a larger edit distance.
 
   suggest-spelling
-  ;; (->* [String] [#:epsilon Natural #:limit Natural] (Listof String))
-  ;; (suggest-spelling w #:epsilon e #:limit N)
+  ;; (->* [String] [#:max-distance Natural #:limit Natural] (Listof String))
+  ;; (suggest-spelling w #:max-distance e #:limit N)
   ;; Return a list of at most N words that are within `e` Levenshtein distance from `w`.
 )
 
@@ -25,7 +25,7 @@
 
 ;; =============================================================================
 
-(define default-epsilon 2)
+(define default-max-distance 2)
 (define default-limit 10)
 (define-runtime-path common-words "./common-words.rktd")
 
@@ -59,7 +59,7 @@
     (car w+s)))
 
 (define (suggest-spelling str-param
-                          #:epsilon [eps default-epsilon]
+                          #:max-distance [eps default-max-distance]
                           #:limit   [lim default-limit])
   (define num-matches (box 0))
   (define str (string-downcase str-param))
@@ -74,7 +74,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
   (check-apply* filter-similar
     ["car" '("cat" "boat" "wolf" "march")
@@ -99,6 +99,6 @@
     ["we"  #:limit 1 == '("the")]
     ["I"   #:limit 0 == '()]
     ["I"   #:limit 3 == '("be" "of" "to")]
-    ["I" #:epsilon 1 #:limit 3 == '("a" "in" "I")]
+    ["I" #:max-distance 1 #:limit 3 == '("a" "in" "I")]
   )
 )

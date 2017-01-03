@@ -12,10 +12,12 @@
 
 (require
   (only-in racket/match match-define)
+  (only-in racket/list last)
   ipoe/private/scrape/scrape-util
   racket/string
   sxml
   (only-in ipoe/private/util/string
+    string-ascii
     string-count-chars)
 )
 
@@ -73,9 +75,20 @@
                                 src) self)
     (define url (word->url word))
     (define sxml (url->sxml url))
-    (define w-res (sxml->word sxml))
-    (define d-res (sxml->definition sxml))
-    (define s-res (sxml->num-syllables sxml))
+    (define ok? (sxml-200? sxml))
+    (define-values [w-res d-res s-res]
+      (if ok?
+        (values (sxml->word sxml) (sxml->definition sxml) (sxml->num-syllables sxml))
+        (begin
+          (log-scrape-warning "~a" sxml)
+          (values #f #f #f))))
+    (log-scrape-debug (string-append
+                        (format "[word-scraper:~a]~n" src)
+                        (format "  word : ~a~n" word)
+                        (format "  url : ~a~n" url)
+                        (format "  parsed : ~a~n" w-res)
+                        (format "  definition : ~a~n" d-res)
+                        (format "  syllables : ~a~n" s-res)))
     (and
       w-res d-res s-res
       (string-ci=? word w-res)
@@ -87,7 +100,7 @@
 (define dictionary.com
   (word-scraper
     ;; word->url
-    (lambda (w) (string-append "http://dictionary.reference.com/browse/" w))
+    (lambda (w) (string-append "http://www.dictionary.com/browse/" w))
 
     ;; sxml->definition
     (lambda (sxml)
@@ -103,7 +116,7 @@
              (add1 (string-count-chars #\· h1)))))
 
     ;; sxml->word
-    (if-car-sxpath '(// h1 span *text*)) ;; Brittle! But I could not get class? working
+    (if-car-sxpath `(// h1 ,(class? "head-entry") span *text*))
 
     ;; src
     'dictionary.com))
@@ -138,12 +151,30 @@
 (define merriam-webster
   (word-scraper
     ;; word->url
-    (lambda (w) (string-append "http://www.merriam-webster.com/dictionary/" w))
+    (lambda (w) (string-append "https://www.merriam-webster.com/dictionary/" w))
 
     ;; sxml->definition
-    (lambda (sxml)
-      (let ([p ((if-car-sxpath `(// p ,(class? "definition-inner-item") span *text*)) sxml)])
-        (and p (string-trim (car (string-split p ":"))))))
+    (let ([merriam-webster-trim
+           (lambda (strings)
+             (let loop ([s* strings])
+               (cond
+                [(null? s*)
+                 #f]
+                [(or (regexp-match? #px"^\\s+$" (car s*))
+                     (= 1 (string-length (car s*)))
+                     (string=? ":" (car s*)))
+                 (loop (cdr s*))]
+                [else
+                 (define hd (string-trim (string-ascii (car s*))))
+                 (define tl (loop (cdr s*)))
+                 (if tl
+                   (string-append hd " " tl)
+                   hd) ])))])
+      (lambda (sxml)
+        (let* ([d ((if-car-sxpath `(// div ,(class? "card-primary-content"))) sxml)]
+               [p (and d ((if-car-sxpath `(// p ,(class? "definition-inner-item" string-prefix?) span)) d))]
+               [t (and p ((sxpath `(// *text*)) p))])
+          (and t (merriam-webster-trim t)))))
 
     ;; sxml->num-syllables
     (lambda (sxml)
@@ -221,7 +252,7 @@
 ;; =============================================================================
 
 (module+ test
-  (require rackunit ipoe/private/util/rackunit-abbrevs)
+  (require rackunit rackunit-abbrevs)
 
   (define not-a-word "hguwisdvzodxv")
 
@@ -247,10 +278,10 @@
   )
 
   (check-apply* merriam-webster
-    ["day" == (word-result "day" "a period of 24 hours beginning at midnight" 1 'merriam-webster)]
-    ["penguin" == (word-result "penguin" "a black-and-white bird that cannot fly, that uses its wings for swimming, and that lives in or near the Antarctic" 2 'merriam-webster)]
-    ["umbrella" == (word-result "umbrella" "a device that is used for protection from the rain and sun" 3 'merriam-webster)]
-    ["candelabra" == (word-result "candelabra" "an object with several branches for holding candles or lights" 4 'merriam-webster)]
+    ["day" == (word-result "day" "the time of light between one night and the next" 1 'merriam-webster)]
+    ["penguin" == (word-result "penguin" "any of various erect short-legged flightless aquatic birds (family Spheniscidae) of the southern hemisphere" 2 'merriam-webster)]
+    ["umbrella" == (word-result "umbrella" "a collapsible shade for protection against weather consisting of fabric stretched over hinged ribs radiating from a central pole; especially a small one for carrying in the hand" 3 'merriam-webster)]
+    ["candelabra" == (word-result "candelabra" "a branched candlestick or lamp with several lights" 4 'merriam-webster)]
     [not-a-word == #f]
     ["stopping" == #f]
    )
@@ -278,8 +309,8 @@
    [merriam-webster "each" == 1]
    [american-heritage "each" == 1]
    [american-heritage "every" == 2]
-   [american-heritage "day" == 1])
+   [american-heritage "day" == 1]
    ;[urban-dictionary "magnificent" == #f]
    ;[urban-dictionary "cat" == #f]
-
+  )
 )
