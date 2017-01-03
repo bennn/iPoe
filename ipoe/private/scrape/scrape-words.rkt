@@ -8,6 +8,13 @@
   ;; Search the internet for a new word.
 
   (struct-out word-result)
+
+  (struct-out word-scraper)
+
+  dictionary.com
+  american-heritage
+  merriam-webster
+  the-free-dictionary
 )
 
 (require
