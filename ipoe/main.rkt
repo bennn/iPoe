@@ -1,7 +1,6 @@
 #lang racket/base
 
-;; TODO
-;; Maybe, tools for language builders. We'll see what we can abstract.
+;; Endpoint of `raco ipoe`
 
 (require
   racket/match
@@ -12,18 +11,21 @@
 
 ;; =============================================================================
 
-(define HELP-STR "HELP MESSAGE")
-
-(define (print-help)
-  (displayln HELP-STR))
+(define print-help
+  (let* ([pad-width (for/fold ([acc 0]) ([d (in-list cmd:command-descriptions)])
+                      (max acc (string-length (car d))))]
+         [add-padding (λ (sym) (format "  ~a~a  " sym (make-string (- pad-width (string-length sym)) #\space)))])
+    (λ ()
+      (printf "Usage: raco ipoe <command> <arg> ...~n~n")
+      (printf "Commands:~n")
+      (for ([d (in-list cmd:command-descriptions)])
+        (printf "~a~a~n" (add-padding (car d)) (cdr d)))
+      (void))))
 
 (define (print-unknown k)
   (printf "Unrecognized command '~a'. Use `raco ipoe --help` to see a list of available commands.\n" k))
 
 ;; =============================================================================
-
-;; Wanted aliases:
-;; - show ~ list
 
 (module+ main
   (require racket/cmdline)
@@ -39,8 +41,9 @@
         ;; edit? audit? or build this into NEW 
         ['check
          (cmd:check (cdr ARG*))]
-        [rkt ;; Shortcut for checking, instead of 'racket FILE.rkt'
+        [rkt
          #:when (string-suffix? (car ARG*) ".rkt")
+         ;; Shortcut for checking, instead of 'racket FILE.rkt'
          (cmd:check ARG*)]
         [(or 'db 'dbshell)
          (cmd:dbshell (cdr ARG*))]
@@ -52,7 +55,7 @@
          (cmd:new (cdr ARG*))]
         ['remove
          (cmd:remove (cdr ARG*))]
-        ['show  ;; TODO
+        [(or 'show 'list)
          (cmd:show (cdr ARG*))]
         ['update
          (cmd:update (cdr ARG*))]

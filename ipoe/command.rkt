@@ -3,31 +3,18 @@
 ;; Command-line tools. For use with raco:
 ;;   raco ipoe COMMAND ARG ...
 ;; Will execute each tool with the list `ARG ...`
-;; (Tools will verify that `ARG ...` is well-formed for their purposes)
+;; (Tools will verify that `ARG ...` is well-formed)
 
 (provide
   check
-  ;; Check a sequence of poems.
-  ;; This is a shortcut for calling `racket FILE.rkt` on each poem individually
-
   dbshell
-  ;; Open a REPL session with the database
-
   init
-  ;; Initialize a new database.
-  ;; A guided setup.
-
   new
-  ;; Create a new poem form, or interactively add a new word to the database
-
   remove
-  ;; Delete poem forms or words
-
   show
-  ;; Display information on installed poem forms
-
   update
-  ;; Edit information about a word
+
+  command-descriptions
 )
 
 ;; -----------------------------------------------------------------------------
@@ -41,3 +28,15 @@
   ipoe/private/command/show
   ipoe/private/command/update
 )
+
+;; =============================================================================
+
+(define command-descriptions '(
+  ("check" . "Check a poem for syntax errors (same as `raco make)")
+  ("db" . "Open a REPL to your local iPoe database")
+  ("init" . "Initialize a new database")
+  ("new" . "Add a word to the database")
+  ("remove" . "Remove a word from the database")
+  ("show" . "List all poetic forms")
+  ("update" . "Edit a word")))
+
