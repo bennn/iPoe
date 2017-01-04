@@ -182,10 +182,10 @@ Hopefully, these will eventually re-appear in a more general context (@seclink["
     @racket[word->url] converts a word to a URL for a web page that may have information about the word.
   }
   @item{
-    @racket[sxml->definition] parses an @racket[sxml] page for the definition of a word.
+    @racket[sxml->defn] parses an @racket[sxml] page for the definition of a word.
   }
   @item{
-    @racket[sxml->num-syllables] parses an @racket[sxml] page for the number of syllables in a word.
+    @racket[sxml->syll] parses an @racket[sxml] page for the number of syllables in a word.
   }
   @item{
     @racket[sxml->word] parses an @racket[sxml] page for the word the page describes.

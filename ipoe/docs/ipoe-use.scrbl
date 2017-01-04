@@ -19,7 +19,7 @@ Here's a first shot:
 
 pit pat pit pat, rain?
 or clicking on a keyboard?
-it's 3 am I don't care anymore
+it's 3 am I don't care no more
 }
 
 Save the file as @litchar{./first.haiku} and run @exec{raco make first.haiku} to compile the poem.

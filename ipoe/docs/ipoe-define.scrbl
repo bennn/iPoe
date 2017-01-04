@@ -27,7 +27,7 @@ The syntax accepted by the @hash-lang[] @racketmodname[ipoe] reader is keyword-b
                               @nonterm{rhyme})
   (list @nonterm{rhyme} @racket[symbol?] @nonterm{wildcard})
   (list @nonterm{syllable} @racket[exact-positive-integer?] @nonterm{wildcard})
-  (list @nonterm{wildcard} @racket['*])
+  (list @nonterm{wildcard} @litchar{*})
   (list @nonterm{constraint-expr} @racket[expr])])
 
 In summary, a @hash-lang[] @racketmodname[ipoe] program is a sequence of statements.
