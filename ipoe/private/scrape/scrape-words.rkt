@@ -10,6 +10,7 @@
   (struct-out word-result)
 
   (struct-out word-scraper)
+  make-word-scraper
 
   dictionary.com
   american-heritage
@@ -48,6 +49,13 @@
 ;; -----------------------------------------------------------------------------
 ;; Data Definition: Word Scraper
 
+(define (make-word-scraper name
+                           #:word->url word->url
+                           #:sxml->definition sxml->definition
+                           #:sxml->num-syllables sxml->num-syllables
+                           #:sxml->word sxml->word)
+  (word-scraper word->url sxml->definition sxml->num-syllables sxml->word name))
+
 (struct word-scraper (
   word->url
   ;; (-> String String)
@@ -70,7 +78,8 @@
   ;; Symbol
   ;; The name of this scraper
 
-) #:property prop:procedure
+)
+  #:property prop:procedure
   ;; Search the web for information on a word.
   ;; An instance of this struct defines the search protocol for 1 website
   ;; (-> Word-Scraper String Word-Result)

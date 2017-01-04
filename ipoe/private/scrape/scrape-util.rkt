@@ -82,7 +82,7 @@
     (define id-text ((if-car-sxpath '( @ id *text*)) e))
     (and id-text (string=? str id-text)))
   (filter id=str? elem*))
-(require racket/string)
+
 (define ((class? str [string-equal? string=?]) elem* ???)
   (define (class=str? e)
     (define class-text ((if-car-sxpath '(@ class *text*)) e))
@@ -93,7 +93,7 @@
 (define ((contains-text? pat) elem* ???)
   (define (contains? e)
     (define txt ((if-car-sxpath '(*text*)) e))
-    (and txt (regexp-match pat txt)))
+    (and txt (regexp-match? pat txt)))
   (filter contains? elem*))
 
 ;; =============================================================================

@@ -1,6 +1,10 @@
 #lang reprovide
 
-ipoe/private/scrape/scrape-rhymes
+(only-in ipoe/private/scrape/scrape-rhymes
+  rhyme-result?
+  almost-rhymes?
+  rhymes?
+  scrape-rhyme)
 
 (only-in ipoe/private/scrape/scrape-util
   url->sxml
@@ -10,4 +14,12 @@ ipoe/private/scrape/scrape-rhymes
   contains-text?
   scrape-logger)
 
-ipoe/private/scrape/scrape-words
+(only-in ipoe/private/scrape/scrape-words
+  word-result?
+  word-scraper?
+  make-word-scraper
+  scrape-word
+  dictionary.com
+  american-heritage
+  merriam-webster
+  the-free-dictionary)

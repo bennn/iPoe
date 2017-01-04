@@ -1,6 +1,6 @@
 #lang info
 
-(define collection 'use-pkg-name)
+(define collection "ipoe")
 (define deps
   '("base"
     "db-lib"
@@ -9,13 +9,18 @@
     "html-lib"
     "rackunit-lib"
     "readline-lib"
+    "reprovide-lang"
     "sxml"
    ))
 (define build-deps
   '("scribble-lib"
+    "net-doc"
+    "scribble-doc"
+    "rackunit-lib"
+    "rackunit-abbrevs"
     "racket-doc"))
-(define pkg-desc "Family of languages for editing poetry")
+(define pkg-desc "Interactive Poetry Editor")
 (define pkg-authors '(ben))
-(define raco-commands '(("ipoe" (submod ipoe/main main) "console UI" #f)))
-;(define scribblings '(("scribblings/ipoe.scrbl")))
-(define version "0.1")
+(define raco-commands '(("ipoe" (submod ipoe/main main) "interactive poetry editor" #f)))
+(define scribblings '(("docs/ipoe.scrbl" () (experimental))))
+(define version "0.2")

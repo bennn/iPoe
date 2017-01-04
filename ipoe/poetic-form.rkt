@@ -7,7 +7,7 @@
   quirk?)
 
 (only-in ipoe/private/poem
-  *poem*
+  [*poem* *current-poem*]
 
   poem?
   [stanza/loc? stanza?]
@@ -22,9 +22,9 @@
   line->word*
   poem-count-stanza*
   poem->stanza*
-  poem->word/loc*
+  [poem->word/loc* poem->word*]
   stanza
-  stanza-count-lines
+  [stanza-count-lines stanza-count-line*]
   stanza->line*
   word
   word=?)

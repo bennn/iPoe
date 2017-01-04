@@ -9,3 +9,7 @@ Scrapers for taking information off the internet.
 Helpers:
 - `scrape-util.rkt` General tools for scraping tasks.
 - `html.rkt` Neil VanDyke's html parser
+
+
+TODO
+- syllables at https://www.howmanysyllables.com/
