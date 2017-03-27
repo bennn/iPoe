@@ -139,21 +139,21 @@ But it tends to ask for too much help, you can disable the help by putting @rack
 
 @subsection[#:tag "ipoe-forms"]{Built-in Poetic Forms}
 
-@defmodulelang[ipoe/cinquain]
-@defmodulelang[ipoe/clerihew]
-@defmodulelang[ipoe/couplet]
-@defmodulelang[ipoe/english-sonnet]
-@defmodulelang[ipoe/free-verse]
-@defmodulelang[ipoe/haiku]
-@defmodulelang[ipoe/italian-sonnet]
-@defmodulelang[ipoe/limerick]
-@defmodulelang[ipoe/quaternion]
-@defmodulelang[ipoe/rondelet]
-@defmodulelang[ipoe/sestina]
-@defmodulelang[ipoe/sextilla]
-@defmodulelang[ipoe/tanaga]
-@defmodulelang[ipoe/tercet]
-@defmodulelang[ipoe/villanelle]
+@defmodulelang[ipoe/cinquain #:no-declare]
+@defmodulelang[ipoe/clerihew #:no-declare]
+@defmodulelang[ipoe/couplet #:no-declare]
+@defmodulelang[ipoe/english-sonnet #:no-declare]
+@defmodulelang[ipoe/free-verse #:no-declare]
+@defmodulelang[ipoe/haiku #:no-declare]
+@defmodulelang[ipoe/italian-sonnet #:no-declare]
+@defmodulelang[ipoe/limerick #:no-declare]
+@defmodulelang[ipoe/quaternion #:no-declare]
+@defmodulelang[ipoe/rondelet #:no-declare]
+@defmodulelang[ipoe/sestina #:no-declare]
+@defmodulelang[ipoe/sextilla #:no-declare]
+@defmodulelang[ipoe/tanaga #:no-declare]
+@defmodulelang[ipoe/tercet #:no-declare]
+@defmodulelang[ipoe/villanelle #:no-declare]
 
 @section[#:tag "ipoe-use:pragmatics"]{Pragmatics}
 

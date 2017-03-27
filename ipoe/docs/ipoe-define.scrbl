@@ -7,9 +7,7 @@
 
 @title[#:tag "ipoe-define"]{Defining a new iPoe Language}
 
-@defmodulelang[ipoe]{
-  The @racketmodname[ipoe] language is a specification language for @tech{poetic forms}.
-}
+The @racketmodname[ipoe] language is a specification language for @tech{poetic forms}.
 
 The syntax accepted by the @hash-lang[] @racketmodname[ipoe] reader is keyword-based:
 @(let ([lp @litchar{(}] [rp @litchar{)}])

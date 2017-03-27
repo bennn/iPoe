@@ -3,7 +3,7 @@
 @title[#:tag "top"]{iPoe: interactive poetry editor}
 @author[@hyperlink["https://github.com/bennn"]{Ben Greenman}]
 
-@defmodule[ipoe]{
+@defmodulelang[ipoe]{
   The @racketmodname[ipoe] package is an extensible compiler for poetry.
 }
 
