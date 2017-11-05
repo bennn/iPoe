@@ -163,7 +163,7 @@ If you install PostgreSQL and start a server, running @exec{raco ipoe init} shou
 
 @subsection{Configuration}
 
-Global configuration file: @racket[(build-path (find-system-path 'home-dir) ".ipoe")]
+Global configuration file: @racket[(writable-config-file ".ipoe" #:program "ipoe")]
 
 Local configuration file: @racket{./.ipoe}
 

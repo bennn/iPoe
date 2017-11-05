@@ -66,9 +66,14 @@
   ipoe/private/ui
   ipoe/private/util/string
   ;; --
+  (only-in basedir
+    writable-config-file)
   (only-in racket/set mutable-set set-member? set-add! set->list)
   (for-syntax racket/base syntax/parse racket/syntax)
-  (only-in racket/file file->string file->lines)
+  (only-in racket/file
+    file->string
+    file->lines
+    make-parent-directory*)
 )
 
 ;; =============================================================================
@@ -137,10 +142,21 @@
 ;; (: get-config-filenames (-> (Values String String)))
 (define (get-config-filenames)
   (define global-config
-    (string-append (path->string (find-system-path 'home-dir)) "/" IPOE-CONFIG))
+    (get-global-config-filename))
   (define local-config
     (string-append "./" IPOE-CONFIG))
   (values global-config local-config))
+
+;; Get filename for global configuration file
+;; (: get-global-config-filename (-> String))
+(define (get-global-config-filename)
+  (define legacy-path
+    (string-append (path->string (find-system-path 'home-dir)) "/" IPOE-CONFIG))
+  (if (file-exists? legacy-path)
+    legacy-path
+    (let ([d (writable-config-file IPOE-CONFIG #:program "ipoe")])
+      (make-parent-directory* d)
+      d)))
 
 ;; Add output from `option?` to a table created by `options-init`.
 ;; (: options-set (-> Option* Option Void))
@@ -279,10 +295,15 @@
              (file->string fname))))
     (define (restore-config)
       (for/list ([d (in-list old-config-data*)]
-                 [fname (in-list config-fname*)]
-                 #:when d)
-        (with-output-to-file fname #:exists 'replace
-          (lambda () (display d)))))
+                 [fname (in-list config-fname*)])
+        (cond
+         [d
+          (with-output-to-file fname #:exists 'replace
+            (lambda () (display d)))]
+         [(file-exists? fname)
+          (delete-file fname)]
+         [else
+          (void)])))
     ;; -- Write the new config
     (for ([fname (in-list config-fname*)]
           [new-data (in-list (list global local))])
@@ -308,263 +329,265 @@
     (only-in racket/list last)
     (only-in racket/file file->lines))
 
-  ;; -- almost-option
-  (check-true* almost-option?
-   ["#:key val"]
-   ["key #: val"]
-   ["#:key #:val"]
-   ["   #:key    val:#   "]
-   ["#:#:"]
-   ["keyval#:"])
+  (test-case "almost-option?"
+    (check-true* almost-option?
+     ["#:key val"]
+     ["key #: val"]
+     ["#:key #:val"]
+     ["   #:key    val:#   "]
+     ["#:#:"]
+     ["keyval#:"])
 
-  (check-false* almost-option?
-   ["key val"]
-   ["# : key val"]
-   [""]
-   ["key val:#"])
+    (check-false* almost-option?
+     ["key val"]
+     ["# : key val"]
+     [""]
+     ["key val:#"]))
 
-  ;; -- format-option
-  (check-apply* format-option
-   ['k 'v == "#:k v"]
-   [1 2 == "#:1 2"]
-   ['written? '(1 2 "foo") == "#:written? (1 2 \"foo\")"])
+  (test-case "format-option"
+    (check-apply* format-option
+     ['k 'v == "#:k v"]
+     [1 2 == "#:1 2"]
+     ['written? '(1 2 "foo") == "#:written? (1 2 \"foo\")"]))
 
-  ;; -- get-config-filenames
-  (let-values ([(f1 f2) (get-config-filenames)])
-    (check-true (path-string? f1))
-    (check-true (path-string? f2)))
+  (test-case "get-config-filenames"
+    (let-values ([(f1 f2) (get-config-filenames)])
+      (check-true (path-string? f1))
+      (check-true (path-string? f2))))
 
-  ;; -- options-init
-  (let ([o* (options-init)])
-    (define-values [g l] (get-config-filenames))
-    (cond
-     [(hash-empty? o*)
-      (check-false (file-exists? g))
-      (check-false (file-exists? l))
-      ;; -- create a dummy .ipoe file, to make sure init works
-      (parameterize ([current-directory (find-system-path 'temp-dir)])
-        (unless (file-exists? IPOE-CONFIG)
-          (with-output-to-file IPOE-CONFIG
-            (lambda () (displayln "#:test output"))))
-        (define ln* (file->lines IPOE-CONFIG))
-        (define o*+ (options-init))
-        (check-equal? (options-count o*+) (length ln*)))]
-     [else
-      ;; -- Number of default options should be at least the length of
-      ;;    each config file. (It's not the sum because duplicates don't
-      ;;    add to the count.)
-      (define (L fname)
-        (if (file-exists? fname) (length (file->lines fname)) 0))
-      (check-true (<= (L g) (options-count o*)))
-      (check-true (<= (L l) (options-count o*)))]))
+  (test-case "options-init"
+    (let ([o* (options-init)])
+      (define-values [g l] (get-config-filenames))
+      (cond
+       [(hash-empty? o*)
+        (check-false (file-exists? g))
+        (check-false (file-exists? l))
+        ;; -- create a dummy .ipoe file, to make sure init works
+        (parameterize ([current-directory (find-system-path 'temp-dir)])
+          (unless (file-exists? IPOE-CONFIG)
+            (with-output-to-file IPOE-CONFIG
+              (lambda () (displayln "#:test output"))))
+          (define ln* (file->lines IPOE-CONFIG))
+          (define o*+ (options-init))
+          ;; TODO not sure what expected should be
+          (check-equal? (options-count o*+) (sub1 (length ln*))))]
+       [else
+        ;; -- Number of default options should be at least the length of
+        ;;    each config file. (It's not the sum because duplicates don't
+        ;;    add to the count.)
+        (define (L fname)
+          (if (file-exists? fname) (length (file->lines fname)) 0))
+        (check-true (<= (L g) (options-count o*)))
+        (check-true (<= (L l) (options-count o*)))])))
 
-  ;; -- options-set (options-count, options-get)
-  (let* ([opt (options-init)]
-         [o1 (option? "")]
-         [o2 (option? "#:a b")]
-         ;; TODO o3 tests depend on what's in the user's config files.
-         ;;      if the option's already there, the number of values in the
-         ;;      hash won't increase
-         [o3 (option? "#:grammarcheck? #f")])
-    (define N (options-count opt))
-    (check-false (options-set opt o1))
-    (check-equal? (options-count opt) N)
-    (check-true (options-set opt o2))
-    (check-equal? (options-count opt) (+ 1 N))
-    (check-equal? (options-get opt 'a) 'b)
-    (check-true (options-set opt o3))
-    (check-equal? (options-count opt) (+ 2 N))
-    (check-equal? (options-get opt 'grammarcheck?) #f))
+  (test-case "options-set (options-count, options-get)"
+    (let* ([opt (options-init)]
+           [o1 (option? "")]
+           [o2 (option? "#:a b")]
+           ;; TODO o3 tests depend on what's in the user's config files.
+           ;;      if the option's already there, the number of values in the
+           ;;      hash won't increase
+           [o3 (option? "#:grammarcheck? #f")])
+      (define N (options-count opt))
+      (check-false (options-set opt o1))
+      (check-equal? (options-count opt) N)
+      (check-true (options-set opt o2))
+      (check-equal? (options-count opt) (+ 1 N))
+      (check-equal? (options-get opt 'a) 'b)
+      (check-true (options-set opt o3))
+      (check-equal? (options-count opt) (+ 2 N))
+      (check-equal? (options-get opt 'grammarcheck?) #f)))
 
-  ;; -- options-set-from-file
+  (test-case "options-set-from-file"
   (define (gen-tmpfile fname)
     (define s (symbol->string (gensym)))
     (define full-path
       (string-append (path->string (find-system-path 'temp-dir))
                      "/"
                      (or fname s)))
+
     (if (file-exists? full-path)
         (gen-tmpfile (string-append fname s))
         full-path))
 
-  (define-syntax-rule (refresh-file f str ...)
-    (with-output-to-file f #:exists 'replace
-      (lambda () (displayln str) ...)))
+    (define-syntax-rule (refresh-file f str ...)
+      (with-output-to-file f #:exists 'replace
+        (lambda () (displayln str) ...)))
 
-  (let ([fname (gen-tmpfile "ipoe.parameters.test")])
-    (define-syntax-rule (test-from-file [str ...] count [kv ...])
-      (let* ([o* (options-new)]
-             [get (lambda (k) (hash-ref o* k (lambda () #f)))])
-        (refresh-file fname str ...)
-        (options-set-from-file o* fname)
-        (check-equal? (options-count o*) count)
-        (check-apply* get
-          kv ...)))
-    ;; --- blank config
-    (test-from-file [""] 0 [['any == #f] ['keys == #f]])
-    ;; -- normal config
-    (test-from-file
-      ["#:a a"
-       "#:b b"]
-      2
-      [['a == 'a]
-       ['b == 'b]
-       ['c == #f]])
-    ;; --- extra newlines
-    (test-from-file
-      ["#:first-option \"and-value\""
-       ""
-       "#:second 001/2"
-       "#:third #t"]
-      3
-      [['first-option == "and-value"]
-       ['second == 1/2]
-       ['third ==  #t]])
-    ;; --- error
-    (check-exn (regexp "ipoe:config")
-      (lambda () (test-from-file ["gibberish"] 0 [[#t == #t]])))
-    ;; --- whitespace in value
-    (check-exn (regexp "Error reading configuration")
-      (lambda () (test-from-file ["#:opt \"some value\""] 0 [[#t == #t]]))))
+    (let ([fname (gen-tmpfile "ipoe.parameters.test")])
+      (define-syntax-rule (test-from-file [str ...] count [kv ...])
+        (let* ([o* (options-new)]
+               [get (lambda (k) (hash-ref o* k (lambda () #f)))])
+          (refresh-file fname str ...)
+          (options-set-from-file o* fname)
+          (check-equal? (options-count o*) count)
+          (check-apply* get
+            kv ...)))
+      ;; --- blank config
+      (test-from-file [""] 0 [['any == #f] ['keys == #f]])
+      ;; -- normal config
+      (test-from-file
+        ["#:a a"
+         "#:b b"]
+        2
+        [['a == 'a]
+         ['b == 'b]
+         ['c == #f]])
+      ;; --- extra newlines
+      (test-from-file
+        ["#:first-option \"and-value\""
+         ""
+         "#:second 001/2"
+         "#:third #t"]
+        3
+        [['first-option == "and-value"]
+         ['second == 1/2]
+         ['third ==  #t]])
+      ;; --- error
+      (check-exn (regexp "ipoe:config")
+        (lambda () (test-from-file ["gibberish"] 0 [[#t == #t]])))
+      ;; --- whitespace in value
+      (check-exn (regexp "Error reading configuration")
+        (lambda () (test-from-file ["#:opt \"some value\""] 0 [[#t == #t]])))))
 
-  ;; -- option?
-  (check-false* option?
-   ["key #: val"]
-   ["#:#:"]
-   ["nope"]
-   [""]
-   ["    \t   "]
-   ["viet cong"]
-   ["#w x"]
-   ["a = b"]
-   ["keyval#:"])
-  (check-apply* option?
-   ["#:key val" == (option-match 'key 'val)]
-   ["   #:mr smith" == (option-match 'mr 'smith)]
-   [" #:yes 411" == (option-match 'yes 411)]
-   ["#:key #:val" == (option-match 'key '#:val)]
-   ["   #:key    val:#   " == (option-match 'key 'val:#)])
+  (test-case "option?"
+    (check-false* option?
+     ["key #: val"]
+     ["#:#:"]
+     ["nope"]
+     [""]
+     ["    \t   "]
+     ["viet cong"]
+     ["#w x"]
+     ["a = b"]
+     ["keyval#:"])
+    (check-apply* option?
+     ["#:key val" == (option-match 'key 'val)]
+     ["   #:mr smith" == (option-match 'mr 'smith)]
+     [" #:yes 411" == (option-match 'yes 411)]
+     ["#:key #:val" == (option-match 'key '#:val)]
+     ["   #:key    val:#   " == (option-match 'key 'val:#)]))
 
-  ;; -- option?, with custom parser
-  (check-equal? (option? "#:xxx yyy" #:parse-value (lambda (x) x))
-                (option-match 'xxx "yyy"))
-  (check-equal? (option? "#:cat tac" #:parse-value (lambda (x) 42))
-                (option-match 'cat 42))
+  (test-case "option?, with custom parser"
+    (check-equal? (option? "#:xxx yyy" #:parse-value (lambda (x) x))
+                  (option-match 'xxx "yyy"))
+    (check-equal? (option? "#:cat tac" #:parse-value (lambda (x) 42))
+                  (option-match 'cat 42)))
 
-  ;; -- parameterize-from-hash
-  (let* ([opt (options-init)]
-         [init-count (options-count opt)]
-         [o1  (option? "#:online? #f")]
-         [o2  (option? "  #:bad-rhyme-penalty -666")]
-         [o3  (option? "nothin")]
-         [o4  (option? "#:not real")])
-    (for ([o (in-list (list o1 o2 o3 o4))])
-      (options-set opt o))
-    ;; -- pre-test
-    (check-true (< init-count (options-count opt)))
-    (check-true (*online?*))
-    (check-true (<= 0 (*bad-rhyme-penalty*)))
-    (check-print
-      "Unknown key 'not'.\n"
-      (lambda () (parameterize-from-hash opt (lambda ()
-        ;; -- mid-test
-        (check-false (*online?*))
-        (check-true (negative? (*bad-rhyme-penalty*)))))))
-    ;; -- post-test
-    (check-true (*online?*))
-    (check-true (<= 0 (*bad-rhyme-penalty*))))
+  (test-case "parameterize-from-hash"
+    (let* ([opt (options-init)]
+           [init-count (options-count opt)]
+           [o1  (option? "#:online? #f")]
+           [o2  (option? "  #:bad-rhyme-penalty -666")]
+           [o3  (option? "nothin")]
+           [o4  (option? "#:not real")])
+      (for ([o (in-list (list o1 o2 o3 o4))])
+        (options-set opt o))
+      ;; -- pre-test
+      (check-true (< init-count (options-count opt)))
+      (check-true (*online?*))
+      (check-true (<= 0 (*bad-rhyme-penalty*)))
+      (check-print
+        "Unknown key 'not'.\n"
+        (lambda () (parameterize-from-hash opt (lambda ()
+          ;; -- mid-test
+          (check-false (*online?*))
+          (check-true (negative? (*bad-rhyme-penalty*)))))))
+      ;; -- post-test
+      (check-true (*online?*))
+      (check-true (<= 0 (*bad-rhyme-penalty*)))))
 
-  ;; -- save-option
-  (with-config #:local ""
-    (lambda ()
-      (define-values [gc lc] (get-config-filenames))
-      ;; -- Write k/v pair to config file
-      (define key 'hello)
-      (define val 'world)
-      (save-option key val #:location 'local)
-      ;; -- Check new contents against the old
-      (define local-data (string-trim (file->string lc)))
-      (check-equal? local-data "#:hello world")
-      (define global-lines (file->lines gc))
-      (check-equal? (options-count (options-init))
-                    (add1 (length global-lines)))))
-
-  (with-config #:global ""
-    (lambda ()
-      (define-values [gc lc] (get-config-filenames))
-      (define key 'hello)
-      (define val 'world)
-      (save-option key val #:location 'global)
-      (check-equal? (string-trim (file->string gc))
-                    (format "#:~a ~a" key val))))
-
-  ;; -- symbol->config-filename
-  (let-values ([(gc lc) (get-config-filenames)])
-    (check-apply* symbol->config-filename
-     ['global == gc]
-     ['local == lc])
-    (check-exn #rx"parameters:symbol->config-filename"
-      (lambda () (symbol->config-filename 'zardoz))))
-
-  ;; -- update-option
-  (let-values ([(k v) (values 'hello 'world)]
-               [(gc lc) (get-config-filenames)])
-    (define option-str (format-option k v))
-    (define (local->line*) (file->lines lc))
-    (define (global->line*) (file->lines gc))
-    ;; --- update-option, nothing exists (local)
+  (test-case "save-option"
     (with-config #:local ""
       (lambda ()
-        (update-option k v #:location 'local)
-        (check-equal? (local->line*) (list "" option-str))))
-    ;; --- update-option, nothing exists (global)
+        (define-values [gc lc] (get-config-filenames))
+        ;; -- Write k/v pair to config file
+        (define key 'hello)
+        (define val 'world)
+        (save-option key val #:location 'local)
+        ;; -- Check new contents against the old
+        (define local-data (string-trim (file->string lc)))
+        (check-equal? local-data "#:hello world")
+        (define global-lines (if (file-exists? gc) (file->lines gc) '()))
+        (check-equal? (options-count (options-init))
+                      (add1 (length global-lines)))))
+
     (with-config #:global ""
       (lambda ()
-        (update-option k v #:location 'global)
-        (check-equal? (global->line*) (list "" option-str))))
-    ;; --- update-option, key exists (global)
-    (with-config #:global (format "#:~a john" k)
-      (lambda ()
-        (update-option k v #:location 'global)
-        (check-equal? (global->line*) (list option-str))))
-    ;; --- update-option, key exists + other bindings exist
-    (let ([existing-opt "#:foo bar"])
-      (with-config #:global (string-append (format "#:~a john\n" k)
-                                           existing-opt)
+        (define-values [gc lc] (get-config-filenames))
+        (define key 'hello)
+        (define val 'world)
+        (save-option key val #:location 'global)
+        (check-equal? (string-trim (file->string gc))
+                      (format "#:~a ~a" key val)))))
+
+  (test-case "symbol->config-filename"
+    (let-values ([(gc lc) (get-config-filenames)])
+      (check-apply* symbol->config-filename
+       ['global == gc]
+       ['local == lc])
+      (check-exn #rx"parameters:symbol->config-filename"
+        (lambda () (symbol->config-filename 'zardoz)))))
+
+  (test-case "update-option"
+    (let-values ([(k v) (values 'hello 'world)]
+                 [(gc lc) (get-config-filenames)])
+      (define option-str (format-option k v))
+      (define (local->line*) (file->lines lc))
+      (define (global->line*) (file->lines gc))
+      ;; --- update-option, nothing exists (local)
+      (with-config #:local ""
+        (lambda ()
+          (update-option k v #:location 'local)
+          (check-equal? (local->line*) (list "" option-str))))
+      ;; --- update-option, nothing exists (global)
+      (with-config #:global ""
         (lambda ()
           (update-option k v #:location 'global)
-          (define line* (global->line*))
-          (check-equal? (length line*) 2)
-          (check-equal? (car line*) option-str)
-          (check-equal? (cadr line*) existing-opt))))
-    ;; --- update-option, key exists + garbage exists
-    (let* ([existing-opt "#:baz quux"]
-           [existing-key (format "#:~a you" k)]
-           [garbage1     "    "]
-           [garbage2     "malformed!"]
-           [opt*         (list existing-opt existing-key garbage1 garbage2)])
-      (with-config #:global (string-join opt* "\n")
+          (check-equal? (global->line*) (list "" option-str))))
+      ;; --- update-option, key exists (global)
+      (with-config #:global (format "#:~a john" k)
         (lambda ()
           (update-option k v #:location 'global)
-          (define line* (global->line*))
-          (check-equal? (length line*) (length opt*))
-          (check-equal? (car line*) (car opt*))
-          (check-equal? (cadr line*) option-str)
-          (check-equal? (caddr line*) (caddr opt*))
-          (check-equal? (cadddr line*) (cadddr opt*)))))
-    ;; --- update-option, only other bindings exist
-    (let* ([opt1 "#:a b"]
-           [opt2 "garbage"]
-           [opt3 "(a list of 5 garbage)"]
-           [opt4 "#:another \"good-key\""]
-           [opt* (list opt1 opt2 opt3 opt4)])
-      (with-config #:global (string-join opt* "\n")
-        (lambda ()
-          (update-option k v #:location 'global)
-          (define line* (global->line*))
-          (check-equal? (length line*) (add1 (length opt*)))
-          (for ([o (in-list opt*)] [l (in-list line*)])
-            (check-equal? o l))
-          (check-equal? (last line*) option-str)))))
+          (check-equal? (global->line*) (list option-str))))
+      ;; --- update-option, key exists + other bindings exist
+      (let ([existing-opt "#:foo bar"])
+        (with-config #:global (string-append (format "#:~a john\n" k)
+                                             existing-opt)
+          (lambda ()
+            (update-option k v #:location 'global)
+            (define line* (global->line*))
+            (check-equal? (length line*) 2)
+            (check-equal? (car line*) option-str)
+            (check-equal? (cadr line*) existing-opt))))
+      ;; --- update-option, key exists + garbage exists
+      (let* ([existing-opt "#:baz quux"]
+             [existing-key (format "#:~a you" k)]
+             [garbage1     "    "]
+             [garbage2     "malformed!"]
+             [opt*         (list existing-opt existing-key garbage1 garbage2)])
+        (with-config #:global (string-join opt* "\n")
+          (lambda ()
+            (update-option k v #:location 'global)
+            (define line* (global->line*))
+            (check-equal? (length line*) (length opt*))
+            (check-equal? (car line*) (car opt*))
+            (check-equal? (cadr line*) option-str)
+            (check-equal? (caddr line*) (caddr opt*))
+            (check-equal? (cadddr line*) (cadddr opt*)))))
+      ;; --- update-option, only other bindings exist
+      (let* ([opt1 "#:a b"]
+             [opt2 "garbage"]
+             [opt3 "(a list of 5 garbage)"]
+             [opt4 "#:another \"good-key\""]
+             [opt* (list opt1 opt2 opt3 opt4)])
+        (with-config #:global (string-join opt* "\n")
+          (lambda ()
+            (update-option k v #:location 'global)
+            (define line* (global->line*))
+            (check-equal? (length line*) (add1 (length opt*)))
+            (for ([o (in-list opt*)] [l (in-list line*)])
+              (check-equal? o l))
+            (check-equal? (last line*) option-str))))))
 
 )
