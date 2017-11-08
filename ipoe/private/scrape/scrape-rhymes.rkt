@@ -23,6 +23,7 @@
 (require
   ipoe/private/ui
   ipoe/private/scrape/scrape-util
+  ipoe/private/util/logging
   (only-in sxml sxpath if-car-sxpath)
   (only-in racket/string string-trim string-join)
   (only-in racket/list take)
@@ -111,21 +112,27 @@
 (module+ test
   (require rackunit rackunit-abbrevs)
 
+  (define CI? (equal? "true" (getenv "CI")))
+
   (test-case "rhyme?:almost-rhyme?"
-    (let ([rr (scrape-rhyme "parent")])
-      (check-true (rhymes? rr "aberrant"))
-      (check-true (almost-rhymes? rr "embarrassed"))
-      (check-false (rhymes? rr "child"))
-      (check-false (almost-rhymes? rr "cat"))))
+    (when (not CI?)
+      (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-scrape-warning "network error, skipping test"))))
+        (define rr (scrape-rhyme "parent"))
+        (check-true (rhymes? rr "aberrant"))
+        (check-true (almost-rhymes? rr "embarrassed"))
+        (check-false (rhymes? rr "child"))
+        (check-false (almost-rhymes? rr "cat")))))
 
   (test-case "scrape-rhyme"
-    (define r (scrape-rhyme "mouse"))
-    (check-true (rhyme-result? r))
+    (when (not CI?)
+      (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-scrape-warning "network error, skipping test"))))
+        (define r (scrape-rhyme "mouse"))
+        (check-true (rhyme-result? r))
 
-    (check-equal? (take (rhyme-result-rhyme* r) 3)
-                  '("porterhouse" "slaughterhouse" "clearinghouse"))
+        (check-equal? (take (rhyme-result-rhyme* r) 3)
+                      '("porterhouse" "slaughterhouse" "clearinghouse"))
 
-    (check-equal? (take (rhyme-result-almost-rhyme* r) 3)
-                  '("mouth" "aus" "mows"))
+        (check-equal? (take (rhyme-result-almost-rhyme* r) 3)
+                      '("mouth" "aus" "mows"))))
   )
 )

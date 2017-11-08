@@ -293,15 +293,16 @@
     rackunit-abbrevs
     (only-in racket/string string-join))
 
-  (define o* (options-init))
+  (define o* (options-init-for-test))
 
   (define-syntax-rule (with-db-test e ...)
-    (parameterize-from-hash o* (lambda ()
-     (parameterize ([*interactive?* #f])
-      (with-ipoe-db #:user (*user*)
-                    #:dbname (*dbname*)
-                    #:commit? #f
-        (lambda () e ...))))))
+    (when o*
+      (parameterize-from-hash o* (lambda ()
+       (parameterize ([*interactive?* #f])
+        (with-ipoe-db #:user (*user*)
+                      #:dbname (*dbname*)
+                      #:commit? #f
+          (lambda () e ...)))))))
 
   (define-syntax-rule (add-word/nothing w s)
      (add-word w #:syllables s

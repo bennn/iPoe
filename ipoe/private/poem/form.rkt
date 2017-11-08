@@ -261,6 +261,8 @@
     (only-in racket/string string-split)
   )
 
+  (define CI? (equal? "true" (getenv "CI")))
+
   ;; -- check-duplicate
   ;; Always void if first arg is #f
   (check-equal? (check-duplicate #f #:new-val 'a #:src 'b #:msg 'c)
@@ -374,14 +376,16 @@
               (lambda () (couplet-validator port))))
           (close-input-port port)
           res)
-        (define r
-          (check-print
-            (list #rx"Finished" #rx"")
-            (lambda () (test-couplet pass-str))))
-        (check-true (poem? (car r)))
-        (check-exn
-          (regexp "ipoe")
-          (lambda () (test-couplet fail-str))))
+        (when (not CI?)
+          (with-handlers ((exn:fail:network? (lambda (ex) (void))))
+            (define r
+              (check-print
+                (list #rx"Finished" #rx"")
+                (lambda () (test-couplet pass-str))))
+            (check-true (poem? (car r)))
+            (check-exn
+              (regexp "ipoe")
+              (lambda () (test-couplet fail-str))))))
 
   ;; --- Testing options
   (let* ([free-validator (make-validator (form 'free '() #f '()))]

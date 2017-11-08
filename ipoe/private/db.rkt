@@ -58,7 +58,7 @@
   ;; Execute the thunk in the context of a fresh database connection
 
   word->almost-rhyme*
-  ;; (->* [string?] [#:db connection?] (sequence/c string?)
+  ;; (->* [string?] [#:db connection?] (sequence/c string?))
   ;; Return the sequence of words that almost rhyme with the argument.
 
   word->id
@@ -66,7 +66,7 @@
   ;; Get the id of the word, if it exists
 
   word->rhyme*
-  ;; (->* [string?] [connection?] (sequence/c string?)
+  ;; (->* [string?] [connection?] (sequence/c string?))
   ;; Return the sequence of words that rhyme with the argument
 
   word->syllables*
@@ -76,6 +76,7 @@
   word-exists?
   ;; (->* [string?] [#:db connection?] boolean?)
   ;; True if the second argument is in the database
+
 )
 
 ;; -----------------------------------------------------------------------------
@@ -90,6 +91,7 @@
   ipoe/private/db/migrate
   (only-in ipoe/private/util/string
     string-empty?)
+  ipoe/private/util/logging
   ;; --
   racket/match
   racket/sequence
@@ -812,25 +814,25 @@
 
   ;; -------------------------------------------------------------------
 
-  (define o*
-    (let-values ([(gc lc) (get-config-filenames)])
-      (if (file-exists? lc)
-          (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
-          (options-init))))
+  (define CI? (equal? "true" (getenv "CI")))
+
+  (define o* (options-init-for-test))
 
   (define-syntax-rule (with-db-test e)
-    (parameterize-from-hash o* (lambda ()
-      (parameterize ([*verbose* #t])
-        (with-ipoe-db #:commit? #f
-                      #:user (*user*)
-                      #:dbname (*dbname*)
-          (lambda () e))))))
+    (when o*
+      (parameterize-from-hash o* (lambda ()
+        (parameterize ([*verbose* #t])
+          (with-ipoe-db #:commit? #f
+                        #:user (*user*)
+                        #:dbname (*dbname*)
+            (lambda () e)))))))
 
   (define-syntax-rule (with-online-test e)
-    (parameterize-from-hash o* (lambda ()
-     (parameterize ([*interactive?* #f])
-      (with-ipoe-db #:commit? #f #:online-only? #t
-        (lambda () e))))))
+    (when o*
+      (parameterize-from-hash o* (lambda ()
+       (parameterize ([*interactive?* #f])
+        (with-ipoe-db #:commit? #f #:online-only? #t
+          (lambda () e)))))))
 
   ;; Clear the cache first, then do the rest of the user's expression
   (define-syntax-rule (with-config/cache [global local] e)
@@ -870,7 +872,7 @@
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
   (with-config/cache [#f #f]
-    (begin
+    (when o*
       ;; Log in to the database, make some queries
       ;; Use `with-ipoe-db` to test config/cache
       (with-online-test
@@ -994,19 +996,21 @@
   (let ([rx #rx"ipoe:db:find-word"])
     (check-exn rx
       (lambda () (find-word "yolo")))
-    (check-exn rx
-      (lambda ()
-        (with-online-test
+    (with-online-test
+      (check-exn rx
+        (lambda ()
           (find-word "yolo")))))
 
   ;; -- find-r
   (let ([rx #rx"find-rhyme"])
     (check-exn rx
       (lambda () (find-r #:table 'rhyme)))
-    (check-exn rx
-      (lambda () (with-online-test (find-r #:table 'rhyme))))
-    (check-exn rx
-      (lambda () (with-db-test (find-r #:table 'rhyme)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (find-r #:table 'rhyme))))
+    (with-db-test
+      (check-exn rx
+        (lambda () (find-r #:table 'rhyme)))))
 
   (with-db-test
     (begin
@@ -1052,8 +1056,9 @@
   (let ([rx #rx"find-r"])
     (check-exn rx
       (lambda () (almost-rhymes-with?/id 1 2)))
-    (check-exn rx
-      (lambda () (with-online-test (almost-rhymes-with?/id 1 2)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (almost-rhymes-with?/id 1 2)))))
 
   ;; -- rhymes-with?/id
   (with-db-test
@@ -1068,8 +1073,9 @@
   (let ([rx #rx"find-r"])
     (check-exn rx
       (lambda () (rhymes-with?/id 1 2)))
-    (check-exn rx
-      (lambda () (with-online-test (rhymes-with?/id 1 2)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (rhymes-with?/id 1 2)))))
 
   ;; -- has-syllables? /id
   (with-db-test
@@ -1093,10 +1099,12 @@
       (lambda () (has-syllables? w s)))
     (check-exn rx
       (lambda () (has-syllables?/id wid s)))
-    (check-exn rx
-      (lambda () (with-online-test (has-syllables? w s))))
-    (check-exn rx
-      (lambda () (with-online-test (has-syllables?/id wid s)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (has-syllables? w s))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (has-syllables?/id wid s)))))
 
   ;; -- id->word
   (with-db-test
@@ -1109,8 +1117,9 @@
   (let ([rx #rx"find-word"])
     (check-exn rx
       (lambda () (id->word 69)))
-    (check-exn rx
-      (lambda () (with-online-test (id->word 623)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (id->word 623)))))
 
   ;; -- syllables->word*
   (with-db-test
@@ -1143,8 +1152,9 @@
   (let ([rx #rx"syllables->word*"])
     (check-exn rx
       (lambda () (syllables->word* 8)))
-    (check-exn rx
-      (lambda () (with-online-test (syllables->word* 7)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (syllables->word* 7)))))
 
   ;; -- word->id /fail
   (with-db-test
@@ -1161,12 +1171,14 @@
   (let ([rx #rx"find-word"])
     (check-exn rx
       (lambda () (word->id "foobar")))
-    (check-exn rx
-      (lambda () (with-online-test (word->id "foobar"))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (word->id "foobar"))))
     (check-exn rx
       (lambda () (word->id/fail "foobar" #:src 'TEST)))
-    (check-exn rx
-      (lambda () (with-online-test (word->id/fail "foobar" #:src 'TEST)))))
+    (with-online-test
+      (check-exn rx
+        (lambda () (word->id/fail "foobar" #:src 'TEST)))))
 
   ;; ------------------------------------------------------------------
   ;; -- online-or-db queries
@@ -1330,12 +1342,14 @@
         [s 4])
     (check-exn rx1
       (lambda () (add-syllables w s)))
-    (check-exn rx1
-      (lambda () (with-online-test (add-syllables w s))))
+    (with-online-test
+      (check-exn rx1
+        (lambda () (add-syllables w s))))
     (check-exn rx2
       (lambda () (add-syllables/id wid s)))
-    (check-exn rx2
-      (lambda () (with-online-test (add-syllables/id wid s)))))
+    (with-online-test
+      (check-exn rx2
+        (lambda () (add-syllables/id wid s)))))
 
   ;; -- add-(almost-)rhyme, refl should not fail
   (with-db-test
@@ -1526,9 +1540,8 @@
       (list #rx"^Attempting to add" #rx"^Cannot add word .*? not connected")
       (lambda () (add-word new-word))))
     ;; Offline
-    (check-false (with-online-test (add-word new-word)))
-    (check-false
-      (with-online-test (add-word new-word))))
+    (with-online-test (check-false (add-word new-word)))
+    (with-online-test (check-false (add-word new-word))))
 
   ;; -- add-word*
   (with-db-test
@@ -1553,7 +1566,7 @@
       ;;  (check-false (rhymes-with? w1 w2))
       ;;  (check-false (rhymes-with? w2 w1))
       ;;  (check-true (almost-rhymes-with? w1 w2))
-      ;;  (check-true (almost-rhymes-with? w2 w1)))))
+      ;;  (check-true (almost-rhymes-with? w2 w1)))
 
 
   ;; -- update-word*
@@ -1579,8 +1592,8 @@
    ;; -- update word, good old error cases
    (let ([w "asdhaegdafsdf"])
     (parameterize ([*interactive?* #f])
-     (check-false
-       (with-online-test (update-word w)))
+     (with-online-test
+       (check-false (update-word w)))
      (check-false
        (check-print
          "";(list #rx"not connected")
@@ -1609,20 +1622,22 @@
     (let ([rx #rx"remove-word"])
       (check-exn rx (lambda () (remove-word w)))
       ;; Online-only
-      (check-exn rx (lambda () (with-online-test (remove-word w))))))
+      (with-online-test (check-exn rx (lambda () (remove-word w))))))
 
   ;; ------------------------------------------------------------------
   ;; -- read-cache
   (parameterize ([*ipoe-cache-dir* (path->string (find-system-path 'temp-dir))])
     ;; --- Normal use
-    (let* ([C (make-cache)]
-           [w "yogurt"])
-      (define r (cons (scrape/cache 'word w #:cache C #:scrape scrape-word)
-                      #f))
-      (check-equal? (hash-ref C w (lambda () #f)) r)
-      (write-cache C)
-      (define C+ (read-cache))
-      (check-equal? (hash-ref C+ w (lambda () #f)) r))
+    (when (not CI?)
+      (let* ([C (make-cache)]
+             [w "yogurt"])
+        (with-handlers ([exn:fail:network? (λ (ex) (log-ipoe-db-warning "network error, skipping test"))])
+          (define r
+              (cons (scrape/cache 'word w #:cache C #:scrape scrape-word) #f))
+          (check-equal? (hash-ref C w (lambda () #f)) r)
+          (write-cache C)
+          (define C+ (read-cache))
+          (check-equal? (hash-ref C+ w (lambda () #f)) r))))
     ;; --- Garbage in the cache file
     (define-syntax-rule (check-garbage thunk)
       (let ()
@@ -1679,16 +1694,17 @@
   ;; -- TODO test resolve, never suggest words not-in-database
 
   ;; Should scrape internet for syllables
-  (parameterize ([*interactive?* #f] [*online?* #t])
-    (check-apply* (lambda (w) (resolve-syllables w #f))
-      ["hour" == 1]
-      ["never" == 2]
-      ["mississippi" == 4]
-      ["continuity" == 5]
-      ["asbferufvzfjuvfds" == #f]
-    )
-    ;; Should trust the user input
-    (check-apply* (lambda (w) (resolve-syllables w 99))
-      ["hour" == 99]
-    ))
+  (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-db-warning "network error, skipping test"))))
+    (parameterize ([*interactive?* #f] [*online?* #t])
+      (check-apply* (lambda (w) (resolve-syllables w #f))
+        ["hour" == 1]
+        ["never" == 2]
+        ["mississippi" == 4]
+        ["continuity" == 5]
+        ["asbferufvzfjuvfds" == #f]
+      )
+      ;; Should trust the user input
+      (check-apply* (lambda (w) (resolve-syllables w 99))
+        ["hour" == 99]
+      )))
 )

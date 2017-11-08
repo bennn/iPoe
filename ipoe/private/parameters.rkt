@@ -2,6 +2,7 @@
 
 ;; Run-time parameters and their parsing and setting
 
+(require racket/contract)
 (provide
   ;; NOTE: every 'define-parameter' is provided
 
@@ -25,6 +26,10 @@
   ;; (-> OptionTbl)
   ;; Initialize a table of run-time configuration options
 
+  options-init-for-test
+  ;; (-> (U #f OptionTbl))
+  ;; Initialize options hash for tests, or #f if things are not right for testing
+
   options-set
   ;; (-> OptionTbl Symbol Any Boolean)
   ;; Add the the (Symbol Any) pair to the OptionTbl
@@ -36,8 +41,9 @@
   ;; @optional{parse-value} controls how Racket values are parsed
   ;;  from the string `VALUE`.
 
-  parameterize-from-hash
-  ;; (-> OptionTbl (-> Any) Any)
+  (contract-out
+   [parameterize-from-hash
+    (-> option-tbl? procedure? any)])
   ;; Update all parameters defined in this file with data from the OptionTbl,
   ;;  then execute the thunk in this updated context.
 
@@ -64,6 +70,7 @@
 (require
   ipoe/private/suggest
   ipoe/private/ui
+  ipoe/private/util/logging
   ipoe/private/util/string
   ;; --
   (only-in basedir
@@ -78,6 +85,8 @@
 
 ;; =============================================================================
 ;; Parameters
+
+(define option-tbl? hash?)
 
 (define ALL-PARAMETERS (mutable-set))
 
@@ -197,6 +206,18 @@
   (when (file-exists? local-config)
     (options-set-from-file o* local-config))
   o*)
+
+(define (options-init-for-test)
+  (define-values (gc lc) (get-config-filenames))
+  (cond
+   [(not (file-exists? gc))
+    (log-ipoe-db-warning "missing global config file '~a', cannot initialize DB connection, skipping the DB tests" gc)
+    #f]
+   [(file-exists? gc)
+    (log-ipoe-db-warning "found local config file '~a', skipping DB tests")
+    #f]
+   [else
+    (options-init)]))
 
 ;; Seach for "#:KEY VAL" on a line (for arbitrary text "KEY" and "VAL")
 ;; Ignore any extra whitespace before/after "#:KEY" or "VAL"

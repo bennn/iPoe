@@ -399,21 +399,21 @@
 (module+ test
   (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
-  ;; -- arg-error
-  (check-equal?
-    (arg-error 'FOO 'BAR 'BAZ)
-    "FOO: expected BAR, got BAZ")
+  (test-case "arg-error"
+    (check-equal?
+      (arg-error 'FOO 'BAR 'BAZ)
+      "FOO: expected BAR, got BAZ"))
 
-  ;; -- query TODO
-  ;(parameterize ([*skip* 0] [*take* 0])
-  ;  (check-equal?
-  ;    (query cdr '(1 2 5) '())
-  ;    '(2 5)))
+  #;(test-case "query" ;; TODO
+    (parameterize ([*skip* 0] [*take* 0])
+      (check-equal?
+        (query cdr '(1 2 5) '())
+        '(2 5))))
 
-  ;; -- unknown-word
-  (check-equal?
-    (unknown-word 'FOO)
-    "Unknown word 'FOO'")
+  (test-case "unknown-word"
+    (check-equal?
+      (unknown-word 'FOO)
+      "Unknown word 'FOO'"))
 
   (test-case "warning"
     (check-print
@@ -424,56 +424,52 @@
       "Warning: FOO BAR BAZ\n"
       (lambda () (warning "~a ~a ~a" 'FOO 'BAR 'BAZ))))
 
-  ;; -- COMMAND
   (define-syntax-rule (get-exec sym)
     (command-exec (find-command sym)))
 
   (define-syntax-rule (add-word/nothing w)
      (add-word w #:rhymes '() #:almost-rhymes '()))
 
-  (define o*
-    (let-values ([(gc lc) (get-config-filenames)])
-      (if (file-exists? lc)
-          (error 'ipoe:db:test "Detected local config file '~a', please delete or change directories before running tests.")
-          (options-init))))
+  (define o* (options-init-for-test))
 
   (define-syntax-rule (with-db-test e)
-    (parameterize-from-hash o* (lambda ()
-      (parameterize ([*verbose* #t]
-                     [*interactive?* #f]
-                     [*online?* #f])
-        (with-ipoe-db #:commit? #f
-                      #:user (*user*)
-                      #:dbname (*dbname*)
-          (lambda () e))))))
+    (when o*
+      (parameterize-from-hash o* (lambda ()
+        (parameterize ([*verbose* #t]
+                       [*interactive?* #f]
+                       [*online?* #f])
+          (with-ipoe-db #:commit? #f
+                        #:user (*user*)
+                        #:dbname (*dbname*)
+            (lambda () e)))))))
 
-  ;; --- exit
-  (let ([exec (get-exec 'exit)])
-    (check-equal?
-     (exec 'exit)
-     'EXIT)
-    (check-false
-     (exec 'foo)))
+  (test-case "exit"
+    (let ([exec (get-exec 'exit)])
+      (check-equal?
+       (exec 'exit)
+       'EXIT)
+      (check-false
+       (exec 'foo))))
 
-  ;; --- help
-  (let ([exec (get-exec 'help)])
-    (check-equal?
-     (exec 'help)
-     HELP-STR)
-    (check-false (exec 'edit)))
+  (test-case "help"
+    (let ([exec (get-exec 'help)])
+      (check-equal?
+       (exec 'help)
+       HELP-STR)
+      (check-false (exec 'edit))))
 
-  ;; --- id->word
-  (with-db-test
-   (let* ([id 'id->word]
-          [exec (get-exec id)]
-          [w "iabpgasgasd"])
-     (add-word w)
-     (define wid (word->id w))
-     (check-equal? (exec (list id wid))  w)
-     (remove-word w)
-     (check-regexp-match #rx"^Unbound ID" (exec (list id wid)))
-     (check-regexp-match #rx"^id->word: expected" (exec (list id "foo")))
-     (check-false (exec 'blah))))
+  (test-case "id->word"
+    (with-db-test
+     (let* ([id 'id->word]
+            [exec (get-exec id)]
+            [w "iabpgasgasd"])
+       (add-word w)
+       (define wid (word->id w))
+       (check-equal? (exec (list id wid))  w)
+       (remove-word w)
+       (check-regexp-match #rx"^Unbound ID" (exec (list id wid)))
+       (check-regexp-match #rx"^id->word: expected" (exec (list id "foo")))
+       (check-false (exec 'blah)))))
 
   ;; --- remove-word
   (with-db-test
@@ -625,198 +621,199 @@
      (check-false (exec 'dasdg))))
 
 
-  ;; -- HELP-STR
-  (check-equal?
-    (length (string-split HELP-STR "\n"))
-    (add1 (length COMMAND*)))
+  (test-case "HELP-STR"
+    (check-equal?
+      (length (string-split HELP-STR "\n"))
+      (add1 (length COMMAND*))))
 
   ;; -- REPL TODO
 
-  ;; -- exit?
-  (check-true* (lambda (x) (and (exit? x) #t))
-   ['exit]
-   ['q])
+  (test-case "exit?"
+    (check-true* (lambda (x) (and (exit? x) #t))
+     ['exit]
+     ['q])
 
-  (check-false* exit?
-   ['a]
-   ["asdf"])
+    (check-false* exit?
+     ['a]
+     ["asdf"]))
 
-  ;; -- help?
-  (check-true* (lambda (x) (and (help? x) #t))
-   ['help]
-   ['h])
+  (test-case "help?"
+    (check-true* (lambda (x) (and (help? x) #t))
+     ['help]
+     ['h])
 
-  (check-false* help?
-   ['x]
-   ['(31)]
-   ["yolo"])
+    (check-false* help?
+     ['x]
+     ['(31)]
+     ["yolo"]))
 
-  ;; -- find-command
-  (for ([s (in-list '(exit id->word word->id word->syllables* word->rhyme*))])
+  (test-case "find-command"
+    (for ([s (in-list '(exit id->word word->id word->syllables* word->rhyme*))])
+      (check-equal?
+        (command-id (find-command s))
+        s))
+
+    (for ([s (in-list '(a blah foo bar))])
+      (check-false (find-command s))))
+
+  (test-case "take"
     (check-equal?
-      (command-id (find-command s))
-      s))
+      (take 3 '())
+      "")
 
-  (for ([s (in-list '(a blah foo bar))])
-    (check-false (find-command s)))
+    (check-equal?
+      (take 1 '(1 2 3))
+      "1")
 
-  ;; -- take
-  (check-equal?
-    (take 3 '())
-    "")
+    (check-equal?
+      (take 3 '(1 2 3))
+      "1\n2\n3")
 
-  (check-equal?
-    (take 1 '(1 2 3))
-    "1")
+    (check-equal?
+      (take 5 '(1 2 3))
+      "1\n2\n3")
 
-  (check-equal?
-    (take 3 '(1 2 3))
-    "1\n2\n3")
-
-  (check-equal?
-    (take 5 '(1 2 3))
-    "1\n2\n3")
-
-  (check-equal?
-    (take #f '(1 2 3))
-    "1\n2\n3")
-
-  (parameterize ([*take* 2])
     (check-equal?
       (take #f '(1 2 3))
-      "1\n2"))
+      "1\n2\n3")
 
-  ;; -- parse-db-options, lim,skip
-  (let*-values ([(l-val s-val) (values 1 2)]
-                [(lm sk) (parse-db-options `(#:limit ,l-val #:skip ,s-val))])
-    (check-equal? lm l-val)
-    (check-equal? sk s-val))
+    (parameterize ([*take* 2])
+      (check-equal?
+        (take #f '(1 2 3))
+        "1\n2")))
 
-  ;; -- parse-db-options, skip,lim
-  (let*-values ([(l-val s-val) (values 1 2)]
-                [(lm sk) (parse-db-options `(#:skip ,s-val #:limit ,l-val))])
-    (check-equal? lm l-val)
-    (check-equal? sk s-val))
+  (test-case "parse-db-options"
+    ;; -- parse-db-options, lim,skip
+    (let*-values ([(l-val s-val) (values 1 2)]
+                  [(lm sk) (parse-db-options `(#:limit ,l-val #:skip ,s-val))])
+      (check-equal? lm l-val)
+      (check-equal? sk s-val))
 
-  ;; -- parse-db-options, missing lim/skip
-  (let*-values ([(s-val) 3]
-                [(lm sk) (parse-db-options `(#:skip ,s-val))])
-    (check-false lm)
-    (check-equal? sk s-val))
+    ;; -- parse-db-options, skip,lim
+    (let*-values ([(l-val s-val) (values 1 2)]
+                  [(lm sk) (parse-db-options `(#:skip ,s-val #:limit ,l-val))])
+      (check-equal? lm l-val)
+      (check-equal? sk s-val))
 
-  (let*-values ([(l-val) 3]
-                [(lm sk) (parse-db-options `(#:limit ,l-val))])
-    (check-equal? lm l-val)
-    (check-false sk))
+    ;; -- parse-db-options, missing lim/skip
+    (let*-values ([(s-val) 3]
+                  [(lm sk) (parse-db-options `(#:skip ,s-val))])
+      (check-false lm)
+      (check-equal? sk s-val))
 
-  ;; -- parse-db-options, bound twice
-  (check-print (list #rx"^Warning: Option #:limit set twice")
-    (lambda ()
-      (let*-values ([(l-val-0 l-val-1) (values 1 2)]
-                    [(lm sk) (parse-db-options `(#:limit ,l-val-0
-                                                 #:limit ,l-val-1))])
-        (check-equal? lm l-val-1)
-        (check-false sk))))
+    (let*-values ([(l-val) 3]
+                  [(lm sk) (parse-db-options `(#:limit ,l-val))])
+      (check-equal? lm l-val)
+      (check-false sk))
 
-  (check-print (list
-                 #rx"^Warning: Option #:skip set twice"
-                 #rx"^Warning: Option #:limit set twice")
-    (lambda ()
-      (let*-values ([(l-val-0 l-val-1) (values 1 2)]
-                    [(s-val-0 s-val-1) (values 3 6)]
-                    [(lm sk) (parse-db-options `(#:limit ,l-val-0
-                                                 #:skip ,s-val-0
-                                                 #:skip ,s-val-1
-                                                 #:limit ,l-val-1))])
-        (check-equal? lm l-val-1)
-        (check-equal? sk s-val-1))))
+    ;; -- parse-db-options, bound twice
+    (check-print (list #rx"^Warning: Option #:limit set twice")
+      (lambda ()
+        (let*-values ([(l-val-0 l-val-1) (values 1 2)]
+                      [(lm sk) (parse-db-options `(#:limit ,l-val-0
+                                                   #:limit ,l-val-1))])
+          (check-equal? lm l-val-1)
+          (check-false sk))))
 
-  ;; -- parse-db-options, nonsense options
-  (let*-values ([(l-val s-val) (values 1 2)]
-                [(lm sk) (parse-db-options `(#:foo 1
-                                             #:skip ,s-val
-                                             #:limit ,l-val))])
-    (check-equal? lm l-val)
-    (check-equal? sk s-val))
+    (check-print (list
+                   #rx"^Warning: Option #:skip set twice"
+                   #rx"^Warning: Option #:limit set twice")
+      (lambda ()
+        (let*-values ([(l-val-0 l-val-1) (values 1 2)]
+                      [(s-val-0 s-val-1) (values 3 6)]
+                      [(lm sk) (parse-db-options `(#:limit ,l-val-0
+                                                   #:skip ,s-val-0
+                                                   #:skip ,s-val-1
+                                                   #:limit ,l-val-1))])
+          (check-equal? lm l-val-1)
+          (check-equal? sk s-val-1))))
 
-  (let*-values ([(l-val s-val) (values 1 2)]
-                [(lm sk) (parse-db-options `(#:foo 1
-                                             #:skip ,s-val
-                                             #:bar 8131
-                                             #:limit ,l-val))])
-    (check-equal? lm l-val)
-    (check-equal? sk s-val))
+    ;; -- parse-db-options, nonsense options
+    (let*-values ([(l-val s-val) (values 1 2)]
+                  [(lm sk) (parse-db-options `(#:foo 1
+                                               #:skip ,s-val
+                                               #:limit ,l-val))])
+      (check-equal? lm l-val)
+      (check-equal? sk s-val))
 
-  (let*-values ([(l-val s-val) (values 1 2)]
-                [(lm sk) (parse-db-options `(#:foo
-                                             #:skip ,s-val
-                                             #:bar
-                                             #:limit ,l-val
-                                             #:baz))])
-    (check-equal? lm l-val)
-    (check-equal? sk s-val))
+    (let*-values ([(l-val s-val) (values 1 2)]
+                  [(lm sk) (parse-db-options `(#:foo 1
+                                               #:skip ,s-val
+                                               #:bar 8131
+                                               #:limit ,l-val))])
+      (check-equal? lm l-val)
+      (check-equal? sk s-val))
 
-  ;; -- parse-db-options, bad type
-  (check-print (list #rx"^Warning: Ignoring invalid")
-    (lambda ()
-      (let*-values ([(l-val s-val) (values 0 "pickles")]
-                    [(lm sk) (parse-db-options `(#:skip ,s-val
-                                                 #:limit ,l-val))])
-        (check-false sk)
-        (check-equal? lm l-val))))
+    (let*-values ([(l-val s-val) (values 1 2)]
+                  [(lm sk) (parse-db-options `(#:foo
+                                               #:skip ,s-val
+                                               #:bar
+                                               #:limit ,l-val
+                                               #:baz))])
+      (check-equal? lm l-val)
+      (check-equal? sk s-val))
 
-  (check-print (list #rx"^Warning: Ignoring invalid")
-    (lambda ()
-      (let*-values ([(l-val s-val) (values "pickles" 2)]
-                    [(lm sk) (parse-db-options `(#:skip ,s-val
-                                                 #:limit ,l-val))])
-        (check-false lm)
-        (check-equal? sk s-val))))
+    ;; -- parse-db-options, bad type
+    (check-print (list #rx"^Warning: Ignoring invalid")
+      (lambda ()
+        (let*-values ([(l-val s-val) (values 0 "pickles")]
+                      [(lm sk) (parse-db-options `(#:skip ,s-val
+                                                   #:limit ,l-val))])
+          (check-false sk)
+          (check-equal? lm l-val))))
 
-  ;; -- parse-db-options, missing val
-  (check-print (list #rx"^Warning: Missing value")
-    (lambda ()
-      (let*-values ([(l-val) 8]
-                    [(lm sk) (parse-db-options `(#:skip #:limit ,l-val))])
-        (check-equal? lm l-val)
-        (check-false sk))))
+    (check-print (list #rx"^Warning: Ignoring invalid")
+      (lambda ()
+        (let*-values ([(l-val s-val) (values "pickles" 2)]
+                      [(lm sk) (parse-db-options `(#:skip ,s-val
+                                                   #:limit ,l-val))])
+          (check-false lm)
+          (check-equal? sk s-val))))
 
-  (check-print (list #rx"^Warning: Missing value")
-    (lambda ()
-      (let*-values ([(s-val) 8]
-                    [(lm sk) (parse-db-options `(#:limit #:skip ,s-val))])
-        (check-equal? sk s-val)
-        (check-false lm))))
+    ;; -- parse-db-options, missing val
+    (check-print (list #rx"^Warning: Missing value")
+      (lambda ()
+        (let*-values ([(l-val) 8]
+                      [(lm sk) (parse-db-options `(#:skip #:limit ,l-val))])
+          (check-equal? lm l-val)
+          (check-false sk))))
 
-  ;; -- parse-db-options, empty list
-  (let*-values ([(lm sk) (parse-db-options '())])
-    (check-false lm)
-    (check-false sk))
+    (check-print (list #rx"^Warning: Missing value")
+      (lambda ()
+        (let*-values ([(s-val) 8]
+                      [(lm sk) (parse-db-options `(#:limit #:skip ,s-val))])
+          (check-equal? sk s-val)
+          (check-false lm))))
 
-  ;; -- show-help
-  (check-equal?
-    (show-help)
-    HELP-STR)
+    ;; -- parse-db-options, empty list
+    (let*-values ([(lm sk) (parse-db-options '())])
+      (check-false lm)
+      (check-false sk)))
 
-  (check-equal?
-    (show-help #f)
-    HELP-STR)
-
-  ;; -- show-help, command
-  (let* ([s '(exit)])
+  (test-case "show-help"
     (check-equal?
-      (show-help s)
-      (command-descr (find-command (car s)))))
+      (show-help)
+      HELP-STR)
 
-  ;; -- show-help, invalid command
-  (let* ([s 'foo])
     (check-equal?
-      (show-help (list s))
-      (format "Unknown command '~a'" s)))
+      (show-help #f)
+      HELP-STR)
 
-  ;; -- show-help, bad type
-  (let* ([a "whaaa"])
-    (check-equal?
-      (show-help a)
-      (format "Cannot help with '~a'" a)))
+    ;; -- show-help, command
+    (let* ([s '(exit)])
+      (check-equal?
+        (show-help s)
+        (command-descr (find-command (car s)))))
+
+    ;; -- show-help, invalid command
+    (let* ([s 'foo])
+      (check-equal?
+        (show-help (list s))
+        (format "Unknown command '~a'" s)))
+
+    ;; -- show-help, bad type
+    (let* ([a "whaaa"])
+      (check-equal?
+        (show-help a)
+        (format "Cannot help with '~a'" a))))
 )

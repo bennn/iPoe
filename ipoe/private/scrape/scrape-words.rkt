@@ -27,6 +27,7 @@
   (only-in ipoe/private/util/string
     string-ascii
     string-count-chars)
+  ipoe/private/util/logging
 )
 
 ;; =============================================================================
@@ -272,61 +273,66 @@
 
   (define not-a-word "hguwisdvzodxv")
 
-  (check-apply* (lambda (w) (word-result? (scrape-word w)))
-   ["yes" == #t]
-   ["mississippi" == #t]
-   [not-a-word == #f]
-  )
+  (define CI? (equal? "true" (getenv "CI")))
 
-  (check-apply* dictionary.com
-   ["penguin" == (word-result "penguin" "any of several flightless, aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having webbed feet and wings reduced to flippers." 2 'dictionary.com)]
-   ["flower" == (word-result "flower" "the blossom of a plant." 2 'dictionary.com)]
-   [not-a-word == #f]
-   ["cats" == #f]
-  )
+  (when (not CI?)
+    (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-scrape-warning "network error, skipping test"))))
 
-  (check-apply* the-free-dictionary
-   ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
-   ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
-   ["coalman" == (word-result "coalman" "a person who sells or delivers coal" 1 'the-free-dictionary)]
-   [not-a-word == #f]
-   ["leagues" == #f]
-  )
+    (check-apply* (lambda (w) (word-result? (scrape-word w)))
+     ["yes" == #t]
+     ["mississippi" == #t]
+     [not-a-word == #f]
+    )
 
-  (check-apply* merriam-webster
-    ["day" == (word-result "day" "the time of light between one night and the next" 1 'merriam-webster)]
-    ["penguin" == (word-result "penguin" "any of various erect short-legged flightless aquatic birds (family Spheniscidae) of the southern hemisphere" 2 'merriam-webster)]
-    ["umbrella" == (word-result "umbrella" "a collapsible shade for protection against weather consisting of fabric stretched over hinged ribs radiating from a central pole; especially a small one for carrying in the hand" 3 'merriam-webster)]
-    ["candelabra" == (word-result "candelabra" "a branched candlestick or lamp with several lights" 4 'merriam-webster)]
-    [not-a-word == #f]
-    ["stopping" == #f]
-   )
+    (check-apply* dictionary.com
+     ["penguin" == (word-result "penguin" "any of several flightless, aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having webbed feet and wings reduced to flippers." 2 'dictionary.com)]
+     ["flower" == (word-result "flower" "the blossom of a plant." 2 'dictionary.com)]
+     [not-a-word == #f]
+     ["cats" == #f]
+    )
 
-  (check-apply* american-heritage
-   ["trip" == (word-result "trip" "A going from one place to another; a journey." 1 'american-heritage)]
-   ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'american-heritage)]
-   ["hardcover" == (word-result "hardcover" "Having a rigid binding, as of cardboard covered with cloth or with leather. Used of books." 3 'american-heritage)]
-   [not-a-word == #f]
-    ["stopping" == #f] ;; Word converted to root -- scraping should fail
-  )
+    (check-apply* the-free-dictionary
+     ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'the-free-dictionary)]
+     ["boilerplate" == (word-result "boilerplate" "Steel in the form of flat plates used in making steam boilers." 3 'the-free-dictionary)]
+     ["coalman" == (word-result "coalman" "a person who sells or delivers coal" 1 'the-free-dictionary)]
+     [not-a-word == #f]
+     ["leagues" == #f]
+    )
 
-;  (check-apply* urban-dictionary
-;   ["match" == #t]
-;   [not-a-word == #f]
-;   ["leagues" == #f]
-;  )
+    (check-apply* merriam-webster
+      ["day" == (word-result "day" "the time of light between one night and the next" 1 'merriam-webster)]
+      ["penguin" == (word-result "penguin" "any of various erect short-legged flightless aquatic birds (family Spheniscidae) of the southern hemisphere" 2 'merriam-webster)]
+      ["umbrella" == (word-result "umbrella" "a collapsible shade for protection against weather consisting of fabric stretched over hinged ribs radiating from a central pole; especially a small one for carrying in the hand" 3 'merriam-webster)]
+      ["candelabra" == (word-result "candelabra" "a branched candlestick or lamp with several lights" 4 'merriam-webster)]
+      [not-a-word == #f]
+      ["stopping" == #f]
+     )
 
-  (define (check-syllables scraper w)
-    (word-result-num-syllables (scraper w)))
+    (check-apply* american-heritage
+     ["trip" == (word-result "trip" "A going from one place to another; a journey." 1 'american-heritage)]
+     ["penguin" == (word-result "penguin" "Any of various stout, flightless aquatic birds of the family Spheniscidae, of the Southern Hemisphere, having flipperlike wings and webbed feet adapted for swimming and diving, short scalelike feathers, and white underparts with a dark back." 2 'american-heritage)]
+     ["hardcover" == (word-result "hardcover" "Having a rigid binding, as of cardboard covered with cloth or with leather. Used of books." 3 'american-heritage)]
+     [not-a-word == #f]
+      ["stopping" == #f] ;; Word converted to root -- scraping should fail
+    )
 
-  (check-apply* (lambda (scraper w) (word-result-num-syllables (scraper w)))
-   [dictionary.com "each" == 1]
-   [the-free-dictionary "each" == 1]
-   [merriam-webster "each" == 1]
-   [american-heritage "each" == 1]
-   [american-heritage "every" == 2]
-   [american-heritage "day" == 1]
-   ;[urban-dictionary "magnificent" == #f]
-   ;[urban-dictionary "cat" == #f]
-  )
+;    (check-apply* urban-dictionary
+;     ["match" == #t]
+;     [not-a-word == #f]
+;     ["leagues" == #f]
+;    )
+
+    (define (check-syllables scraper w)
+      (word-result-num-syllables (scraper w)))
+
+    (check-apply* (lambda (scraper w) (word-result-num-syllables (scraper w)))
+     [dictionary.com "each" == 1]
+     [the-free-dictionary "each" == 1]
+     [merriam-webster "each" == 1]
+     [american-heritage "each" == 1]
+     [american-heritage "every" == 2]
+     [american-heritage "day" == 1]
+     ;[urban-dictionary "magnificent" == #f]
+     ;[urban-dictionary "cat" == #f]
+    )))
 )
