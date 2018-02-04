@@ -384,14 +384,14 @@
         (check-false (file-exists? g))
         (check-false (file-exists? l))
         ;; -- create a dummy .ipoe file, to make sure init works
-        (parameterize ([current-directory (find-system-path 'temp-dir)])
-          (unless (file-exists? IPOE-CONFIG)
-            (with-output-to-file IPOE-CONFIG
-              (lambda () (displayln "#:test output"))))
-          (define ln* (file->lines IPOE-CONFIG))
-          (define o*+ (options-init))
-          ;; TODO not sure what expected should be
-          (check-equal? (options-count o*+) (sub1 (length ln*))))]
+        (define o*+
+          (parameterize ([current-directory (find-system-path 'temp-dir)])
+            (with-output-to-file IPOE-CONFIG #:exists 'replace
+              (lambda () (displayln "#:test output")))
+            (begin0
+              (options-init)
+              (delete-file IPOE-CONFIG))))
+        (check-equal? (options-count o*+) 1)]
        [else
         ;; -- Number of default options should be at least the length of
         ;;    each config file. (It's not the sum because duplicates don't

@@ -173,6 +173,8 @@
 (module+ test
   (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
+  (define CI? (equal? "true" (getenv "CI")))
+
   ;; -- get-username
   (check-apply* (lambda (k1 k2)
                   (check-print (list #rx"command-line$")
@@ -238,18 +240,20 @@
   ;; -- psql-create-tables TODO
 
   ;; -- psql-installed?, pass (machine-dependent)
-  (check-true
-    (check-print
-      (list #rx"^Checking for `psql`")
-      psql-installed?))
+  (when (not CI?)
+    (check-true
+      (check-print
+        (list #rx"^Checking for `psql`")
+        psql-installed?)))
 
   ;; -- psql-installed?, fail TODO
 
   ;; -- psql-running, pass (machine-dependent)
-  (check-true
-    (check-print
-      (list #rx"^Checking for psql server")
-      psql-running?))
+  (when (not CI?)
+    (check-true
+      (check-print
+        (list #rx"^Checking for psql server")
+        psql-running?)))
 
   ;; -- save-config TODO
 

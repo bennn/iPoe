@@ -864,11 +864,12 @@
   ;;       (thread-wait prompt-thread))))
 
   ;; -- with-ipoe-db, invalid user
-  (parameterize ([*online?* #f])
-    (check-exn #rx"^Failed to connect"
-      (lambda ()
-        (with-ipoe-db #:user "ANONSTEIN" #:dbname "MISSING-TABLE"
-          (lambda () (void))))))
+  (when (not CI?)
+    (parameterize ([*online?* #f])
+      (check-exn #rx"^Failed to connect"
+        (lambda ()
+          (with-ipoe-db #:user "ANONSTEIN" #:dbname "MISSING-TABLE"
+            (lambda () (void)))))))
 
   ;; -- with-ipoe-db, online-mode, check that preferences are saved
   (with-config/cache [#f #f]
