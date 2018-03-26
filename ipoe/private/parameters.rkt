@@ -350,6 +350,8 @@
     (only-in racket/list last)
     (only-in racket/file file->lines))
 
+  (define CI? (equal? "true" (getenv "CI")))
+
   (test-case "almost-option?"
     (check-true* almost-option?
      ["#:key val"]
@@ -519,28 +521,29 @@
       (check-true (<= 0 (*bad-rhyme-penalty*)))))
 
   (test-case "save-option"
-    (with-config #:local ""
-      (lambda ()
-        (define-values [gc lc] (get-config-filenames))
-        ;; -- Write k/v pair to config file
-        (define key 'hello)
-        (define val 'world)
-        (save-option key val #:location 'local)
-        ;; -- Check new contents against the old
-        (define local-data (string-trim (file->string lc)))
-        (check-equal? local-data "#:hello world")
-        (define global-lines (if (file-exists? gc) (file->lines gc) '()))
-        (check-equal? (options-count (options-init))
-                      (add1 (length global-lines)))))
+    (when (not CI?)
+      (with-config #:local ""
+        (lambda ()
+          (define-values [gc lc] (get-config-filenames))
+          ;; -- Write k/v pair to config file
+          (define key 'hello)
+          (define val 'world)
+          (save-option key val #:location 'local)
+          ;; -- Check new contents against the old
+          (define local-data (string-trim (file->string lc)))
+          (check-equal? local-data "#:hello world")
+          (define global-lines (if (file-exists? gc) (file->lines gc) '()))
+          (check-equal? (options-count (options-init))
+                        (add1 (length global-lines)))))
 
-    (with-config #:global ""
-      (lambda ()
-        (define-values [gc lc] (get-config-filenames))
-        (define key 'hello)
-        (define val 'world)
-        (save-option key val #:location 'global)
-        (check-equal? (string-trim (file->string gc))
-                      (format "#:~a ~a" key val)))))
+      (with-config #:global ""
+        (lambda ()
+          (define-values [gc lc] (get-config-filenames))
+          (define key 'hello)
+          (define val 'world)
+          (save-option key val #:location 'global)
+          (check-equal? (string-trim (file->string gc))
+                        (format "#:~a ~a" key val))))))
 
   (test-case "symbol->config-filename"
     (let-values ([(gc lc) (get-config-filenames)])

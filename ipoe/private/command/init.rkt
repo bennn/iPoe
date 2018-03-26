@@ -175,93 +175,94 @@
 
   (define CI? (equal? "true" (getenv "CI")))
 
-  ;; -- get-username
-  (check-apply* (lambda (k1 k2)
-                  (check-print (list #rx"command-line$")
-                    (lambda () (get-username k1 k2))))
-   ["foo" #f == "foo"]
-   ["foo" "bar" == "foo"])
+  (test-case "get-username"
+    (check-apply* (lambda (k1 k2)
+                    (check-print (list #rx"command-line$")
+                      (lambda () (get-username k1 k2))))
+     ["foo" #f == "foo"]
+     ["foo" "bar" == "foo"]))
 
-  ;; -- get-dbname
-  (check-apply* (lambda (k1 k2)
-                  (check-print (list #rx"command-line$")
-                    (lambda () (get-username k1 k2))))
-   ["foo" #f == "foo"]
-   ["foo" "bar" == "foo"])
+  (test-case "get-dbname"
+    (check-apply* (lambda (k1 k2)
+                    (check-print (list #rx"command-line$")
+                      (lambda () (get-username k1 k2))))
+     ["foo" #f == "foo"]
+     ["foo" "bar" == "foo"]))
 
-  ;; -- param-fallback
-  (check-equal?
-    (check-print (list #rx"command-line$")
-      (lambda () (param-fallback "yes" #f #:src #f #:prompt #f #:descr #f)))
-    "yes")
+  (test-case "param-fallback"
+    (check-equal?
+      (check-print (list #rx"command-line$")
+        (lambda () (param-fallback "yes" #f #:src #f #:prompt #f #:descr #f)))
+      "yes")
 
-  (check-equal?
-    (check-print (list #rx"config file$")
-      (lambda () (param-fallback #f "yes" #:src #f #:prompt #f #:descr #f)))
-    "yes")
+    (check-equal?
+      (check-print (list #rx"config file$")
+        (lambda () (param-fallback #f "yes" #:src #f #:prompt #f #:descr #f)))
+      "yes")
 
-  (define ((check-bad-param-0 p))
-    (check-print (list #rx"^Got")
+    (define ((check-bad-param-0 p))
+      (check-print (list #rx"^Got")
+        (lambda ()
+          (param-fallback p #f #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))
+
+    (define ((check-bad-param-1 p))
+      (check-print (list #rx"^Got")
+        (lambda ()
+          (param-fallback #f p #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))
+
+    (for ([bp (in-list '("54" "A1" "1_" "hello-there" "can't use this" "YO LO"))])
+      (check-exn #rx"ipoe:init" (check-bad-param-0 bp))
+      (check-exn #rx"ipoe:init" (check-bad-param-1 bp))
+      (void)))
+
+  (test-case "psql-create-user, failure"
+    (check-exn #rx"ipoe:init"
       (lambda ()
-        (param-fallback p #f #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))
+        (check-print (list #rx"^Checking that user")
+          (lambda () (psql-create-user "FAKE-USER"))))))
 
-  (define ((check-bad-param-1 p))
-    (check-print (list #rx"^Got")
+  #;(test-case "psql-create-user, success"
+    (parameterize-from-hash (options-init)
       (lambda ()
-        (param-fallback #f p #:src 'bad-param1 #:prompt "heyo" #:descr "bye"))))
-
-  (for ([bp (in-list '("54" "A1" "1_" "hello-there" "can't use this" "YO LO"))])
-    (check-exn #rx"ipoe:init" (check-bad-param-0 bp))
-    (check-exn #rx"ipoe:init" (check-bad-param-1 bp))
-    (void))
-
-  ;; -- psql-create-user, failure
-  (check-exn #rx"ipoe:init"
-    (lambda ()
-      (check-print (list #rx"^Checking that user")
-        (lambda () (psql-create-user "FAKE-USER")))))
-
-  ;; -- psql-create-user, success
-  ;(parameterize-from-hash (options-init)
-  ;  (lambda ()
-  ;    (define u (*user*))
-  ;    (cond
-  ;     [u
-  ;      ;; User exists, let's try the test
-  ;      (check-equal?
-  ;        (check-print (list #rx"^Checking that user")
-  ;          (lambda () (psql-create-user u)))
-  ;        (void))]
-  ;     [else
-  ;      (displayln "TEST WARNING: cannot run psql-create-user success test, could not infer a valid DB user")])))
+        (define u (*user*))
+        (cond
+         [u
+          ;; User exists, let's try the test
+          (check-equal?
+            (check-print (list #rx"^Checking that user")
+              (lambda () (psql-create-user u)))
+            (void))]
+         [else
+          (displayln "TEST WARNING: cannot run psql-create-user success test, could not infer a valid DB user")]))))
 
   ;; -- psql-create-db TODO
 
   ;; -- psql-create-tables TODO
 
-  ;; -- psql-installed?, pass (machine-dependent)
-  (when (not CI?)
-    (check-true
-      (check-print
-        (list #rx"^Checking for `psql`")
-        psql-installed?)))
+  (test-case "psql-installed?, pass (machine-dependent)"
+    (when (not CI?)
+      (check-true
+        (check-print
+          (list #rx"^Checking for `psql`")
+          psql-installed?))))
 
   ;; -- psql-installed?, fail TODO
 
-  ;; -- psql-running, pass (machine-dependent)
-  (when (not CI?)
-    (check-true
-      (check-print
-        (list #rx"^Checking for psql server")
-        psql-running?)))
+  (test-case "psql-running, pass (machine-dependent)"
+    (when (not CI?)
+      (check-true
+        (check-print
+          (list #rx"^Checking for psql server")
+          psql-running?))))
 
   ;; -- save-config TODO
 
-  ;; -- start-server, pass
-  (check-true
-    (check-print
-      (list
-        #rx"^Checking"
-        #rx"^Checking")
-      start-server))
+  (test-case "start-server, pass"
+    (when (not CI?)
+      (check-true
+        (check-print
+          (list
+            #rx"^Checking"
+            #rx"^Checking")
+          start-server))))
 )
