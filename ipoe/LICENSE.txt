@@ -1,5 +1,5 @@
 ipoe
-Copyright (c) 2015-2017 Ben Greenman
+Copyright (c) 2015-2019 Ben Greenman
 
 This package is distributed under the GNU Lesser General Public
 License (LGPL).  This means that you can link this package into proprietary
