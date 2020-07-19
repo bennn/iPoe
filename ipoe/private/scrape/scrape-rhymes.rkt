@@ -112,7 +112,7 @@
 (module+ test
   (require rackunit rackunit-abbrevs)
 
-  (define CI? (equal? "true" (getenv "CI")))
+  (define CI? (getenv "CI"))
 
   (test-case "rhyme?:almost-rhyme?"
     (when (not CI?)

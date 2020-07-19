@@ -814,12 +814,12 @@
 
   ;; -------------------------------------------------------------------
 
-  (define CI? (equal? "true" (getenv "CI")))
+  (define CI? (getenv "CI"))
 
   (define o* (options-init-for-test))
 
   (define-syntax-rule (with-db-test e)
-    (when o*
+    (when (and o* (not CI?))
       (parameterize-from-hash o* (lambda ()
         (parameterize ([*verbose* #t])
           (with-ipoe-db #:commit? #f
@@ -828,7 +828,7 @@
             (lambda () e)))))))
 
   (define-syntax-rule (with-online-test e)
-    (when o*
+    (when (and o* (not CI?))
       (parameterize-from-hash o* (lambda ()
        (parameterize ([*interactive?* #f])
         (with-ipoe-db #:commit? #f #:online-only? #t

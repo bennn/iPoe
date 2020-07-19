@@ -273,7 +273,7 @@
 
   (define not-a-word "hguwisdvzodxv")
 
-  (define CI? (equal? "true" (getenv "CI")))
+  (define CI? (getenv "CI"))
 
   (when (not CI?)
     (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-scrape-warning "network error, skipping test"))))

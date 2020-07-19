@@ -261,7 +261,7 @@
     (only-in racket/string string-split)
   )
 
-  (define CI? (equal? "true" (getenv "CI")))
+  (define CI? (getenv "CI"))
 
   ;; -- check-duplicate
   ;; Always void if first arg is #f

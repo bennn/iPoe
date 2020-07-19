@@ -399,6 +399,8 @@
 (module+ test
   (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
+  (define CI? (getenv "CI"))
+
   (test-case "arg-error"
     (check-equal?
       (arg-error 'FOO 'BAR 'BAZ)
@@ -433,7 +435,7 @@
   (define o* (options-init-for-test))
 
   (define-syntax-rule (with-db-test e)
-    (when o*
+    (when (and o* (not CI?))
       (parameterize-from-hash o* (lambda ()
         (parameterize ([*verbose* #t]
                        [*interactive?* #f]

@@ -350,7 +350,7 @@
     (only-in racket/list last)
     (only-in racket/file file->lines))
 
-  (define CI? (equal? "true" (getenv "CI")))
+  (define CI? (getenv "CI"))
 
   (test-case "almost-option?"
     (check-true* almost-option?
@@ -422,16 +422,16 @@
       (check-equal? (options-get opt 'grammarcheck?) #f)))
 
   (test-case "options-set-from-file"
-  (define (gen-tmpfile fname)
-    (define s (symbol->string (gensym)))
-    (define full-path
-      (string-append (path->string (find-system-path 'temp-dir))
-                     "/"
-                     (or fname s)))
+    (define (gen-tmpfile fname)
+      (define s (symbol->string (gensym)))
+      (define full-path
+        (string-append (path->string (find-system-path 'temp-dir))
+                       "/"
+                       (or fname s)))
 
-    (if (file-exists? full-path)
-        (gen-tmpfile (string-append fname s))
-        full-path))
+      (if (file-exists? full-path)
+          (gen-tmpfile (string-append fname s))
+          full-path))
 
     (define-syntax-rule (refresh-file f str ...)
       (with-output-to-file f #:exists 'replace

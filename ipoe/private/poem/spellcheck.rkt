@@ -66,8 +66,10 @@
 
   (define o* (options-init-for-test))
 
+  (define CI? (getenv "CI"))
+
   (define-syntax-rule (with-db-test e)
-    (when o*
+    (when (and o* (not CI?))
       (parameterize-from-hash o*
         (lambda ()
          (parameterize ([*interactive?* #f])

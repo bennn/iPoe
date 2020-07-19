@@ -173,7 +173,7 @@
 (module+ test
   (require rackunit rackunit-abbrevs ipoe/private/util/check-print)
 
-  (define CI? (equal? "true" (getenv "CI")))
+  (define CI? (getenv "CI"))
 
   (test-case "get-username"
     (check-apply* (lambda (k1 k2)
@@ -216,10 +216,11 @@
       (void)))
 
   (test-case "psql-create-user, failure"
-    (check-exn #rx"ipoe:init"
-      (lambda ()
-        (check-print (list #rx"^Checking that user")
-          (lambda () (psql-create-user "FAKE-USER"))))))
+    (unless CI?
+      (check-exn #rx"ipoe:init"
+        (lambda ()
+          (check-print (list #rx"^Checking that user")
+            (lambda () (psql-create-user "FAKE-USER")))))))
 
   #;(test-case "psql-create-user, success"
     (parameterize-from-hash (options-init)
