@@ -1695,17 +1695,18 @@
   ;; -- TODO test resolve, never suggest words not-in-database
 
   ;; Should scrape internet for syllables
-  (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-db-warning "network error, skipping test"))))
-    (parameterize ([*interactive?* #f] [*online?* #t])
-      (check-apply* (lambda (w) (resolve-syllables w #f))
-        ["hour" == 1]
-        ["never" == 2]
-        ["mississippi" == 4]
-        ["continuity" == 5]
-        ["asbferufvzfjuvfds" == #f]
-      )
-      ;; Should trust the user input
-      (check-apply* (lambda (w) (resolve-syllables w 99))
-        ["hour" == 99]
-      )))
+  (unless CI?
+    (with-handlers ((exn:fail:network? (lambda (ex) (log-ipoe-db-warning "network error, skipping test"))))
+      (parameterize ([*interactive?* #f] [*online?* #t])
+        (check-apply* (lambda (w) (resolve-syllables w #f))
+          ["hour" == 1]
+          ["never" == 2]
+          ["mississippi" == 4]
+          ["continuity" == 5]
+          ["asbferufvzfjuvfds" == #f]
+        )
+        ;; Should trust the user input
+        (check-apply* (lambda (w) (resolve-syllables w 99))
+          ["hour" == 99]
+        ))))
 )
