@@ -1534,15 +1534,16 @@
        (check-true (for/and ([s (word->syllables* w)]) (positive? s))))))
 
   ;; --- add-word failures
-  (let ([new-word "asdhvuianjsdkvasd"])
-    ;; Not connected to DB
-    (check-false
-     (check-print
-      (list #rx"^Attempting to add" #rx"^Cannot add word .*? not connected")
-      (lambda () (add-word new-word))))
-    ;; Offline
-    (with-online-test (check-false (add-word new-word)))
-    (with-online-test (check-false (add-word new-word))))
+  (unless CI?
+    (let ([new-word "asdhvuianjsdkvasd"])
+      ;; Not connected to DB
+      (check-false
+       (check-print
+        (list #rx"^Attempting to add" #rx"^Cannot add word .*? not connected")
+        (lambda () (add-word new-word))))
+      ;; Offline
+      (with-online-test (check-false (add-word new-word)))
+      (with-online-test (check-false (add-word new-word)))))
 
   ;; -- add-word*
   (with-db-test
